@@ -1,0 +1,11 @@
+target/
+# WoW Assets
+*.MPQ
+*.m2
+*.wdt
+*.wmo
+*.wdl
+*.adt
+*.BLP
+*.skin
+.idea/

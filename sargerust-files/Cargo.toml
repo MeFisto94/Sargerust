@@ -1,0 +1,27 @@
+[package]
+name = "sargerust-files"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+byteorder = "1.4.3"
+thiserror = "1.0.48"
+cfg-if = "1.0.0"
+num_enum = "0.7.0"
+sargerust-files-derive-parseable = { path = "sargerust-files-derive-parseable" }
+
+[dev-dependencies]
+anyhow = "1.0.75"
+
+[features]
+# Vanilla is the implicit default, so we don't need to guard everything within if (vanilla)
+tbc = []
+wotlk = []
+
+# https://github.com/paalgyula/summit
+# https://wotlkdev.github.io/wiki/theory/adt.html
+# https://www.gdcvault.com/play/1016519/Forward-Rendering-Pipeline-for-Modern
+# https://crates.io/crates/quick_cache
+# https://wowdl.net/installeur/WoW-2.4.3-install-rar
