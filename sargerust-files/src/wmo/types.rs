@@ -2,6 +2,7 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
+use std::collections::HashMap;
 use std::fs::read;
 use std::io::ErrorKind::UnexpectedEof;
 use std::io::Read;
@@ -71,13 +72,16 @@ impl Parseable<MOHDChunk> for MOHDChunk {
 
 #[derive(Debug)]
 pub struct MOTXChunk {
-  pub textureNameList: Vec<String>
+  pub textureNameList: Vec<String>,
+  pub offsets: HashMap<u32, usize>
 }
 
 impl Parseable<MOTXChunk> for MOTXChunk {
   fn parse<R: Read>(rdr: &mut R) -> Result<MOTXChunk, ParserError> {
+    let gsl = GenericStringList::parse(rdr)?;
     Ok(MOTXChunk {
-      textureNameList: GenericStringList::parse(rdr)?.stringList
+      textureNameList: gsl.stringList,
+      offsets: gsl.offset_to_stringList_offset
     })
   }
 }
@@ -138,13 +142,16 @@ impl Parseable<MOMTChunk> for MOMTChunk {
 
 #[derive(Debug)]
 pub struct MOGNChunk {
-  pub groupNameList: Vec<String>
+  pub groupNameList: Vec<String>,
+  pub offset_lookup: HashMap<u32, usize>,
 }
 
 impl Parseable<MOGNChunk> for MOGNChunk {
   fn parse<R: Read>(rdr: &mut R) -> Result<MOGNChunk, ParserError> {
+    let gsl = GenericStringList::parse(rdr)?;
     Ok(MOGNChunk {
-      groupNameList: GenericStringList::parse(rdr)?.stringList
+      groupNameList: gsl.stringList,
+      offset_lookup: gsl.offset_to_stringList_offset
     })
   }
 }
@@ -295,12 +302,17 @@ impl Parseable<MODSChunk> for MODSChunk {
 
 #[derive(Debug)]
 pub struct MODNChunk {
-  pub doodadNameList: Vec<String>
+  pub doodadNameList: Vec<String>,
+  pub doodadNameListLookup: HashMap<u32, usize>,
 }
 
 impl Parseable<MODNChunk> for MODNChunk {
   fn parse<R: Read>(rdr: &mut R) -> Result<MODNChunk, ParserError> {
-    Ok(MODNChunk { doodadNameList: GenericStringList::parse(rdr)?.stringList })
+    let gsl = GenericStringList::parse(rdr)?;
+    Ok(MODNChunk {
+      doodadNameList: gsl.stringList,
+      doodadNameListLookup: gsl.offset_to_stringList_offset
+    })
   }
 }
 

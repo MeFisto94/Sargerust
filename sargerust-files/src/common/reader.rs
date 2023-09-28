@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::CString;
 use std::io::ErrorKind::UnexpectedEof;
 use std::io::Read;
@@ -141,21 +142,30 @@ impl Parseable<u128> for u128 {
 // Helper Type because we have multiple chunks that are merely String Arrays.
 #[derive(Debug, Clone)]
 pub struct GenericStringList {
-  pub stringList: Vec<String>
+  pub stringList: Vec<String>,
+  pub offset_to_stringList_offset: HashMap<u32, usize>,
 }
 
 impl Parseable<GenericStringList> for GenericStringList {
   fn parse<R: Read>(rdr: &mut R) -> Result<GenericStringList, ParserError> {
+    let mut map = HashMap::new();
     let mut list = Vec::new();
+    let mut byte_ctr = 0u32;
     loop {
       let cstring_res = read_cstring(rdr);
       if cstring_res.is_ok() {
-        let string = cstring_res.unwrap().into_string()?;
+        let string = cstring_res?.into_string()?;
 
-        // This is a costly way to skip the padding, but we can#t properly "peek" with rdr
+        // This is a costly way to skip the padding, but we can't properly "peek" with rdr
         // Furthermore, making read_cstring skip leading NUL-bytes makes it less readable and concise.
+        // Additionally, thanks to MODDs byte offset, we need to keep track of the relative offsets of every string.
         if !string.is_empty() {
+          map.insert(byte_ctr, list.len());
+          let str_len = (string.chars().count() + 1) as u32;
           list.push(string);
+          byte_ctr += str_len;
+        } else {
+          byte_ctr += 1;
         }
       } else {
         match cstring_res {
@@ -166,7 +176,8 @@ impl Parseable<GenericStringList> for GenericStringList {
     }
 
     Ok(GenericStringList {
-      stringList: list
+      stringList: list,
+      offset_to_stringList_offset: map
     })
   }
 }

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-// TODO: At some point, get rid of all the high-level impl Parseables and use #[derive(Parseable)] or maybe #[derive(Deserializable)]
+// TODO: At some point, get rid of all the highlevel impl Parseables and use #[derive(Parseable)] or maybe #[derive(Deserializable)]
 #[derive(Error, Debug)]
 pub enum ParserError {
     #[error("The file's magic value does not match the expectation {magic}")]
@@ -31,6 +31,7 @@ pub enum ParserError {
 
 pub mod adt;
 pub mod common;
+pub mod highlevel;
 pub mod m2;
 pub mod wdt;
 pub mod wmo;
