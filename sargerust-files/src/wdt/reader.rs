@@ -3,7 +3,7 @@ use std::io::Read;
 
 use crate::common::types::{IffChunk, MVerChunk};
 use crate::ParserError;
-use crate::wdt::types::{MainChunk, MODFChunk, MPHDChunk, MWMOChunk, WDTAsset};
+use crate::wdt::types::{MainChunk, SMMapObjDef, MPHDChunk, MWMOChunk, WDTAsset};
 
 pub struct WDTReader {
 }
@@ -64,10 +64,11 @@ impl WDTReader {
     let mwmo = MWMOChunk::from(mwmo_chunk);
     dbg!(mwmo);
 
+    // TODO: Isn't this an array?
     let modf = chunk_list.iter()
       .find(|chunk| chunk.magic_str().eq("MODF"))
       .expect("Missing mandatory MODF chunk")
-      .parse::<MODFChunk>()?;
+      .parse::<SMMapObjDef>()?;
     dbg!(modf);
 
     Ok(WDTAsset {

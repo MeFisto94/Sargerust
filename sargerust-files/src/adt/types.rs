@@ -2,11 +2,13 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
+use std::collections::HashMap;
 use std::io::{ErrorKind, Read};
 use sargerust_files_derive_parseable::Parse;
 use crate::common::reader::{GenericStringList, Parseable, read_chunk_array};
 use crate::common::types::{C3Vector, CImVector, IffChunk};
 use crate::ParserError;
+use crate::wdt::types::SMMapObjDef;
 
 // https://wowdev.wiki/ADT/v18
 
@@ -20,7 +22,7 @@ pub struct ADTAsset {
   pub mwmo: MWMOChunk,
   pub mwid: MWIDChunk,
   pub mddf: MDDFChunk,
-  // TODO: pub modf: MODFChunk,
+  pub modf: MODFChunk,
   pub mh2o: MH2OChunk,
   pub mcnks: Vec<MCNKChunk>
 }
@@ -100,15 +102,16 @@ impl Parseable<MMIDChunk> for MMIDChunk {
 }
 
 // as opposed to in WDT, this seems to be an array
-// TODO: that's also why we need to duplicate MODFChunk, it's an array that can have 0 elements, too. Not in WDT though.
 #[derive(Debug)]
 pub struct MWMOChunk {
-  pub filenames: Vec<String>
+  pub filenames: Vec<String>,
+  pub offsets: HashMap<u32, usize>,
 }
 
 impl Parseable<MWMOChunk> for MWMOChunk {
   fn parse<R: Read>(rdr: &mut R) -> Result<MWMOChunk, ParserError> {
-    Ok(MWMOChunk { filenames: GenericStringList::parse(rdr)?.stringList })
+    let gsl = GenericStringList::parse(rdr)?;
+    Ok(MWMOChunk { filenames: gsl.stringList, offsets: gsl.offset_to_stringList_offset })
   }
 }
 
@@ -141,6 +144,17 @@ pub struct MDDFChunk {
 impl Parseable<MDDFChunk> for MDDFChunk {
   fn parse<R: Read>(rdr: &mut R) -> Result<MDDFChunk, ParserError> {
     Ok(MDDFChunk{ doodadDefs: Vec::<SMDoodadDef>::parse(rdr)? })
+  }
+}
+
+#[derive(Debug)]
+pub struct MODFChunk {
+  pub mapObjDefs: Vec<SMMapObjDef>
+}
+
+impl Parseable<MODFChunk> for MODFChunk {
+  fn parse<R: Read>(rdr: &mut R) -> Result<MODFChunk, ParserError> {
+    Ok(MODFChunk{ mapObjDefs: Vec::<SMMapObjDef>::parse(rdr)? })
   }
 }
 

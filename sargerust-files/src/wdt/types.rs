@@ -2,6 +2,7 @@
 use std::ffi::CStr;
 use std::io::Read;
 use byteorder::{LittleEndian, ReadBytesExt};
+use sargerust_files_derive_parseable::Parse;
 use crate::common::reader::Parseable;
 use crate::common::types::{C3Vector, CAaBox, IffChunk};
 use crate::ParserError;
@@ -93,9 +94,8 @@ impl From<&IffChunk> for MWMOChunk {
   }
 }
 
-#[derive(Debug, Copy, Clone)]
-/// SMMapObjDef
-pub struct MODFChunk {
+#[derive(Debug, Copy, Clone, Parse)]
+pub struct SMMapObjDef {
   pub nameId: u32,
   pub uniqueId: u32,
   pub pos: C3Vector,
@@ -106,20 +106,4 @@ pub struct MODFChunk {
   pub nameSet: u16,
   /// when in ADT, scale, in WDT potentially padding
   pub scale: u16
-}
-
-impl Parseable<MODFChunk> for MODFChunk {
-  fn parse<R: Read>(rdr: &mut R) -> Result<MODFChunk, ParserError> {
-    Ok(MODFChunk {
-      nameId: rdr.read_u32::<LittleEndian>()?,
-      uniqueId: rdr.read_u32::<LittleEndian>()?,
-      pos: C3Vector::parse(rdr)?,
-      rot: C3Vector::parse(rdr)?,
-      extents: CAaBox::parse(rdr)?,
-      flags: rdr.read_u16::<LittleEndian>()?,
-      doodadSet: rdr.read_u16::<LittleEndian>()?,
-      nameSet: rdr.read_u16::<LittleEndian>()?,
-      scale: rdr.read_u16::<LittleEndian>()?,
-    })
-  }
 }

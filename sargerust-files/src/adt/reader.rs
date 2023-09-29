@@ -1,7 +1,7 @@
 use std::io::ErrorKind::UnexpectedEof;
 use std::io::Read;
 
-use crate::adt::types::{ADTAsset, MCINChunk, MCNKChunk, MDDFChunk, MH2OChunk, MHDRChunk, MMDXChunk, MMIDChunk, MTEXChunk, MWIDChunk, MWMOChunk};
+use crate::adt::types::{ADTAsset, MCINChunk, MCNKChunk, MDDFChunk, MH2OChunk, MHDRChunk, MMDXChunk, MMIDChunk, MODFChunk, MTEXChunk, MWIDChunk, MWMOChunk};
 use crate::common::reader::{get_mandatory_chunk_by_name, Parseable};
 use crate::common::types::{IffChunk, MVerChunk};
 use crate::ParserError;
@@ -36,9 +36,9 @@ impl ADTReader {
     };
     // No real error, only an EOF
 
-    for chunk in &chunk_list {
-      dbg!(chunk.magic_str());
-    }
+    // for chunk in &chunk_list {
+    //   dbg!(chunk.magic_str());
+    // }
 
     let mhdr = get_mandatory_chunk_by_name::<MHDRChunk>(&chunk_list, "MHDR")?;
     let mcin = get_mandatory_chunk_by_name::<MCINChunk>(&chunk_list, "MCIN")?;
@@ -48,8 +48,7 @@ impl ADTReader {
     let mwmo = get_mandatory_chunk_by_name::<MWMOChunk>(&chunk_list, "MWMO")?;
     let mwid = get_mandatory_chunk_by_name::<MWIDChunk>(&chunk_list, "MWID")?;
     let mddf = get_mandatory_chunk_by_name::<MDDFChunk>(&chunk_list, "MDDF")?;
-    // TODO: Fix MODF
-    //let modf = get_mandatory_chunk_by_name::<MODFChunk>(&chunk_list, "MODF")?;
+    let modf = get_mandatory_chunk_by_name::<MODFChunk>(&chunk_list, "MODF")?;
     let mh2o = get_mandatory_chunk_by_name::<MH2OChunk>(&chunk_list, "MH2O")?;
     // TODO: assert all the coming locations comparing to the offsets here.
     let mcnk_err: Result<Vec<MCNKChunk>, _> = chunk_list.iter()
@@ -67,6 +66,7 @@ impl ADTReader {
       mwmo,
       mwid,
       mddf,
+      modf,
       mh2o,
       mcnks,
     }))
