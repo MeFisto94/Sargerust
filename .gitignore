@@ -9,3 +9,4 @@ target/
 *.BLP
 *.skin
 .idea/
+sargerust-files/test-data
