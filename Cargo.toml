@@ -1,0 +1,33 @@
+[package]
+name = "sargerust"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = [
+    "sargerust-files",
+    "sargerust-files/sargerust-files-derive-parseable"
+]
+
+[dependencies]
+# Logging, but getting rid of the regex feature/dependency for regex filters.
+env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
+mpq = "0.8"
+image-blp = "1"
+sargerust-files = { path = "sargerust-files", features = ["wotlk"] }
+anyhow = "1.0.75"
+
+# For the Rendering/Game Engine
+# Linear algebra library
+glam = "0.24"
+# Renderer core
+rend3 = { git = "https://github.com/BVE-Reborn/rend3" }
+# Programmable render list that dictates how the scene renders
+rend3-routine = { git = "https://github.com/BVE-Reborn/rend3" }
+# Provides `block_on` to wait for futures from sync code
+pollster = "0.3"
+# windowing
+winit = "0.28"
+
+# dedup material_ids in WMO Group files MOPY chunk
+itertools = "0.11.0"
