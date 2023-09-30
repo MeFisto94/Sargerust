@@ -1,35 +1,18 @@
 use std::collections::HashMap;
-use itertools::Itertools;
 use std::f32::consts::PI;
+use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::ops::Deref;
 
-use glam::{Affine3A, DVec2, Quat, Vec2, Vec3, Vec3A, Vec4};
+use glam::{Affine3A, DVec2, Vec2, Vec3, Vec3A, Vec4};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
-use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, Texture, Texture2DHandle};
+use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, Texture2DHandle};
 use rend3::util::typedefs::FastHashMap;
 use rend3_routine::pbr::PbrMaterial;
 
-use sargerust_files::common::types::{C3Vector, C4Quaternion};
 use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
 use sargerust_files::wmo::types::{SMOMaterial, WMOGroupAsset, WMORootAsset};
-
-// TODO: Get rid of that and solve differently, especially implicitly copying by taking in a borrow
-pub struct _Vec3(Vec3);
-impl From<C3Vector> for _Vec3 {
-  #[inline(always)]
-  fn from(value: C3Vector) -> Self {
-    _Vec3(Vec3::new(value.x, value.y, value.z))
-  }
-}
-
-pub struct _Quat(Quat);
-impl From<C4Quaternion> for _Quat {
-  #[inline(always)]
-  fn from(value: C4Quaternion) -> Self { _Quat(Quat::from_xyzw(value.x, value.y, value.z, value.w))}
-}
 
 fn create_mesh(asset: &M2Asset, skin: &M2SkinProfile) -> Result<rend3::types::Mesh, anyhow::Error>{
   // let chair_m2 = r"sargerust-files\test-data\Chair01.m2";
