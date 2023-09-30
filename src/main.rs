@@ -9,9 +9,11 @@ use image_blp::parser::parse_blp_with_externals;
 use itertools::Itertools;
 use mpq::Archive;
 use sargerust_files::adt::reader::ADTReader;
+use sargerust_files::adt::types::SMDoodadDef;
 use sargerust_files::common::types::{C3Vector, C4Quaternion};
 use sargerust_files::m2::reader::M2Reader;
 use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
+use sargerust_files::wdt::types::SMMapObjDef;
 use sargerust_files::wmo::reader::WMOReader;
 use sargerust_files::wmo::types::{WMOGroupAsset, WMORootAsset};
 
@@ -68,81 +70,6 @@ fn main() {
     }
 }
 
-fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), anyhow::Error> {
-    let adt = ADTReader::parse_asset(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, r"World\Maps\Kalimdor\Kalimdor_1_1.adt")?)?;
-
-    let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
-    let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
-    let mut texture_map = HashMap::new();
-
-    dbg!(&adt.mwmo);
-    dbg!(&adt.mwid);
-    dbg!(&adt.modf);
-
-    // dbg!(adt.mmdx);
-    // dbg!(adt.mmid);
-    // dbg!(adt.mddf);
-
-    // TODO: placement information missing.
-    let mut wmos: Vec<(WMORootAsset, Vec<WMOGroupAsset>)> = Vec::new();
-    for wmo_ref in adt.modf.mapObjDefs.iter().skip(1) { // TODO: Remove skip once we use the orientation
-        let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
-        dbg!(&name);
-
-        let wmo = WMOReader::parse_root(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, name).unwrap()).unwrap();
-
-        let doodads = collect_dooads(common, common2, &mut m2_cache, &wmo);
-        for dad in doodads {
-            render_list.push(dad);
-        }
-
-        // preload (force-cache) all textures
-        let textures = wmo.momt.materialList.iter()
-            .map(|tex| wmo.motx.textureNameList[wmo.motx.offsets[&tex.texture_1]].clone())
-            .collect_vec();
-
-        for texture in textures {
-            let blp = load_blp_from_mpq(common, &texture).expect("Texture loading error");
-            texture_map.insert(texture, blp);
-        }
-
-        let group_list = load_wmo_groups(common2, &wmo, name.trim_end_matches(".wmo"));
-        wmos.push((wmo, group_list));
-    }
-
-    for dad_ref in adt.mddf.doodadDefs {
-        let name = &adt.mmdx.filenames[*adt.mmdx.offsets.get(&adt.mmid.mmdx_offsets[dad_ref.nameId as usize]).unwrap()];
-        dbg!(&name);
-
-        // fix name: currently it ends with .mdx but we need .m2
-        let name = name.to_lowercase().replace(".mdx", ".m2");
-        if name.to_lowercase().contains("emitter") ||
-            name.to_uppercase().contains("GENERALDIRTYPLATE01") || name.to_uppercase().contains("GENERALCANDELABRA01")
-            || name.to_uppercase().contains("GOLDSHIREINN")
-            || name.to_lowercase().contains("02") || name.to_lowercase().contains("03") || name.to_lowercase().contains("01") {
-            continue;
-        }
-
-        let entry = load_m2_doodad(common, common2, &mut m2_cache, &name);
-        let scale = Vec3::new(dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0);
-        let rotation = Quat::from_euler(EulerRot::YXZ, dad_ref.rotation.x.to_radians(), dad_ref.rotation.y.to_radians(), dad_ref.rotation.z.to_radians());
-        let mut translation = from_vec(dad_ref.position);
-        // MDDFS (TODO: MODF) uses a completely different coordinate system, so we need to fix up things.
-        translation.x = -translation.x; // west is positive X!!
-        std::mem::swap(&mut translation.z, &mut translation.y); // maybe needs inverting.
-
-        // // relative to a corner of the map, but we want to have the center in mid (just alone for rotation etc)
-        // translation.x -= 17066.0; // WOWDEV
-        // translation.y -= 17066.0;
-        dbg!(translation);
-
-        let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
-        render_list.push((transform, entry.clone()));
-    }
-
-    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map);
-    Ok(())
-}
 
 /// Extracts the doodads (i.e. M2 models that have been placed into the world at a specific position) that are defined in the WMO Root
 fn collect_dooads(common: &mut Archive, common2: &mut Archive, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> {
@@ -245,7 +172,7 @@ fn main_simple_wmo(common: &mut Archive, common2: &mut Archive) -> Result<(), an
     let mut wmo: WMORootAsset = WMOReader::parse_root(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, &format!("{}.wmo", wmo_path))?)?;
 
     // TODO: m2_cache should become an implementation detail of the struct that provides collect_doodads?
-    // TODO: collect_doodads shouldn't cotain the cache loading logic anyway.
+    // TODO: collect_doodads shouldn't contain the cache loading logic anyway.
     let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
 
     let dooads = collect_dooads(common, common2, &mut m2_cache, &mut wmo);
@@ -260,12 +187,113 @@ fn main_simple_wmo(common: &mut Archive, common2: &mut Archive) -> Result<(), an
         texture_map.insert(texture, blp);
     }
 
-    let mut wmos = Vec::new();
-    wmos.push((wmo, group_list));
+    let wmos = vec![(Affine3A::IDENTITY, wmo, group_list)];
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    rendering::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map);
+    rendering::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map);
     Ok(())
+}
+
+fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), anyhow::Error> {
+    let adt = ADTReader::parse_asset(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, r"World\Maps\Kalimdor\Kalimdor_1_1.adt")?)?;
+
+    let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
+    let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
+    let mut texture_map = HashMap::new();
+
+    let mut wmos: Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)> = Vec::new();
+    for wmo_ref in adt.modf.mapObjDefs.iter() {
+        let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
+        //dbg!(&name);
+
+        let wmo = WMOReader::parse_root(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, name).unwrap()).unwrap();
+        let transform = transform_for_wmo_ref(wmo_ref);
+
+        let doodads = collect_dooads(common, common2, &mut m2_cache, &wmo);
+        for dad in doodads {
+            // NOTE: Here we loose the relationship between DAD and wmo, that is required for parenting.
+            // Since rend3 does not have a scenegraph, we "fake" the parenting for now.
+            let (mut dad_trans, rc) = dad;
+            //dbg!(dad_trans.translation);
+            dad_trans = transform * dad_trans;
+            //dbg!(dad_trans.translation);
+            render_list.push((dad_trans, rc));
+        }
+
+        // preload (force-cache) all textures
+        let textures = wmo.momt.materialList.iter()
+            .map(|tex| wmo.motx.textureNameList[wmo.motx.offsets[&tex.texture_1]].clone())
+            .collect_vec();
+
+        for texture in textures {
+            let blp = load_blp_from_mpq(common, &texture).expect("Texture loading error");
+            texture_map.insert(texture, blp);
+        }
+
+        let group_list = load_wmo_groups(common2, &wmo, name.trim_end_matches(".wmo"));
+
+        wmos.push((transform, wmo, group_list));
+    }
+
+    for dad_ref in adt.mddf.doodadDefs {
+        let name = &adt.mmdx.filenames[*adt.mmdx.offsets.get(&adt.mmid.mmdx_offsets[dad_ref.nameId as usize]).unwrap()];
+        dbg!(&name);
+
+        // fix name: currently it ends with .mdx but we need .m2
+        let name = name.to_lowercase().replace(".mdx", ".m2");
+        if name.to_lowercase().contains("emitter") ||
+            name.to_uppercase().contains("GENERALDIRTYPLATE01") || name.to_uppercase().contains("GENERALCANDELABRA01")
+            || name.to_uppercase().contains("GOLDSHIREINN")
+            || name.to_lowercase().contains("02")  {
+            continue;
+        }
+
+        let entry = load_m2_doodad(common, common2, &mut m2_cache, &name);
+        let transform = transform_for_doodad_ref(dad_ref);
+        render_list.push((transform, entry.clone()));
+    }
+
+    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map);
+    Ok(())
+}
+
+fn transform_for_doodad_ref(dad_ref: SMDoodadDef) -> Affine3A {
+    let scale = Vec3::new(dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0);
+    //let rotation = Quat::from_euler(EulerRot::ZYX, dad_ref.rotation.x.to_radians(), (dad_ref.rotation.y - 90.0).to_radians(), dad_ref.rotation.z.to_radians());
+    let rotation = Quat::from_euler(EulerRot::ZYX, (dad_ref.rotation.y + 180.0).to_radians(), (dad_ref.rotation.x + 0.0).to_radians(), (dad_ref.rotation.z + 0.0).to_radians());
+    // MDDFS (TODO: MODF) uses a completely different coordinate system, so we need to fix up things.
+    let translation = Vec3::new(-dad_ref.position.x, dad_ref.position.z, dad_ref.position.y);
+
+    // // relative to a corner of the map, but we want to have the center in mid (just alone for rotation etc)
+    // translation.x -= 17066.0; // WOWDEV
+    // translation.y -= 17066.0;
+    dbg!(translation);
+
+    let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
+    transform
+}
+
+fn transform_for_wmo_ref(wmo_ref: &SMMapObjDef) -> Affine3A {
+    // Apparently, this scale is only valid starting legion, before it is padding (and probably 0)
+    // cfg[feature = "legion")]
+    // let scale = Vec3::new(wmo_ref.scale as f32 / 1024.0, wmo_ref.scale as f32 / 1024.0, wmo_ref.scale as f32 / 1024.0);
+
+    let scale = Vec3::new(1.0, 1.0, 1.0);
+    //let rotation = Quat::from_euler(EulerRot::ZYX, wmo_ref.rot.x.to_radians(), (wmo_ref.rot.y - 90.0).to_radians(), (wmo_ref.rot.z + 0.0).to_radians());
+    let rotation = Quat::from_euler(EulerRot::ZYX, (wmo_ref.rot.y + 180.0).to_radians(), (wmo_ref.rot.x).to_radians(), (wmo_ref.rot.z + 0.0).to_radians());
+    // let mut translation = from_vec(wmo_ref.pos);
+    // // MODF uses a completely different coordinate system, so we need to fix up things.
+    // translation.x = -translation.x; // west is positive X!!
+    // std::mem::swap(&mut translation.z, &mut translation.y); // maybe needs inverting.
+
+    // // relative to a corner of the map, but we want to have the center in mid (just alone for rotation etc)
+    // translation.x -= 17066.0; // WOWDEV
+    // translation.y -= 17066.0;
+
+    let translation = Vec3::new(-wmo_ref.pos.x, wmo_ref.pos.z, wmo_ref.pos.y);
+    dbg!(translation);
+    let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
+    transform
 }
 
 #[allow(unused)]

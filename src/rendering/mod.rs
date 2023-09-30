@@ -85,7 +85,7 @@ struct App {
 pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>,
               wmos: W, textures: HashMap<String, BlpImage>)
 where
-  W: IntoIterator<Item = (&'a WMORootAsset, &'a Vec<WMOGroupAsset>)>,
+  W: IntoIterator<Item = (&'a Affine3A, &'a WMORootAsset, &'a Vec<WMOGroupAsset>)>,
 {
   let mut app = App::default();
 
@@ -190,7 +190,7 @@ where
     object_list.push(_object_handle);
   }
 
-  for (wmo_root, wmo_groups) in wmos {
+  for (transform, wmo_root, wmo_groups) in wmos {
     for group in wmo_groups {
       for batch in &group.moba.batchList {
         let mesh = create_mesh_wmo(&group, batch.startIndex as usize,
@@ -224,7 +224,7 @@ where
         let material_handle = renderer.add_material(material);
 
         // Combine the mesh and the material with a location to give an object.
-        let object = create_object(Affine3A::IDENTITY, mesh_handle, material_handle);
+        let object = create_object(*transform, mesh_handle, material_handle);
 
         // Creating an object will hold onto both the mesh and the material
         // even if they are deleted.
