@@ -42,7 +42,7 @@ fn main() {
     // debug_dump_mpq_filelist(data_folder, "expansion.MPQ");
     // debug_dump_mpq_filelist(data_folder, "lichking.MPQ");
 
-    //let mut expansion = Archive::open(format!("{}\\expansion.MPQ", data_folder)).unwrap();
+    let mut expansion = Archive::open(data_folder.join("expansion.MPQ")).unwrap();
     let mut common = Archive::open(data_folder.join("common.MPQ")).unwrap();
     let mut common2 = Archive::open(data_folder.join("common-2.MPQ")).unwrap();
 
@@ -55,18 +55,10 @@ fn main() {
     // debug_dump_file(&mut common2, r"World\Maps\Kalimdor\Kalimdor_0_1.adt");
     // debug_dump_file(&mut common2, r"World\Maps\Kalimdor\Kalimdor_0_2.adt");
 
-    //debug_dump_blp(&mut expansion, r"WORLD\EXPANSION01\DOODADS\GENERIC\BLOODELF\BENCHES\BE_BENCH_01.BLP");
-    //let m2_path = "World\\EXPANSION01\\DOODADS\\GENERIC\\BLOODELF\\Chairs\\BE_Chair01.m2";
-    //let skin_path =  r"World\EXPANSION01\DOODADS\GENERIC\BLOODELF\Chairs\BE_Chair0100.skin";
-    //let tex_path = r"WORLD\EXPANSION01\DOODADS\GENERIC\BLOODELF\BENCHES\BE_BENCH_01.BLP";
+    main_simple_m2(&mut common, &mut expansion).unwrap();
+    return;
 
-    // let m2_path = r"Creature\talbuk\Talbuk.m2";
-    // let skin_path = r"Creature\talbuk\Talbuk00.skin";
-    // let tex_path = r"Creature\talbuk\TalbukSkinBrown.blp"; // common.mpq!
 
-    // let m2 = M2Reader::parse_asset(&mut Cursor::new(read_mpq_file_into_owned(&mut expansion, m2_path))).unwrap();
-    // let skin = M2Reader::parse_skin_profile(&mut Cursor::new(read_mpq_file_into_owned(&mut expansion, skin_path))).unwrap();
-    // let blp = load_blp_from_mpq(&mut common, tex_path);
     // let wmo: WMORootAsset = WMOReader::parse_root(&mut Cursor::new(read_mpq_file_into_owned(&mut common2, r"World\wmo\Dungeon\AZ_Subway\Subway.wmo"))).unwrap();
 
     let adt = ADTReader::parse_asset(&mut Cursor::new(io::mpq::loader::read_mpq_file_into_owned(&mut common2, r"World\Maps\Kalimdor\Kalimdor_1_1.adt").unwrap())).unwrap();
@@ -128,12 +120,6 @@ fn main() {
         }
     }
 
-    // Render random item
-    // let (name, rc) = m2_cache.iter().next().unwrap();
-    // let (m2, skin, blp_opt) = rc.deref();
-    // println!("Rendering {}", name);
-    // rendering::render(vec![(Affine3A::from_translation(Vec3::new(0.0, 0.0, 0.0)), (m2, skin.first().unwrap(), blp_opt.as_ref()))]);
-
     let group_list = load_wmo_groups(&wmo, &mut common2);
     let textures = wmo.momt.materialList.iter()
         .map(|tex| wmo.motx.textureNameList[wmo.motx.offsets[&tex.texture_1]].clone())
@@ -146,7 +132,7 @@ fn main() {
     }
 
     // Render whole wmo (only doodads).
-    rendering::render(render_list, group_list, &wmo, texture_map);
+    rendering::render(render_list, group_list, Some(&wmo), texture_map);
 }
 
 fn load_wmo_groups(wmo: &WMORootAsset, common2: &mut Archive) -> Vec<WMOGroupAsset> {
@@ -160,13 +146,36 @@ fn load_wmo_groups(wmo: &WMORootAsset, common2: &mut Archive) -> Vec<WMOGroupAss
 
     let mut group_list = Vec::new();
     for x in 0..wmo.mohd.nGroups {
-        let cursor = &mut Cursor::new(io::mpq::loader::read_mpq_file_into_owned(common2,
-                                                                       &format!("{}_{:0>3}.wmo", r"World\wmo\Dungeon\AZ_Subway\Subway", x)).unwrap());
+        let cursor = &mut io::mpq::loader::read_mpq_file_into_cursor(common2,
+                                                                       &format!("{}_{:0>3}.wmo", r"World\wmo\Dungeon\AZ_Subway\Subway", x)).unwrap();
         let group = WMOReader::parse_group(cursor).unwrap();
         group_list.push(group);
     }
 
     group_list
+}
+
+fn main_simple_m2(common: &mut Archive, expansion: &mut Archive) -> Result<(), anyhow::Error> {
+    // This method demonstrates very simple m2 rendering (not in the context of wmos or adts).
+
+    //debug_dump_blp(&mut expansion, r"WORLD\EXPANSION01\DOODADS\GENERIC\BLOODELF\BENCHES\BE_BENCH_01.BLP");
+    //let m2_path = "World\\EXPANSION01\\DOODADS\\GENERIC\\BLOODELF\\Chairs\\BE_Chair01.m2";
+    //let skin_path =  r"World\EXPANSION01\DOODADS\GENERIC\BLOODELF\Chairs\BE_Chair0100.skin";
+    //let tex_path = r"WORLD\EXPANSION01\DOODADS\GENERIC\BLOODELF\BENCHES\BE_BENCH_01.BLP";
+
+    let m2_path = r"Creature\talbuk\Talbuk.m2";
+    let skin_path = r"Creature\talbuk\Talbuk00.skin";
+    let tex_path = r"Creature\talbuk\TalbukSkinBrown.blp"; // common.mpq!
+
+    let m2 = M2Reader::parse_asset(&mut io::mpq::loader::read_mpq_file_into_cursor(expansion, m2_path)?)?;
+    let skin = M2Reader::parse_skin_profile(&mut io::mpq::loader::read_mpq_file_into_cursor(expansion, skin_path)?)?;
+    let blp_opt = load_blp_from_mpq(common, tex_path);
+
+    // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
+    rendering::render(vec![(Affine3A::from_translation(Vec3::new(0.0, 0.0, 0.0)),
+                            Rc::new((m2, vec![skin], blp_opt)))], vec![],
+                      None, HashMap::new());
+    Ok(())
 }
 
 #[allow(unused)]

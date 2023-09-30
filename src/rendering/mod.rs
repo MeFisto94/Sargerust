@@ -15,14 +15,6 @@ use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
 use sargerust_files::wmo::types::{SMOMaterial, WMOGroupAsset, WMORootAsset};
 
 fn create_mesh(asset: &M2Asset, skin: &M2SkinProfile) -> Result<rend3::types::Mesh, anyhow::Error>{
-  // let chair_m2 = r"sargerust-files\test-data\Chair01.m2";
-  // let mut file = BufReader::new(File::open(chair_m2)?);
-  // let asset: M2Asset = M2Reader::parse_asset(&mut file)?;
-  //
-  // let chair_skin = r"sargerust-files\test-data\Chair0100.skin";
-  // let mut skin_file = BufReader::new(File::open(chair_skin)?);
-  // let skin = M2Reader::parse_skin_profile(&mut skin_file)?;
-
   let mut verts = Vec::<Vec3>::with_capacity(skin.vertices.len());
   let mut uvs = Vec::<Vec2>::with_capacity(skin.vertices.len());
 
@@ -89,10 +81,9 @@ struct App {
   pub last_mouse_delta: Option<DVec2>,
 }
 
-//asset: &M2Asset, skin: &M2SkinProfile, blp_opt: Option<&BlpImage>
 // since the current impl doesn't care about RAM (see the mpq crate force-loading all mpqs), we can safely pass a load of (potentially unused) textures
 pub fn render(assets: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>,
-              group_list: Vec<WMOGroupAsset>, wmo_root: &WMORootAsset, textures: HashMap<String, BlpImage>) {
+              group_list: Vec<WMOGroupAsset>, wmo_root_opt: Option<&WMORootAsset>, textures: HashMap<String, BlpImage>) {
   let mut app = App::default();
 
   // Create event loop and window
@@ -221,6 +212,8 @@ pub fn render(assets: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<Blp
       //   println!("Group {} has more than one material: {}", group.mogp.uniqueID, material_ids.len());
       //   // TODO: Support, there are groups that have like 20 materials, chances are low to pick the right one
       // }
+
+      let wmo_root = wmo_root_opt.expect("If there are WMO Groups, the WMO root needs to be passed as well");
 
       let first_material = match batch.material_id {
         0xFF => None,
