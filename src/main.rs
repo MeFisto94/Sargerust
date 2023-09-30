@@ -43,7 +43,7 @@ fn main() {
     // debug_dump_mpq_filelist(data_folder, "lichking.MPQ");
 
     let simple_m2 = false;
-    let simple_wmo = true;
+    let simple_wmo = false;
 
     let mut common = Archive::open(data_folder.join("common.MPQ")).unwrap();
     let mut common2 = Archive::open(data_folder.join("common-2.MPQ")).unwrap();
@@ -60,17 +60,20 @@ fn main() {
     if simple_m2 {
         let mut expansion = Archive::open(data_folder.join("expansion.MPQ")).unwrap();
         main_simple_m2(&mut common, &mut expansion).unwrap();
-        return;
     }
     else if simple_wmo {
         main_simple_wmo(&mut common, &mut common2).unwrap();
-        return;
+    } else {
+        main_simple_adt(&mut common, &mut common2).unwrap();
     }
+}
 
-    let adt = ADTReader::parse_asset(&mut Cursor::new(io::mpq::loader::read_mpq_file_into_owned(&mut common2, r"World\Maps\Kalimdor\Kalimdor_1_1.adt").unwrap())).unwrap();
+fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), anyhow::Error> {
+    let adt = ADTReader::parse_asset(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, r"World\Maps\Kalimdor\Kalimdor_1_1.adt")?)?;
 
     let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
     let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
+    let mut texture_map = HashMap::new();
 
     dbg!(&adt.mwmo);
     dbg!(&adt.mwid);
@@ -80,37 +83,39 @@ fn main() {
     // dbg!(adt.mmid);
     // dbg!(adt.mddf);
 
-    // temporary.
-    let mut wmo: WMORootAsset = WMOReader::parse_root(&mut Cursor::new(io::mpq::loader::read_mpq_file_into_owned(&mut common2, r"World\wmo\Dungeon\AZ_Subway\Subway.wmo").unwrap())).unwrap();
-
-    for wmo_ref in adt.modf.mapObjDefs.iter().skip(1) {
+    // TODO: placement information missing.
+    let mut wmos: Vec<(WMORootAsset, Vec<WMOGroupAsset>)> = Vec::new();
+    for wmo_ref in adt.modf.mapObjDefs.iter().skip(1) { // TODO: Remove skip once we use the orientation
         let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
-        wmo = WMOReader::parse_root(&mut io::mpq::loader::read_mpq_file_into_cursor(&mut common2, name).unwrap()).unwrap();
+        dbg!(&name);
+
+        let wmo = WMOReader::parse_root(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, name).unwrap()).unwrap();
+
+        let doodads = collect_dooads(common, common2, &mut m2_cache, &wmo);
+        for dad in doodads {
+            render_list.push(dad);
+        }
+
+        // preload (force-cache) all textures
+        let textures = wmo.momt.materialList.iter()
+            .map(|tex| wmo.motx.textureNameList[wmo.motx.offsets[&tex.texture_1]].clone())
+            .collect_vec();
+
+        for texture in textures {
+            let blp = load_blp_from_mpq(common, &texture).expect("Texture loading error");
+            texture_map.insert(texture, blp);
+        }
+
+        let group_list = load_wmo_groups(common2, &wmo, name.trim_end_matches(".wmo"));
+        wmos.push((wmo, group_list));
     }
 
-    let doodads = collect_dooads(&mut common, &mut common2, &mut m2_cache, &mut wmo);
-    for dad in doodads {
-        render_list.push(dad);
-    }
-
-    // TODO: derive path from the wmo file name.
-    let group_list = load_wmo_groups(&mut common2, &wmo, r"World\wmo\Dungeon\AZ_Subway\Subway");
-    let textures = wmo.momt.materialList.iter()
-        .map(|tex| wmo.motx.textureNameList[wmo.motx.offsets[&tex.texture_1]].clone())
-        .collect_vec();
-
-    let mut texture_map = HashMap::new();
-    for texture in textures {
-        let blp = load_blp_from_mpq(&mut common, &texture).expect("Texture loading error");
-        texture_map.insert(texture, blp);
-    }
-
-    // Render whole wmo (only doodads).
-    rendering::render(render_list, group_list, Some(&wmo), texture_map);
+    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map);
+    Ok(())
 }
 
 /// Extracts the doodads (i.e. M2 models that have been placed into the world at a specific position) that are defined in the WMO Root
-fn collect_dooads(mut common: &mut Archive, mut common2: &mut Archive, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, wmo: &mut WMORootAsset) -> Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> {
+fn collect_dooads(mut common: &mut Archive, mut common2: &mut Archive, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> {
     let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
     for mods in &wmo.mods.doodadSetList {
         let start = mods.startIndex as usize;
@@ -122,8 +127,9 @@ fn collect_dooads(mut common: &mut Archive, mut common2: &mut Archive, m2_cache:
 
             // fix name: currently it ends with .mdx but we need .m2
             let name = name.replace(".MDX", ".m2");
-            if name.to_lowercase().contains("emitter") || name.to_lowercase().contains("goldshireinn") ||
+            if name.to_lowercase().contains("emitter") ||
                 name.to_uppercase().contains("GENERALDIRTYPLATE01") || name.to_uppercase().contains("GENERALCANDELABRA01")
+                || name.to_uppercase().contains("GOLDSHIREINN")
                 || name.to_lowercase().contains("02") || name.to_lowercase().contains("03") || name.to_lowercase().contains("01") {
                 continue;
             }
@@ -191,13 +197,17 @@ fn main_simple_m2(common: &mut Archive, expansion: &mut Archive) -> Result<(), a
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
     rendering::render(vec![(Affine3A::from_translation(Vec3::new(0.0, 0.0, 0.0)),
                             Rc::new((m2, vec![skin], blp_opt)))], vec![],
-                      None, HashMap::new());
+                      HashMap::new());
     Ok(())
 }
 
 fn main_simple_wmo(common: &mut Archive, common2: &mut Archive) -> Result<(), anyhow::Error> {
     // This method demonstrates very simple wmo rendering (not in the context of adts).
-    let wmo_path = r"World\wmo\Dungeon\AZ_Subway\Subway";
+    //let wmo_path = r"World\wmo\Dungeon\AZ_Subway\Subway";
+    //let wmo_path = r"World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn"; <-- broken due to files loading error
+    //let wmo_path = r"World\wmo\Azeroth\Buildings\GriffonAviary\GriffonAviary"; <-- broken, textures not located, skipping them
+    let wmo_path = r"World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn_closed";
+
     let mut wmo: WMORootAsset = WMOReader::parse_root(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, &format!("{}.wmo", wmo_path))?)?;
 
     // TODO: m2_cache should become an implementation detail of the struct that provides collect_doodads?
@@ -216,8 +226,11 @@ fn main_simple_wmo(common: &mut Archive, common2: &mut Archive) -> Result<(), an
         texture_map.insert(texture, blp);
     }
 
+    let mut wmos = Vec::new();
+    wmos.push((wmo, group_list));
+
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    rendering::render(dooads, group_list, Some(&wmo), texture_map);
+    rendering::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map);
     Ok(())
 }
 

@@ -82,8 +82,11 @@ struct App {
 }
 
 // since the current impl doesn't care about RAM (see the mpq crate force-loading all mpqs), we can safely pass a load of (potentially unused) textures
-pub fn render(assets: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>,
-              group_list: Vec<WMOGroupAsset>, wmo_root_opt: Option<&WMORootAsset>, textures: HashMap<String, BlpImage>) {
+pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>,
+              wmos: W, textures: HashMap<String, BlpImage>)
+where
+  W: IntoIterator<Item = (&'a WMORootAsset, &'a Vec<WMOGroupAsset>)>,
+{
   let mut app = App::default();
 
   // Create event loop and window
@@ -148,7 +151,7 @@ pub fn render(assets: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<Blp
 
   let mut object_list = Vec::new(); // we need to prevent object handles from getting dropped.
 
-  for (transform, rc) in assets {
+  for (transform, rc) in placed_doodads {
     let (asset, skins, blp_opt) = rc.deref();
     // Create mesh and calculate smooth normals based on vertices
     let mesh = create_mesh(asset, skins.first().unwrap()).unwrap();
@@ -187,63 +190,64 @@ pub fn render(assets: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<Blp
     object_list.push(_object_handle);
   }
 
-  for group in group_list {
-    for batch in &group.moba.batchList {
-      let mesh = create_mesh_wmo(&group, batch.startIndex as usize,
-     batch.count as usize, batch.minIndex as usize,batch.maxIndex as usize).unwrap();
+  for (wmo_root, wmo_groups) in wmos {
+    for group in wmo_groups {
+      for batch in &group.moba.batchList {
+        let mesh = create_mesh_wmo(&group, batch.startIndex as usize,
+                                   batch.count as usize, batch.minIndex as usize,
+                                   batch.maxIndex as usize).unwrap();
 
-      // Add mesh to renderer's world.
-      //
-      // All handles are refcounted, so we only need to hang onto the handle until we
-      // make an object.
-      let mesh_handle = renderer.add_mesh(mesh);
+        // Add mesh to renderer's world.
+        //
+        // All handles are refcounted, so we only need to hang onto the handle until we
+        // make an object.
+        let mesh_handle = renderer.add_mesh(mesh);
 
-      // // In theory, we'd need to split the triangle soup ("mesh") based on the MOPY chunks material_id
-      // // so we can have distinct objects per material. The engine may support multiple materials
-      // // but we may not want to render them with 100 meshes and textures anyway, semantically they
-      // // are separate objects, I guess.
-      // let material_ids: Vec<u8> = group.mopy.polyList.iter()
-      //     .map(|poly| poly.material_id)
-      //     .filter(|&mid| mid != 0xFF) // collision only triangles
-      //     .unique()
-      //     .collect();
-      //
-      // if material_ids.len() > 1 {
-      //   println!("Group {} has more than one material: {}", group.mogp.uniqueID, material_ids.len());
-      //   // TODO: Support, there are groups that have like 20 materials, chances are low to pick the right one
-      // }
+        // // In theory, we'd need to split the triangle soup ("mesh") based on the MOPY chunks material_id
+        // // so we can have distinct objects per material. The engine may support multiple materials
+        // // but we may not want to render them with 100 meshes and textures anyway, semantically they
+        // // are separate objects, I guess.
+        // let material_ids: Vec<u8> = group.mopy.polyList.iter()
+        //     .map(|poly| poly.material_id)
+        //     .filter(|&mid| mid != 0xFF) // collision only triangles
+        //     .unique()
+        //     .collect();
+        //
+        // if material_ids.len() > 1 {
+        //   println!("Group {} has more than one material: {}", group.mogp.uniqueID, material_ids.len());
+        //   // TODO: Support, there are groups that have like 20 materials, chances are low to pick the right one
+        // }
 
-      let wmo_root = wmo_root_opt.expect("If there are WMO Groups, the WMO root needs to be passed as well");
+        let first_material = match batch.material_id {
+          0xFF => None,
+          _ => Some(&wmo_root.momt.materialList[batch.material_id as usize])
+        };
 
-      let first_material = match batch.material_id {
-        0xFF => None,
-        _ => Some(&wmo_root.momt.materialList[batch.material_id as usize])
-      };
+        let blp_opt = first_material.and_then(|mat| {
+          let offset = wmo_root.motx.offsets[&mat.texture_1];
+          textures.get(&wmo_root.motx.textureNameList[offset])
+        });
 
-      let blp_opt = first_material.and_then(|mat| {
-        let offset = wmo_root.motx.offsets[&mat.texture_1];
-        textures.get(&wmo_root.motx.textureNameList[offset])
-      });
+        let material = match blp_opt {
+          Some(blp) => {
+            let tex = create_texture_rgba8(blp, 0);
+            let texture_handle = renderer.add_texture_2d(tex);
+            create_material_wmo(first_material, Some(texture_handle))
+          },
+          None => create_material_wmo(first_material, None)
+        };
+        let material_handle = renderer.add_material(material);
 
-      let material = match blp_opt {
-        Some(blp) => {
-          let tex = create_texture_rgba8(blp, 0);
-          let texture_handle = renderer.add_texture_2d(tex);
-          create_material_wmo(first_material, Some(texture_handle))
-        },
-        None => create_material_wmo(first_material, None)
-      };
-      let material_handle = renderer.add_material(material);
+        // Combine the mesh and the material with a location to give an object.
+        let object = create_object(Affine3A::IDENTITY, mesh_handle, material_handle);
 
-      // Combine the mesh and the material with a location to give an object.
-      let object = create_object(Affine3A::IDENTITY, mesh_handle, material_handle);
-
-      // Creating an object will hold onto both the mesh and the material
-      // even if they are deleted.
-      //
-      // We need to keep the object handle alive.
-      let _object_handle = renderer.add_object(object);
-      object_list.push(_object_handle);
+        // Creating an object will hold onto both the mesh and the material
+        // even if they are deleted.
+        //
+        // We need to keep the object handle alive.
+        let _object_handle = renderer.add_object(object);
+        object_list.push(_object_handle);
+      }
     }
   }
 
