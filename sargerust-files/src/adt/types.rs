@@ -81,12 +81,14 @@ impl Parseable<MTEXChunk> for MTEXChunk {
 
 #[derive(Debug)]
 pub struct MMDXChunk {
-  pub filenames: Vec<String>
+  pub filenames: Vec<String>,
+  pub offsets: HashMap<u32, usize>,
 }
 
 impl Parseable<MMDXChunk> for MMDXChunk {
   fn parse<R: Read>(rdr: &mut R) -> Result<MMDXChunk, ParserError> {
-    Ok(MMDXChunk { filenames: GenericStringList::parse(rdr)?.stringList })
+    let gsl = GenericStringList::parse(rdr)?;
+    Ok(MMDXChunk { filenames:  gsl.stringList, offsets: gsl.offset_to_stringList_offset })
   }
 }
 

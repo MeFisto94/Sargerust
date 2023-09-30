@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::ops::Deref;
 use std::rc::Rc;
-use glam::{Affine3A, Quat, Vec3};
+use glam::{Affine3A, EulerRot, Quat, Vec3};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
@@ -110,12 +110,42 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
         wmos.push((wmo, group_list));
     }
 
+    for dad_ref in adt.mddf.doodadDefs {
+        let name = &adt.mmdx.filenames[*adt.mmdx.offsets.get(&adt.mmid.mmdx_offsets[dad_ref.nameId as usize]).unwrap()];
+        dbg!(&name);
+
+        // fix name: currently it ends with .mdx but we need .m2
+        let name = name.to_lowercase().replace(".mdx", ".m2");
+        if name.to_lowercase().contains("emitter") ||
+            name.to_uppercase().contains("GENERALDIRTYPLATE01") || name.to_uppercase().contains("GENERALCANDELABRA01")
+            || name.to_uppercase().contains("GOLDSHIREINN")
+            || name.to_lowercase().contains("02") || name.to_lowercase().contains("03") || name.to_lowercase().contains("01") {
+            continue;
+        }
+
+        let entry = load_m2_doodad(common, common2, &mut m2_cache, &name);
+        let scale = Vec3::new(dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0);
+        let rotation = Quat::from_euler(EulerRot::YXZ, dad_ref.rotation.x.to_radians(), dad_ref.rotation.y.to_radians(), dad_ref.rotation.z.to_radians());
+        let mut translation = from_vec(dad_ref.position);
+        // MDDFS (TODO: MODF) uses a completely different coordinate system, so we need to fix up things.
+        translation.x = -translation.x; // west is positive X!!
+        std::mem::swap(&mut translation.z, &mut translation.y); // maybe needs inverting.
+
+        // // relative to a corner of the map, but we want to have the center in mid (just alone for rotation etc)
+        // translation.x -= 17066.0; // WOWDEV
+        // translation.y -= 17066.0;
+        dbg!(translation);
+
+        let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
+        render_list.push((transform, entry.clone()));
+    }
+
     rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map);
     Ok(())
 }
 
 /// Extracts the doodads (i.e. M2 models that have been placed into the world at a specific position) that are defined in the WMO Root
-fn collect_dooads(mut common: &mut Archive, mut common2: &mut Archive, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> {
+fn collect_dooads(common: &mut Archive, common2: &mut Archive, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> {
     let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
     for mods in &wmo.mods.doodadSetList {
         let start = mods.startIndex as usize;
@@ -134,28 +164,32 @@ fn collect_dooads(mut common: &mut Archive, mut common2: &mut Archive, m2_cache:
                 continue;
             }
 
-            let entry = m2_cache.entry(name.clone()).or_insert_with(|| {
-                //let m2_file = common2.open_file(&name).unwrap_or_else(|_| panic!("File {} missing!", name));
-                let m2_file = io::mpq::loader::read_mpq_file_into_owned(&mut common2, &name).unwrap();
-                let m2_asset = M2Reader::parse_asset(&mut Cursor::new(m2_file)).unwrap();
-                // In theory, we could investigate the number of LoD Levels, but we will just use "0"
-                let skin_file = io::mpq::loader::read_mpq_file_into_owned(&mut common2, &name.replace(".m2", "00.skin")).unwrap();
-                let skin = M2Reader::parse_skin_profile(&mut Cursor::new(skin_file)).unwrap();
-
-                let mut blp_opt = None;
-                if !m2_asset.textures.is_empty() && !name.eq("WORLD\\AZEROTH\\ELWYNN\\PASSIVEDOODADS\\TREES\\ELWYNNTREEMID01.m2") {
-                    blp_opt = load_blp_from_mpq(&mut common, &m2_asset.textures[0].filename);
-                }
-
-                Rc::new((m2_asset, vec![skin], blp_opt))
-            });
-
+            let entry = load_m2_doodad(common, common2, m2_cache, &name);
             let transform: Affine3A = Affine3A::from_scale_rotation_translation(Vec3::new(modd.scale, modd.scale, modd.scale), from_quat(modd.orientation), from_vec(modd.position));
             render_list.push((transform, entry.clone()));
         }
     }
 
     render_list
+}
+
+fn load_m2_doodad(common: &mut Archive, common2: &mut Archive, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, name: &String) -> Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)> {
+    let entry = m2_cache.entry(name.clone()).or_insert_with(|| {
+        //let m2_file = common2.open_file(&name).unwrap_or_else(|_| panic!("File {} missing!", name));
+        let mut m2_file = io::mpq::loader::read_mpq_file_into_cursor(common2, &name).unwrap();
+        let m2_asset = M2Reader::parse_asset(&mut m2_file).unwrap();
+        // In theory, we could investigate the number of LoD Levels, but we will just use "0"
+        let mut skin_file = io::mpq::loader::read_mpq_file_into_cursor(common2, &name.replace(".m2", "00.skin")).unwrap();
+        let skin = M2Reader::parse_skin_profile(&mut skin_file).unwrap();
+
+        let mut blp_opt = None;
+        if !m2_asset.textures.is_empty() && !name.eq("WORLD\\AZEROTH\\ELWYNN\\PASSIVEDOODADS\\TREES\\ELWYNNTREEMID01.m2") {
+            blp_opt = load_blp_from_mpq(common, &m2_asset.textures[0].filename);
+        }
+
+        Rc::new((m2_asset, vec![skin], blp_opt))
+    });
+    entry.clone()
 }
 
 fn load_wmo_groups(common2: &mut Archive, wmo: &WMORootAsset, path: &str) -> Vec<WMOGroupAsset> {

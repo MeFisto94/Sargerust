@@ -203,21 +203,6 @@ where
         // make an object.
         let mesh_handle = renderer.add_mesh(mesh);
 
-        // // In theory, we'd need to split the triangle soup ("mesh") based on the MOPY chunks material_id
-        // // so we can have distinct objects per material. The engine may support multiple materials
-        // // but we may not want to render them with 100 meshes and textures anyway, semantically they
-        // // are separate objects, I guess.
-        // let material_ids: Vec<u8> = group.mopy.polyList.iter()
-        //     .map(|poly| poly.material_id)
-        //     .filter(|&mid| mid != 0xFF) // collision only triangles
-        //     .unique()
-        //     .collect();
-        //
-        // if material_ids.len() > 1 {
-        //   println!("Group {} has more than one material: {}", group.mogp.uniqueID, material_ids.len());
-        //   // TODO: Support, there are groups that have like 20 materials, chances are low to pick the right one
-        // }
-
         let first_material = match batch.material_id {
           0xFF => None,
           _ => Some(&wmo_root.momt.materialList[batch.material_id as usize])
