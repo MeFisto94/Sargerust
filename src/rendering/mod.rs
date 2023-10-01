@@ -248,7 +248,7 @@ where
     let (position, verts, indices) = chunk;
 
     // TODO: Submethod
-    let mesh_verts = verts.iter().map(|(v, col)| Vec3::new(-v.x, -v.y, v.z)).collect_vec();
+    let mesh_verts = verts.iter().map(|(v, col)| Vec3::new(v.x, v.y, v.z)).collect_vec();
     let mesh_col = verts.iter().map(|(v, col)| [col.r, col.g, col.b, col.a]).collect_vec();
 
     let mut mesh = rend3::types::MeshBuilder::new(mesh_verts, rend3::types::Handedness::Left) // used to be RIGHT
@@ -267,7 +267,7 @@ where
     let material_handle = renderer.add_material(material);
     // Don't ask me where flipping the z and the heightmap values comes from.
     // Actually, I think I flipped everything there is now, for consistency with ADT and where it should belong (i.e. 16k, 16k; not negative area)
-    let tt = coordinate_systems::adt_to_blender_transform(Vec3A::new(-position.x, -position.y, position.z));
+    let tt = coordinate_systems::adt_to_blender_transform(Vec3A::new(position.x, position.y, position.z));
     let object = Object {
       mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
       material: material_handle,
@@ -285,19 +285,7 @@ where
     app.camera_location = Vec3A::new(0.0, -4.0, 2.0);
   } else {
     // For the GM Island, we move to it's world location for convenience
-    //app.camera_location = Vec3A::new(1.4*16000.0, 0.005*16000.0, 0.0);
     app.camera_location = coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0));
-    dbg!(app.camera_location);
-    app.camera_location = Vec3A::new(-16000.0, 16000.0, 42.0); // TODO: FIXME, it should be 16k, -16k (or equivalent to the above). but that means everything is still broken, everything?!
-    dbg!(app.camera_location);
-    // -16391.1,
-    // 16595.404,
-    // 535.67145,
-
-    // DOODADS apparently at
-    //    -16304.248,
-    //     16244.517,
-    //     -0.33333817,
   }
 
   let quat = glam::Quat::from_euler(glam::EulerRot::XYZ, 0.5 * PI, 0.0 * PI, 0.0 * PI);

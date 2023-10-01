@@ -364,7 +364,7 @@ fn transform_for_doodad_ref(dad_ref: SMDoodadDef) -> Affine3A {
     // MDDFS (TODO: MODF) uses a completely different coordinate system, so we need to fix up things.
 
     // 32*TILE_SIZE because the map is 64 TS wide, and so we're placing ourselfs into the mid.
-    let translation = Vec3::new(-(32.0 * TILE_SIZE - dad_ref.position.x), (32.0 * TILE_SIZE - dad_ref.position.z), dad_ref.position.y);
+    let translation = Vec3::new((32.0 * TILE_SIZE - dad_ref.position.x), -(32.0 * TILE_SIZE - dad_ref.position.z), dad_ref.position.y);
     dbg!(translation);
 
     let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
@@ -378,7 +378,7 @@ fn transform_for_wmo_ref(wmo_ref: &SMMapObjDef) -> Affine3A {
 
     let scale = Vec3::new(1.0, 1.0, 1.0);
     //let rotation = Quat::from_euler(EulerRot::ZYX, wmo_ref.rot.x.to_radians(), (wmo_ref.rot.y - 90.0).to_radians(), (wmo_ref.rot.z + 0.0).to_radians());
-    let rotation = Quat::from_euler(EulerRot::ZYX, (wmo_ref.rot.y + -0.5*180.0).to_radians(), (wmo_ref.rot.x).to_radians(), (wmo_ref.rot.z + 0.0).to_radians());
+    let rotation = Quat::from_euler(EulerRot::ZYX, (wmo_ref.rot.y + 0.5*180.0).to_radians(), (wmo_ref.rot.x).to_radians(), (wmo_ref.rot.z + 0.0).to_radians());
     // let mut translation = from_vec(wmo_ref.pos);
     // // MODF uses a completely different coordinate system, so we need to fix up things.
     // translation.x = -translation.x; // west is positive X!!
@@ -389,7 +389,7 @@ fn transform_for_wmo_ref(wmo_ref: &SMMapObjDef) -> Affine3A {
     // translation.y -= 17066.0;
 
     // 32*TILE_SIZE because the map is 64 TS wide, and so we're placing ourselfs into the mid.
-    let translation = Vec3::new(-(32.0 * TILE_SIZE - wmo_ref.pos.x), (32.0 * TILE_SIZE - wmo_ref.pos.z), wmo_ref.pos.y);
+    let translation = Vec3::new((32.0 * TILE_SIZE - wmo_ref.pos.x), -(32.0 * TILE_SIZE - wmo_ref.pos.z), wmo_ref.pos.y);
     dbg!(translation);
     let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
     transform
