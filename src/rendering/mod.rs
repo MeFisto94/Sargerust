@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use glam::{Affine3A, DVec2, Vec2, Vec3, Vec3A, Vec4};
+use glam::{Affine3A, DVec2, Mat4, Vec2, Vec3, Vec3A, Vec4};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use itertools::Itertools;
@@ -238,6 +238,7 @@ where
     }
   }
 
+  let had_terrain = !terrain_chunk.is_empty();
   for chunk in terrain_chunk {
     let (transform, verts, indices) = chunk;
 
@@ -260,22 +261,29 @@ where
     };
     let material_handle = renderer.add_material(material);
     dbg!(transform);
+    let tt = Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 1.0 * PI, 0.75 * PI) * Mat4::from_translation(Vec3::new(transform.x, transform.y, transform.z));
+    dbg!(tt.to_scale_rotation_translation());
     let object = Object {
       mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
       material: material_handle,
-      transform: glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 1.0 * PI, 0.75 * PI) * glam::Mat4::from_translation(Vec3::new(transform.x, transform.y, transform.z))
-      //transform: glam::Mat4::from_translation(Vec3::new(transform.x * 8.0, transform.y * 8.0, transform.z))
+      // I think mat * translation rotates our translation and as such is basically always wrong. It can't have ever rotated things as a side effect?
+      transform: tt * Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, -2.0 * PI)
     };
 
     let _object_handle = renderer.add_object(object);
     object_list.push(_object_handle);
   }
 
-  //let view_location = glam::Vec3::new(3.0, -2.5, 3.0);
-  app.camera_location = glam::Vec3A::new(0.0, -4.0, 2.0);
-  let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.5 * PI, 0.0 * PI, 0.0 * PI);
-  //let view = glam::Mat4::IDENTITY;
-  let view = view * glam::Mat4::from_translation(app.camera_location.into());
+  if !had_terrain {
+    app.camera_location = Vec3A::new(0.0, -4.0, 2.0);
+  } else {
+    // For the GM Island, we move to it's world location for convenience
+    app.camera_location = Vec3A::new(1.4*16000.0, 0.005*16000.0, 0.0);
+    dbg!(app.camera_location);
+  }
+
+  let quat = glam::Quat::from_euler(glam::EulerRot::XYZ, 0.5 * PI, 0.0 * PI, 0.0 * PI);
+  let view = Mat4::from_rotation_translation(quat, app.camera_location.into());
 
   // Set camera's location
   renderer.set_camera_data(rend3::types::Camera {
@@ -324,17 +332,12 @@ where
     }
     // Render!
     winit::event::Event::MainEventsCleared => {
-
-      // compare with scene-viewer, when rotation is implemented.
-      // let rotation =
-      //     Mat3A::from_euler(glam::EulerRot::XYZ, -self.camera_pitch, -self.camera_yaw, 0.0).transpose();
-      // let forward = -rotation.z_axis;
-      // let up = rotation.y_axis;
-      // let side = -rotation.x_axis;
-
-      let forward = Vec3A::new(0.0, 1.0, 0.0);
-      let right = Vec3A::new(1.0, 0.0, 0.0);
-      let up = Vec3A::new(0.0, 0.0, 1.0);
+      // Don't ask me why the rotation is so different here, _but_ the camera by default looks down,
+      // so it is rotated differently than the carthesian that moves it.
+      let rotation = glam::Mat3A::from_euler(glam::EulerRot::XYZ, (-app.camera_pitch) * PI, 0.0 /* roll */ * PI,  -app.camera_yaw * PI);
+      let forward: Vec3A = -rotation.y_axis;
+      let right: Vec3A = -rotation.x_axis;
+      let up: Vec3A = -rotation.z_axis;
 
       if *app.scancode_status.get(&17u32).unwrap_or(&false)  {
         // W
@@ -359,9 +362,18 @@ where
       if *app.scancode_status.get(&29u32).unwrap_or(&false) {
         app.camera_location -= up * 20.0/60.0;
       }
+      if *app.scancode_status.get(&57421u32).unwrap_or(&false) {
+        // arrow right
+        app.camera_yaw -= 1.0/60.0;
+      }
+      if *app.scancode_status.get(&57419u32).unwrap_or(&false) {
+        app.camera_yaw += 1.0/60.0;
+      }
 
-      let view = glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.5 * PI, 0.0 * PI, 0.0 * PI);
-      let view = view * glam::Mat4::from_translation(app.camera_location.into());
+      // TODO: the following is under redraw requested in https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/lib.rs#L572
+      let view = Mat4::from_euler(glam::EulerRot::XYZ, (0.5 -app.camera_pitch) * PI, 0.0 /* roll */ * PI,  app.camera_yaw * PI);
+      // TODO: I think this - is still wrong. increasing z causes you to dive.
+      let view = view * Mat4::from_translation((-app.camera_location).into());
 
       // Set camera's location
       renderer.set_camera_data(rend3::types::Camera {
@@ -369,7 +381,6 @@ where
         view,
       });
 
-      // TODO: the following is under redraw requested in https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/lib.rs#L572
       // Get a frame
       let frame = surface.get_current_texture().unwrap();
 
@@ -411,7 +422,7 @@ where
       },
       ..
     } => {
-      if scancode != 17 && (scancode < 30 || scancode > 32) && scancode != 29 && scancode != 42 {
+      if scancode != 17 && (scancode < 30 || scancode > 32) && scancode != 29 && scancode != 42 && scancode != 57419 && scancode != 57421 {
         dbg!(scancode);
       }
 
@@ -464,6 +475,6 @@ fn create_object(transform: Affine3A, mesh_handle: MeshHandle, material_handle: 
   rend3::types::Object {
     mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
     material: material_handle,
-    transform: glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 1.0 * PI, 0.75 * PI) * transform
+    transform: Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 1.0 * PI, 0.75 * PI) * transform
   }
 }
