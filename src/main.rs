@@ -265,18 +265,20 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
         let mut index_buffer = Vec::<u32>::new();
         let mut vert_list = Vec::new();
         let mcvt = mcnk.get_mcvt()?.unwrap();
-        // let mccv = // TODO: coloring
-
+        let use_vertex_color: bool = true; // In theory with this flag we can turn it off for debug purposes.
+        let mccv_opt = mcnk.get_mccv()?.filter(|_| use_vertex_color); // smchunk flag has_mccv.
 
         // Here we're in ADT Terrain space, that is +x -> north, +y -> west. Thus rows grow in -x, columns go to -y.
-
         // index of 9x9: 17 * row + column
         // index of high detail 8x8: 17 * row + column + 9
         for row in 0..9 {
             for column in 0..9 {
                 let low = MCNKChunk::get_index_low(row, column);
                 let height = mcvt[low as usize];
-                vert_list.push((Vec3::new(-GRID_SIZE * row as f32, -GRID_SIZE * column as f32, height), CImVector::from(0x0000FFFFu32)));
+                // TODO: implement MCCV the _rust_ way (can't unwrap in a loop)
+                // let color = if &mccv_opt.is_some() { (mccv_opt.unwrap()[low as usize]) } else { CImVector::from(0x0000FFFFu32) };
+                let color = CImVector::from(0x0000FFFFu32);
+                vert_list.push((Vec3::new(-GRID_SIZE * row as f32, -GRID_SIZE * column as f32, height), color));
             }
 
             if row == 8 {
@@ -286,7 +288,10 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
             for column in 0..8 {
                 let high = MCNKChunk::get_index_high(row, column);
                 let height = mcvt[high as usize];
-                vert_list.push((Vec3::new(-GRID_SIZE * (row as f32 + 0.5), -GRID_SIZE * (column as f32 + 0.5), height), CImVector::from(0xFF0000FFu32)));
+                // see above
+                // let color = if use_vertex_color { (&mccv_opt.unwrap()[high as usize]).clone() } else { CImVector::from(0xFF0000FFu32) };
+                let color = CImVector::from(0xFF0000FFu32);
+                vert_list.push((Vec3::new(-GRID_SIZE * (row as f32 + 0.5), -GRID_SIZE * (column as f32 + 0.5), height), color));
             }
         }
 
@@ -331,7 +336,6 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
                 }
             }
         }
-
 
         // let mut w = BufWriter::new(File::create("./terrain.obj")?);
         // writeln!(w, "o {}","terrain")?;

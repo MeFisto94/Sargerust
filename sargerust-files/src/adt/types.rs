@@ -277,6 +277,14 @@ impl MCNKChunk {
         .transpose()
   }
 
+  pub fn get_mccv(&self) -> Result<Option<MCCVSubChunk>, ParserError> {
+    self.sub_chunks.iter()
+        .filter(|&cnk| cnk.magic_str().eq("MCCV"))
+        .map(|cnk| read_chunk_array(&mut Cursor::new(&cnk.data)))
+        .next()
+        .transpose()
+  }
+
   pub fn get_index_low(row: u8, column: u8) -> u8 {
     17 * row + column
   }
