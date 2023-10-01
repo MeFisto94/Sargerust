@@ -260,7 +260,6 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
     }
 
     let mut terrain_chunk = vec![];
-    let mut chunk_counter = 0u16; // last iteration will be 256 -> overflow
 
     for mcnk in adt.mcnks {
         let mut index_buffer = Vec::<u32>::new();
@@ -269,13 +268,15 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
         // let mccv = // TODO: coloring
 
 
+        // Here we're in ADT Terrain space, that is +x -> north, +y -> west. Thus rows grow in -x, columns go to -y.
+
         // index of 9x9: 17 * row + column
         // index of high detail 8x8: 17 * row + column + 9
         for row in 0..9 {
             for column in 0..9 {
                 let low = MCNKChunk::get_index_low(row, column);
                 let height = mcvt[low as usize];
-                vert_list.push((Vec3::new(GRID_SIZE * column as f32, GRID_SIZE * row as f32, height), CImVector::from(0x0000FFFFu32)));
+                vert_list.push((Vec3::new(-GRID_SIZE * row as f32, -GRID_SIZE * column as f32, height), CImVector::from(0x0000FFFFu32)));
             }
 
             if row == 8 {
@@ -285,7 +286,7 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
             for column in 0..8 {
                 let high = MCNKChunk::get_index_high(row, column);
                 let height = mcvt[high as usize];
-                vert_list.push((Vec3::new(GRID_SIZE * (column as f32 + 0.5), GRID_SIZE * (row as f32 + 0.5), height), CImVector::from(0xFF0000FFu32)));
+                vert_list.push((Vec3::new(-GRID_SIZE * (row as f32 + 0.5), -GRID_SIZE * (column as f32 + 0.5), height), CImVector::from(0xFF0000FFu32)));
             }
         }
 
@@ -343,19 +344,13 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
         //     writeln!(w, "f {} {} {}", i[0] + 1, i[1] + 1, i[2] + 1)?;
         // }
 
-
-        // now with the center being (8, 8), we need to convert column and row.
-        let chunk_column = (chunk_counter % 16); // 0..16
-        let x = (chunk_column as f32 - 8.0) * CHUNK_SIZE;// + mcnk.header.position.x;
-        let chunk_row = (chunk_counter / 16); // 0..16
-        let y = (chunk_row as f32 - 8.0) * CHUNK_SIZE;// + mcnk.header.position.y;
         let chunk_height = mcnk.header.position.z;
-
         let x = mcnk.header.position.x;
         let y = mcnk.header.position.y;
+        let pos = C3Vector {x, y, z: chunk_height };
+        dbg!(pos);
 
-        terrain_chunk.push((C3Vector {x, y, z: chunk_height }, vert_list, index_buffer));
-        chunk_counter += 1;
+        terrain_chunk.push((pos, vert_list, index_buffer));
     }
 
     rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map, terrain_chunk);
@@ -369,7 +364,7 @@ fn transform_for_doodad_ref(dad_ref: SMDoodadDef) -> Affine3A {
     // MDDFS (TODO: MODF) uses a completely different coordinate system, so we need to fix up things.
 
     // 32*TILE_SIZE because the map is 64 TS wide, and so we're placing ourselfs into the mid.
-    let translation = Vec3::new(32.0 * TILE_SIZE - dad_ref.position.x, 32.0 * TILE_SIZE - dad_ref.position.z, dad_ref.position.y);
+    let translation = Vec3::new(-(32.0 * TILE_SIZE - dad_ref.position.x), (32.0 * TILE_SIZE - dad_ref.position.z), dad_ref.position.y);
     dbg!(translation);
 
     let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
@@ -383,7 +378,7 @@ fn transform_for_wmo_ref(wmo_ref: &SMMapObjDef) -> Affine3A {
 
     let scale = Vec3::new(1.0, 1.0, 1.0);
     //let rotation = Quat::from_euler(EulerRot::ZYX, wmo_ref.rot.x.to_radians(), (wmo_ref.rot.y - 90.0).to_radians(), (wmo_ref.rot.z + 0.0).to_radians());
-    let rotation = Quat::from_euler(EulerRot::ZYX, (wmo_ref.rot.y + 180.0).to_radians(), (wmo_ref.rot.x).to_radians(), (wmo_ref.rot.z + 0.0).to_radians());
+    let rotation = Quat::from_euler(EulerRot::ZYX, (wmo_ref.rot.y + -0.5*180.0).to_radians(), (wmo_ref.rot.x).to_radians(), (wmo_ref.rot.z + 0.0).to_radians());
     // let mut translation = from_vec(wmo_ref.pos);
     // // MODF uses a completely different coordinate system, so we need to fix up things.
     // translation.x = -translation.x; // west is positive X!!
@@ -394,7 +389,7 @@ fn transform_for_wmo_ref(wmo_ref: &SMMapObjDef) -> Affine3A {
     // translation.y -= 17066.0;
 
     // 32*TILE_SIZE because the map is 64 TS wide, and so we're placing ourselfs into the mid.
-    let translation = Vec3::new(32.0 * TILE_SIZE - wmo_ref.pos.x, 32.0 * TILE_SIZE - wmo_ref.pos.z, wmo_ref.pos.y);
+    let translation = Vec3::new(-(32.0 * TILE_SIZE - wmo_ref.pos.x), (32.0 * TILE_SIZE - wmo_ref.pos.z), wmo_ref.pos.y);
     dbg!(translation);
     let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
     transform

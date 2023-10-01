@@ -15,6 +15,11 @@ use sargerust_files::common::types::{C3Vector, CArgb, CImVector};
 
 use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
 use sargerust_files::wmo::types::{SMOMaterial, WMOGroupAsset, WMORootAsset};
+use crate::rendering::common::coordinate_systems;
+
+mod common;
+
+// TODO: We have one big weirdness: everything needs to be turned upside down, _but_ this doesn't seem to be a camera setup problem, as one can see by the camera location.
 
 fn create_mesh(asset: &M2Asset, skin: &M2SkinProfile) -> Result<rend3::types::Mesh, anyhow::Error>{
   let mut verts = Vec::<Vec3>::with_capacity(skin.vertices.len());
@@ -240,10 +245,10 @@ where
 
   let had_terrain = !terrain_chunk.is_empty();
   for chunk in terrain_chunk {
-    let (transform, verts, indices) = chunk;
+    let (position, verts, indices) = chunk;
 
     // TODO: Submethod
-    let mesh_verts = verts.iter().map(|(v, col)| Vec3::new(v.x, v.y, v.z)).collect_vec();
+    let mesh_verts = verts.iter().map(|(v, col)| Vec3::new(-v.x, -v.y, v.z)).collect_vec();
     let mesh_col = verts.iter().map(|(v, col)| [col.r, col.g, col.b, col.a]).collect_vec();
 
     let mut mesh = rend3::types::MeshBuilder::new(mesh_verts, rend3::types::Handedness::Left) // used to be RIGHT
@@ -260,14 +265,16 @@ where
       ..PbrMaterial::default()
     };
     let material_handle = renderer.add_material(material);
-    dbg!(transform);
-    let tt = Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 1.0 * PI, 0.75 * PI) * Mat4::from_translation(Vec3::new(transform.x, transform.y, transform.z));
-    dbg!(tt.to_scale_rotation_translation());
+    // Don't ask me where flipping the z and the heightmap values comes from.
+    // Actually, I think I flipped everything there is now, for consistency with ADT and where it should belong (i.e. 16k, 16k; not negative area)
+    let tt = coordinate_systems::adt_to_blender_transform(Vec3A::new(-position.x, -position.y, position.z));
     let object = Object {
       mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
       material: material_handle,
       // I think mat * translation rotates our translation and as such is basically always wrong. It can't have ever rotated things as a side effect?
-      transform: tt * Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 0.0, -2.0 * PI)
+      //transform: tt * Mat4::from_euler(glam::EulerRot::XYZ, 0.0 * PI, 1.0 * PI, 0.75 * PI)
+      //transform: Mat4::from_euler(glam::EulerRot::XYZ, 0.0 * PI, 1.0 * PI, 0.75 * PI) * tt
+      transform: tt
     };
 
     let _object_handle = renderer.add_object(object);
@@ -278,12 +285,23 @@ where
     app.camera_location = Vec3A::new(0.0, -4.0, 2.0);
   } else {
     // For the GM Island, we move to it's world location for convenience
-    app.camera_location = Vec3A::new(1.4*16000.0, 0.005*16000.0, 0.0);
+    //app.camera_location = Vec3A::new(1.4*16000.0, 0.005*16000.0, 0.0);
+    app.camera_location = coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0));
     dbg!(app.camera_location);
+    app.camera_location = Vec3A::new(-16000.0, 16000.0, 42.0); // TODO: FIXME, it should be 16k, -16k (or equivalent to the above). but that means everything is still broken, everything?!
+    dbg!(app.camera_location);
+    // -16391.1,
+    // 16595.404,
+    // 535.67145,
+
+    // DOODADS apparently at
+    //    -16304.248,
+    //     16244.517,
+    //     -0.33333817,
   }
 
   let quat = glam::Quat::from_euler(glam::EulerRot::XYZ, 0.5 * PI, 0.0 * PI, 0.0 * PI);
-  let view = Mat4::from_rotation_translation(quat, app.camera_location.into());
+  let view = Mat4::from_rotation_translation(quat, (-app.camera_location).into());
 
   // Set camera's location
   renderer.set_camera_data(rend3::types::Camera {
@@ -334,14 +352,16 @@ where
     winit::event::Event::MainEventsCleared => {
       // Don't ask me why the rotation is so different here, _but_ the camera by default looks down,
       // so it is rotated differently than the carthesian that moves it.
-      let rotation = glam::Mat3A::from_euler(glam::EulerRot::XYZ, (-app.camera_pitch) * PI, 0.0 /* roll */ * PI,  -app.camera_yaw * PI);
-      let forward: Vec3A = -rotation.y_axis;
-      let right: Vec3A = -rotation.x_axis;
-      let up: Vec3A = -rotation.z_axis;
+      let rotation = glam::Mat3A::from_euler(glam::EulerRot::XYZ, -app.camera_pitch * PI, 0.0 /* roll */ * PI,  -app.camera_yaw * PI);
+      let forward: Vec3A = rotation.y_axis;
+      let right: Vec3A = rotation.x_axis;
+      let up: Vec3A = rotation.z_axis;
 
       if *app.scancode_status.get(&17u32).unwrap_or(&false)  {
         // W
-        app.camera_location += forward * 30.0/60.0; // fake delta time
+        app.camera_location += forward * 30.0/60.0 * 10.0; // fake delta time
+        dbg!(forward);
+        dbg!(app.camera_location);
       }
       if *app.scancode_status.get(&31u32).unwrap_or(&false)  {
         // S
@@ -349,11 +369,11 @@ where
       }
       if *app.scancode_status.get(&30u32).unwrap_or(&false)  {
         // A
-        app.camera_location += right * 20.0/60.0;
+        app.camera_location -= right * 20.0/60.0;
       }
       if *app.scancode_status.get(&32u32).unwrap_or(&false)  {
         // D
-        app.camera_location -= right * 20.0/60.0;
+        app.camera_location += right * 20.0/60.0;
       }
       if *app.scancode_status.get(&42u32).unwrap_or(&false) {
         // LSHIFT
@@ -364,15 +384,17 @@ where
       }
       if *app.scancode_status.get(&57421u32).unwrap_or(&false) {
         // arrow right
-        app.camera_yaw -= 1.0/60.0;
+        app.camera_yaw += 1.0/60.0;
       }
       if *app.scancode_status.get(&57419u32).unwrap_or(&false) {
-        app.camera_yaw += 1.0/60.0;
+        app.camera_yaw -= 1.0/60.0;
       }
 
       // TODO: the following is under redraw requested in https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/lib.rs#L572
-      let view = Mat4::from_euler(glam::EulerRot::XYZ, (0.5 -app.camera_pitch) * PI, 0.0 /* roll */ * PI,  app.camera_yaw * PI);
-      // TODO: I think this - is still wrong. increasing z causes you to dive.
+      // technically, we could also invert the view rotation (remember this is not the cams matrix, but the _view_ matrix, so how do you transform
+      // the world to get to the screen (i.e. 0, 0). Hence we also need to invert the camera_location. Inverting the rotation isn't a deal though,
+      // as we can just control the input angles.
+      let view = Mat4::from_euler(glam::EulerRot::XYZ, (-0.5 - app.camera_pitch) * PI, 0.0 /* roll */ * PI,  app.camera_yaw * PI);
       let view = view * Mat4::from_translation((-app.camera_location).into());
 
       // Set camera's location
@@ -472,9 +494,10 @@ fn create_material_wmo(material: Option<&SMOMaterial>, texture: Option<Texture2D
 }
 
 fn create_object(transform: Affine3A, mesh_handle: MeshHandle, material_handle: MaterialHandle) -> Object {
+  dbg!(transform.to_scale_rotation_translation());
   rend3::types::Object {
     mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
     material: material_handle,
-    transform: Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 1.0 * PI, 0.75 * PI) * transform
+    transform: /*Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 1.0 * PI, 0.75 * PI) * */transform.into()
   }
 }
