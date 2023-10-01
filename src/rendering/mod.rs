@@ -7,9 +7,11 @@ use std::sync::Arc;
 use glam::{Affine3A, DVec2, Vec2, Vec3, Vec3A, Vec4};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
-use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, Texture2DHandle};
+use itertools::Itertools;
+use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, Texture2DHandle, VertexAttribute};
 use rend3::util::typedefs::FastHashMap;
-use rend3_routine::pbr::PbrMaterial;
+use rend3_routine::pbr::{AlbedoComponent, PbrMaterial};
+use sargerust_files::common::types::{C3Vector, CArgb, CImVector};
 
 use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
 use sargerust_files::wmo::types::{SMOMaterial, WMOGroupAsset, WMORootAsset};
@@ -83,7 +85,7 @@ struct App {
 
 // since the current impl doesn't care about RAM (see the mpq crate force-loading all mpqs), we can safely pass a load of (potentially unused) textures
 pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>,
-              wmos: W, textures: HashMap<String, BlpImage>)
+              wmos: W, textures: HashMap<String, BlpImage>, terrain_chunk: Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>)
 where
   W: IntoIterator<Item = (&'a Affine3A, &'a WMORootAsset, &'a Vec<WMOGroupAsset>)>,
 {
@@ -193,7 +195,7 @@ where
   for (transform, wmo_root, wmo_groups) in wmos {
     for group in wmo_groups {
       for batch in &group.moba.batchList {
-        let mesh = create_mesh_wmo(&group, batch.startIndex as usize,
+        let mesh = create_mesh_wmo(group, batch.startIndex as usize,
                                    batch.count as usize, batch.minIndex as usize,
                                    batch.maxIndex as usize).unwrap();
 
@@ -234,6 +236,39 @@ where
         object_list.push(_object_handle);
       }
     }
+  }
+
+  for chunk in terrain_chunk {
+    let (transform, verts, indices) = chunk;
+
+    // TODO: Submethod
+    let mesh_verts = verts.iter().map(|(v, col)| Vec3::new(v.x, v.y, v.z)).collect_vec();
+    let mesh_col = verts.iter().map(|(v, col)| [col.r, col.g, col.b, col.a]).collect_vec();
+
+    let mut mesh = rend3::types::MeshBuilder::new(mesh_verts, rend3::types::Handedness::Left) // used to be RIGHT
+        .with_indices(indices)
+        .with_vertex_color_0(mesh_col)
+        .build().unwrap();
+
+    mesh.double_side();
+
+    let mesh_handle = renderer.add_mesh(mesh);
+    let material = PbrMaterial {
+      unlit: true,
+      albedo: AlbedoComponent::Vertex {srgb: false},
+      ..PbrMaterial::default()
+    };
+    let material_handle = renderer.add_material(material);
+    dbg!(transform);
+    let object = Object {
+      mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
+      material: material_handle,
+      transform: glam::Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 1.0 * PI, 0.75 * PI) * glam::Mat4::from_translation(Vec3::new(transform.x, transform.y, transform.z))
+      //transform: glam::Mat4::from_translation(Vec3::new(transform.x * 8.0, transform.y * 8.0, transform.z))
+    };
+
+    let _object_handle = renderer.add_object(object);
+    object_list.push(_object_handle);
   }
 
   //let view_location = glam::Vec3::new(3.0, -2.5, 3.0);

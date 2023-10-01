@@ -3,7 +3,7 @@
 #![allow(non_camel_case_types)]
 
 use std::collections::HashMap;
-use std::io::{ErrorKind, Read};
+use std::io::{Cursor, ErrorKind, Read};
 use sargerust_files_derive_parseable::Parse;
 use crate::common::reader::{GenericStringList, Parseable, read_chunk_array};
 use crate::common::types::{C3Vector, CImVector, IffChunk};
@@ -265,6 +265,24 @@ impl Parseable<MCNKChunk> for MCNKChunk {
       header,
       sub_chunks: chunk_list
     })
+  }
+}
+
+impl MCNKChunk {
+  pub fn get_mcvt(&self) -> Result<Option<MCVTSubChunk>, ParserError> {
+    self.sub_chunks.iter()
+        .filter(|&cnk| cnk.magic_str().eq("MCVT"))
+        .map(|cnk| read_chunk_array(&mut Cursor::new(&cnk.data)))
+        .next()
+        .transpose()
+  }
+
+  pub fn get_index_low(row: u8, column: u8) -> u8 {
+    17 * row + column
+  }
+
+  pub fn get_index_high(row: u8, column: u8) -> u8 {
+    17 * row + column + 9
   }
 }
 

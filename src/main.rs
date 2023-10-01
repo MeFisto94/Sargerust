@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::io::Cursor;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 use std::ops::Deref;
 use std::rc::Rc;
 use glam::{Affine3A, EulerRot, Quat, Vec3};
@@ -9,8 +10,8 @@ use image_blp::parser::parse_blp_with_externals;
 use itertools::Itertools;
 use mpq::Archive;
 use sargerust_files::adt::reader::ADTReader;
-use sargerust_files::adt::types::SMDoodadDef;
-use sargerust_files::common::types::{C3Vector, C4Quaternion};
+use sargerust_files::adt::types::{MCNKChunk, SMDoodadDef};
+use sargerust_files::common::types::{C3Vector, C4Quaternion, CImVector};
 use sargerust_files::m2::reader::M2Reader;
 use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
 use sargerust_files::wdt::types::SMMapObjDef;
@@ -158,7 +159,7 @@ fn main_simple_m2(common: &mut Archive, expansion: &mut Archive) -> Result<(), a
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
     rendering::render(vec![(Affine3A::from_translation(Vec3::new(0.0, 0.0, 0.0)),
                             Rc::new((m2, vec![skin], blp_opt)))], vec![],
-                      HashMap::new());
+                      HashMap::new(), vec![]);
     Ok(())
 }
 
@@ -190,7 +191,8 @@ fn main_simple_wmo(common: &mut Archive, common2: &mut Archive) -> Result<(), an
     let wmos = vec![(Affine3A::IDENTITY, wmo, group_list)];
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    rendering::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map);
+    rendering::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map,
+                      vec![]);
     Ok(())
 }
 
@@ -253,7 +255,99 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
         render_list.push((transform, entry.clone()));
     }
 
-    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map);
+    let mut terrain_chunk = vec![];
+    let mut chunk_counter = 0u16; // last iteration will be 256 -> overflow
+
+    for mcnk in adt.mcnks {
+        let mut index_buffer = Vec::<u32>::new();
+        let mut vert_list = Vec::new();
+        let mcvt = mcnk.get_mcvt()?.unwrap();
+        // let mccv = // TODO: coloring
+
+
+        // index of 9x9: 17 * row + column
+        // index of high detail 8x8: 17 * row + column + 9
+        for row in 0..9 {
+            for column in 0..9 {
+                let low = MCNKChunk::get_index_low(row, column);
+                let height = mcvt[low as usize] / 102.40;
+                vert_list.push((Vec3::new(column as f32, row as f32, height), CImVector::from(0x0000FFFFu32)));
+            }
+
+            if row == 8 {
+                continue;
+            }
+
+            for column in 0..8 {
+                let high = MCNKChunk::get_index_high(row, column);
+                let height = mcvt[high as usize] / 102.40;
+                vert_list.push((Vec3::new(column as f32 + 0.5, row as f32 + 0.5, height), CImVector::from(0xFF0000FFu32)));
+            }
+        }
+
+        // build the index buffer, this is probably the most difficult part.
+        let low_res = false;
+        if low_res  {
+            for row in 0..8 { // last row won't work.
+                for column in 0..8 {
+                    // tri 1
+                    index_buffer.push(MCNKChunk::get_index_low(row, column) as u32);
+                    index_buffer.push(MCNKChunk::get_index_low(row, column + 1) as u32);
+                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column) as u32);
+
+                    // tri 2
+                    index_buffer.push(MCNKChunk::get_index_low(row, column + 1) as u32);
+                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column + 1) as u32);
+                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column) as u32);
+                }
+            }
+        } else {
+            for row in 0..8 { // last row won't work.
+                for column in 0..8 {
+                    // W
+                    index_buffer.push(MCNKChunk::get_index_low(row, column) as u32);
+                    index_buffer.push(MCNKChunk::get_index_high(row, column) as u32);
+                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column) as u32);
+
+                    // N
+                    index_buffer.push(MCNKChunk::get_index_low(row, column) as u32);
+                    index_buffer.push(MCNKChunk::get_index_low(row, column + 1) as u32);
+                    index_buffer.push(MCNKChunk::get_index_high(row, column) as u32);
+
+                    // E
+                    index_buffer.push(MCNKChunk::get_index_low(row, column + 1) as u32);
+                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column + 1) as u32);
+                    index_buffer.push(MCNKChunk::get_index_high(row, column) as u32);
+
+                    // S
+                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column) as u32);
+                    index_buffer.push(MCNKChunk::get_index_high(row, column) as u32);
+                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column + 1) as u32);
+                }
+            }
+        }
+
+
+        // let mut w = BufWriter::new(File::create("./terrain.obj")?);
+        // writeln!(w, "o {}","terrain")?;
+        // for v in vert_list {
+        //     let (vert, col) = v;
+        //     writeln!(w, "v {} {} {}", vert.x, vert.y, vert.z)?;
+        // }
+        //
+        // for i in index_buffer.chunks_exact(3) {
+        //     writeln!(w, "f {} {} {}", i[0] + 1, i[1] + 1, i[2] + 1)?;
+        // }
+
+        let chunk_column = (chunk_counter % 16) as f32 * 8.0 + mcnk.header.position.x;
+        let chunk_row = (chunk_counter / 16) as f32 * 8.0 + mcnk.header.position.y;
+        let chunk_height = mcnk.header.position.z;
+
+        terrain_chunk.push((C3Vector {x: chunk_column, y: chunk_row, z: chunk_height }, vert_list, index_buffer));
+        chunk_counter += 1;
+    }
+
+    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map, terrain_chunk);
     Ok(())
 }
 
