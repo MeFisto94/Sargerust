@@ -10,7 +10,7 @@ use image_blp::parser::parse_blp_with_externals;
 use itertools::Itertools;
 use mpq::Archive;
 use sargerust_files::adt::reader::ADTReader;
-use sargerust_files::adt::types::{MCNKChunk, SMDoodadDef};
+use sargerust_files::adt::types::{ADTAsset, MCCVSubChunk, MCNKChunk, SMDoodadDef};
 use sargerust_files::common::types::{C3Vector, C4Quaternion, CImVector};
 use sargerust_files::m2::reader::M2Reader;
 use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
@@ -51,6 +51,7 @@ fn main() {
 
     let simple_m2 = false;
     let simple_wmo = false;
+    let simple_adt = false;
 
     let mut common = Archive::open(data_folder.join("common.MPQ")).unwrap();
     let mut common2 = Archive::open(data_folder.join("common-2.MPQ")).unwrap();
@@ -70,8 +71,10 @@ fn main() {
     }
     else if simple_wmo {
         main_simple_wmo(&mut common, &mut common2).unwrap();
-    } else {
+    } else if simple_adt {
         main_simple_adt(&mut common, &mut common2).unwrap();
+    } else {
+        main_multiple_adt(&mut common, &mut common2).unwrap();
     }
 }
 
@@ -206,8 +209,35 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
     let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
     let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
     let mut texture_map = HashMap::new();
-
     let mut wmos: Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)> = Vec::new();
+
+    let terrain_chunk = handle_adt(common, common2, adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?;
+    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map, terrain_chunk);
+    Ok(())
+}
+
+fn main_multiple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), anyhow::Error> {
+    // technically, wdt loading doesn't differ all too much, because if it has terrain, it doesn't have it's own dooads
+    // and then all you have to check is for existing adt files (MAIN chunk)
+    let map_name = r"World\Maps\Kalimdor\Kalimdor";
+    let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
+    let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
+    let mut texture_map = HashMap::new();
+    let mut wmos: Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)> = Vec::new();
+    let mut terrain_chunks: Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)> = Vec::new();
+
+    for row in 0..2 {
+        for column in 0..2 {
+            let adt = ADTReader::parse_asset(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, &format!("{}_{}_{}.adt", map_name, row, column))?)?;
+            terrain_chunks.extend(handle_adt(common, common2, adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?);
+        }
+    }
+
+    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map, terrain_chunks);
+    Ok(())
+}
+
+fn handle_adt(common: &mut Archive, common2: &mut Archive, adt: Box<ADTAsset>, mut m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)>) -> Result<Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>, Error> {
     for wmo_ref in adt.modf.mapObjDefs.iter() {
         let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
         //dbg!(&name);
@@ -250,7 +280,7 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
         if name.to_lowercase().contains("emitter") ||
             name.to_uppercase().contains("GENERALDIRTYPLATE01") || name.to_uppercase().contains("GENERALCANDELABRA01")
             || name.to_uppercase().contains("GOLDSHIREINN")
-            || name.to_lowercase().contains("02")  {
+            || name.to_lowercase().contains("02") {
             continue;
         }
 
@@ -266,7 +296,8 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
         let mut vert_list = Vec::new();
         let mcvt = mcnk.get_mcvt()?.unwrap();
         let use_vertex_color: bool = true; // In theory with this flag we can turn it off for debug purposes.
-        let mccv_opt = mcnk.get_mccv()?.filter(|_| use_vertex_color); // smchunk flag has_mccv.
+        //let mccv_opt = mcnk.get_mccv()?.filter(|_| use_vertex_color); // smchunk flag has_mccv.
+        let mccv_opt: Option<MCCVSubChunk> = None; // TODO: Fixme
 
         // Here we're in ADT Terrain space, that is +x -> north, +y -> west. Thus rows grow in -x, columns go to -y.
         // index of 9x9: 17 * row + column
@@ -297,7 +328,7 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
 
         // build the index buffer, this is probably the most difficult part.
         let low_res = false;
-        if low_res  {
+        if low_res {
             for row in 0..8 { // last row won't work.
                 for column in 0..8 {
                     // tri 1
@@ -351,14 +382,12 @@ fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), an
         let chunk_height = mcnk.header.position.z;
         let x = mcnk.header.position.x;
         let y = mcnk.header.position.y;
-        let pos = C3Vector {x, y, z: chunk_height };
+        let pos = C3Vector { x, y, z: chunk_height };
         dbg!(pos);
 
         terrain_chunk.push((pos, vert_list, index_buffer));
     }
-
-    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map, terrain_chunk);
-    Ok(())
+    Ok(terrain_chunk)
 }
 
 fn transform_for_doodad_ref(dad_ref: SMDoodadDef) -> Affine3A {
