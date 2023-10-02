@@ -15,38 +15,13 @@ use sargerust_files::common::types::{C3Vector, CImVector};
 
 use sargerust_files::wmo::types::{SMOMaterial, WMOGroupAsset, WMORootAsset};
 use crate::rendering::common::coordinate_systems;
-use crate::rendering::common::types::{Mesh, MeshWithLod, VertexBuffers};
+use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, TransparencyType, VertexBuffers};
 use crate::rendering::importer::wmo_importer::WMOGroupImporter;
+use crate::rendering::rend3_backend::Rend3BackendConverter;
 
 pub mod common;
 pub mod importer;
-
-fn create_mesh_from_ir_internal(vertex_buffers: &VertexBuffers, indices: &Vec<u32>) -> Result<rend3::types::Mesh, anyhow::Error>  {
-  // TODO: introspect the individual buffers, and if they are >0, call .with_foo().
-  let mut builder = rend3::types::MeshBuilder::new(vertex_buffers.position_buffer.clone(), rend3::types::Handedness::Right);
-  builder = builder.with_indices(indices.clone());
-
-  if !vertex_buffers.texcoord_buffer_0.is_empty() {
-    builder = builder.with_vertex_texture_coordinates_0(vertex_buffers.texcoord_buffer_0.clone());
-  }
-
-  if !vertex_buffers.normals_buffer.is_empty() {
-    builder = builder.with_vertex_normals(vertex_buffers.normals_buffer.clone());
-  }
-
-  if !vertex_buffers.vertex_color_0.is_empty() {
-    builder = builder.with_vertex_color_0(vertex_buffers.vertex_color_0.clone());
-  }
-
-  Ok(builder.build()?)
-}
-fn create_mesh_from_ir(mesh: &Mesh) -> Result<rend3::types::Mesh, anyhow::Error> {
-  create_mesh_from_ir_internal(&mesh.vertex_buffers, &mesh.index_buffer)
-}
-
-fn create_mesh_from_ir_lod(mesh: &MeshWithLod, lod_level: usize) -> Result<rend3::types::Mesh, anyhow::Error> {
-  create_mesh_from_ir_internal(&mesh.vertex_buffers, &mesh.index_buffers[lod_level])
-}
+pub mod rend3_backend;
 
 fn create_texture_rgba8(blp: &BlpImage, mipmap_level: usize) -> rend3::types::Texture {
   let image = blp_to_image(blp, mipmap_level).expect("decode");
@@ -147,7 +122,7 @@ where
   for (transform, rc) in placed_doodads {
     let ( _mesh, blp_opt) = rc.deref();
     // Create mesh and calculate smooth normals based on vertices
-    let mesh = create_mesh_from_ir(&_mesh).unwrap();
+    let mesh = Rend3BackendConverter::create_mesh_from_ir(&_mesh).unwrap();
 
     // Add mesh to renderer's world.
     //
@@ -155,21 +130,19 @@ where
     // make an object.
     let mesh_handle = renderer.add_mesh(mesh);
 
-    // Add PBR material with all defaults except a single color.
-    // let material = rend3_routine::pbr::PbrMaterial {
-    //   albedo: rend3_routine::pbr::AlbedoComponent::Value(glam::Vec4::new(0.0, 0.5, 0.5, 1.0)),
-    //   ..rend3_routine::pbr::PbrMaterial::default()
-    // };
-
-    let material = match blp_opt {
-      Some(blp) => {
-        let tex = create_texture_rgba8(blp, 0);
-        let texture_handle = renderer.add_texture_2d(tex);
-        create_material(Some(texture_handle))
+    let _material = Material {
+      albedo:
+      match blp_opt {
+        Some(texture_handle) => AlbedoType::Texture/*(TODO)*/,
+        None =>  AlbedoType::Value(Vec4::new(0.6, 0.6, 0.6, 1.0))
       },
-      None => create_material(None)
+      is_unlit: true,
+      transparency: TransparencyType::Cutout { cutout: 0.1 },
     };
 
+    // TODO: concept work for textures
+    let mapped_tex = blp_opt.as_ref().map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
+    let material = Rend3BackendConverter::create_material_from_ir(&_material, mapped_tex);
     let material_handle = renderer.add_material(material);
 
     // Combine the mesh and the material with a location to give an object.
@@ -200,7 +173,7 @@ where
         //
         // All handles are refcounted, so we only need to hang onto the handle until we
         // make an object.
-        let mesh = create_mesh_from_ir_lod(&lod_mesh, i).unwrap();
+        let mesh = Rend3BackendConverter::create_mesh_from_ir_lod(&lod_mesh, i).unwrap();
         let mesh_handle = renderer.add_mesh(mesh);
 
         let first_material = match batch.material_id {
@@ -213,14 +186,26 @@ where
           textures.get(&wmo_root.motx.textureNameList[offset])
         });
 
-        let material = match blp_opt {
-          Some(blp) => {
-            let tex = create_texture_rgba8(blp, 0);
-            let texture_handle = renderer.add_texture_2d(tex);
-            create_material_wmo(first_material, Some(texture_handle))
-          },
-          None => create_material_wmo(first_material, None)
+        let _material = Material {
+          albedo:
+          match first_material {
+            Some(_mat) =>
+              match blp_opt {
+                Some(texture_handle) => AlbedoType::Texture/*(TODO)*/,
+                None => AlbedoType::Value(Vec4::new(_mat.diffColor.r as f32 / 255.0, _mat.diffColor.g as f32 / 255.0,
+                                                    _mat.diffColor.b as f32 / 255.0, _mat.diffColor.a as f32 / 255.0))
+              },
+              None => AlbedoType::Value(Vec4::new(0.6, 0.6, 0.6, 1.0))
+            },
+          is_unlit: true,
+          transparency: TransparencyType::Opaque
         };
+
+        dbg!(&_material);
+
+        // TODO: concept work for textures
+        let mapped_tex = blp_opt.as_ref().map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
+        let material = Rend3BackendConverter::create_material_from_ir(&_material, mapped_tex);
         let material_handle = renderer.add_material(material);
 
         // Combine the mesh and the material with a location to give an object.
@@ -257,16 +242,18 @@ where
       index_buffer: indices
     };
 
-    let mut mesh = create_mesh_from_ir(&_mesh).unwrap();
+    let mut mesh = Rend3BackendConverter::create_mesh_from_ir(&_mesh).unwrap();
     mesh.flip_winding_order(); // it would be better if the mesh came pre-flipped, I guess (especially since the IR is cached).
-
     let mesh_handle = renderer.add_mesh(mesh);
-    let material = PbrMaterial {
-      unlit: true,
-      albedo: AlbedoComponent::Vertex {srgb: false},
-      ..PbrMaterial::default()
+
+    let _material = Material {
+      is_unlit: true,
+      albedo: AlbedoType::Vertex { srgb: true },
+      transparency: TransparencyType::Opaque
     };
+    let material = Rend3BackendConverter::create_material_from_ir(&_material, None);
     let material_handle = renderer.add_material(material);
+
     // Don't ask me where flipping the z and the heightmap values comes from.
     // Actually, I think I flipped everything there is now, for consistency with ADT and where it should belong (i.e. 16k, 16k; not negative area)
     let tt = coordinate_systems::adt_to_blender_transform(Vec3A::new(position.x, position.y, position.z));
@@ -446,41 +433,6 @@ where
     // Other events we don't care about
     _ => {}
   });
-}
-
-fn create_material(texture: Option<Texture2DHandle>) -> PbrMaterial {
-  rend3_routine::pbr::PbrMaterial {
-    albedo:
-    match texture {
-      Some(texture_handle) => rend3_routine::pbr::AlbedoComponent::Texture(texture_handle),
-      None =>  rend3_routine::pbr::AlbedoComponent::Value(Vec4::new(0.6, 0.6, 0.6, 1.0))
-    },
-    unlit: true,
-    transparency: rend3_routine::pbr::Transparency::Cutout {cutout: 0.1},
-    ..PbrMaterial::default()
-  }
-}
-
-fn create_material_wmo(material: Option<&SMOMaterial>, texture: Option<Texture2DHandle>) -> PbrMaterial {
-  match material {
-    None => PbrMaterial {
-      albedo: rend3_routine::pbr::AlbedoComponent::Value(Vec4::new(0.6, 0.6, 0.6, 1.0)),
-      unlit: true,
-      //transparency: rend3_routine::pbr::Transparency::Blend,
-      ..PbrMaterial::default()
-    },
-    Some(_mat) => PbrMaterial {
-      albedo: match texture {
-        Some(texture_handle) => rend3_routine::pbr::AlbedoComponent::Texture(texture_handle),
-        None => rend3_routine::pbr::AlbedoComponent::Value(
-          Vec4::new(_mat.diffColor.r as f32 / 255.0, _mat.diffColor.g as f32 / 255.0,
-                    _mat.diffColor.b as f32 / 255.0, _mat.diffColor.a as f32 / 255.0)),
-      },
-      unlit: true,
-      //transparency: rend3_routine::pbr::Transparency::Blend,
-      ..PbrMaterial::default()
-    }
-  }
 }
 
 fn create_object(transform: Affine3A, mesh_handle: MeshHandle, material_handle: MaterialHandle) -> Object {

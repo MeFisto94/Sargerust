@@ -96,7 +96,7 @@ pub struct SMOMaterial {
   pub frameSidnColor: CImVector,
   pub texture_2: u32,
   pub diffColor: CImVector,
-  pub ground_type: u32, // foreign_keyⁱ<uint32_t, &TerrainTypeRec::m_ID>
+  pub ground_type: u32, // foreign_key <uint32_t, &TerrainTypeRec::m_ID>
   pub texture_3: u32,
   pub color_2: u32,
   pub flags_2: u32,

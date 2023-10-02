@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Formatter};
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
 
 #[derive(Clone)]
 pub struct Mesh {
@@ -40,4 +40,40 @@ impl Debug for VertexBuffers {
 pub struct MeshWithLod {
     pub vertex_buffers: VertexBuffers,
     pub index_buffers: Vec<Vec<u32>>
+}
+
+
+/// Note: The structs in here are very much driven by the current backend/use-case and as such may change
+/// quite often. This is especially true for the material, that has a complex structure.
+#[derive(Clone, Debug)]
+pub struct Material {
+    pub is_unlit: bool,
+    pub albedo: AlbedoType,
+    pub transparency: TransparencyType,
+}
+
+#[derive(Clone, Debug)]
+pub enum AlbedoType {
+    None,
+    Vertex {
+        srgb: bool
+    },
+    Value(Vec4),
+    ValueVertex {
+        value: Vec4,
+        /// Vertex should be converted from srgb -> linear before
+        /// multiplication.
+        srgb: bool,
+    },
+    Texture // TODO
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum TransparencyType {
+    /// Alpha is completely ignored.
+    Opaque,
+    /// Pixels with alpha less than `cutout` is discorded.
+    Cutout { cutout: f32 },
+    /// Alpha is blended.
+    Blend,
 }
