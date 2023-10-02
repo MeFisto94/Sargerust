@@ -40,17 +40,17 @@ git clone https://github.com/msierks/mpq-rust.git && cd mpq-rust && cargo build 
 
 print '(listfile)' contents:
 ```sh
-target/release/mpq -l common.MPQ
+cargo run --example mpq -- -l common.MPQ
 ```
 
 extract file:
 ```
-target/release/mpq -x "(listfile)" common.MPQ
+cargo run --example mpq -- -x "(listfile)" common.MPQ
 ```
 
 More help:
 ```
-target/release/mpq -h
+cargo run --example mpq -- -h
 ```
 
 ## License
