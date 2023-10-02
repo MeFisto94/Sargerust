@@ -1,7 +1,8 @@
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
+use image_blp::BlpImage;
 use itertools::Itertools;
 use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
-use crate::rendering::common::types::{Mesh, VertexBuffers};
+use crate::rendering::common::types::{AlbedoType, Material, Mesh, TransparencyType, VertexBuffers};
 
 pub struct M2Importer {
 }
@@ -60,5 +61,17 @@ impl M2Importer {
     pub fn create_lodable_mesh_lod(skin: &M2SkinProfile) -> Vec<u32> {
         // the indices are local to the values in skin.vertices, so we need to translate the index buffer
         skin.indices.iter().map(|&idx| skin.vertices[idx as usize] as u32).collect_vec()
+    }
+
+    pub fn create_material(blp_opt: &Option<BlpImage> /* TODO */) -> Material {
+        Material {
+            albedo:
+                match blp_opt {
+                    Some(texture_handle) => AlbedoType::Texture/*(TODO)*/,
+                    None =>  AlbedoType::Value(Vec4::new(0.6, 0.6, 0.6, 1.0))
+                },
+            is_unlit: true,
+            transparency: TransparencyType::Cutout { cutout: 0.1 },
+        }
     }
 }

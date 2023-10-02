@@ -10,10 +10,9 @@ use image_blp::convert::blp_to_image;
 use itertools::Itertools;
 use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, Texture2DHandle};
 use rend3::util::typedefs::FastHashMap;
-use rend3_routine::pbr::{AlbedoComponent, PbrMaterial};
 use sargerust_files::common::types::{C3Vector, CImVector};
 
-use sargerust_files::wmo::types::{SMOMaterial, WMOGroupAsset, WMORootAsset};
+use sargerust_files::wmo::types::{WMOGroupAsset, WMORootAsset};
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, TransparencyType, VertexBuffers};
 use crate::rendering::importer::wmo_importer::WMOGroupImporter;
@@ -38,6 +37,14 @@ fn create_texture_rgba8(blp: &BlpImage, mipmap_level: usize) -> rend3::types::Te
   }
 }
 
+fn create_object(transform: Affine3A, mesh_handle: MeshHandle, material_handle: MaterialHandle) -> Object {
+  rend3::types::Object {
+    mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
+    material: material_handle,
+    transform: transform.into()
+  }
+}
+
 #[derive(Default)]
 struct App {
   pub scancode_status: FastHashMap<u32, bool>,
@@ -48,7 +55,7 @@ struct App {
 }
 
 // since the current impl doesn't care about RAM (see the mpq crate force-loading all mpqs), we can safely pass a load of (potentially unused) textures
-pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(Mesh, Option<BlpImage>)>)>, wmos: W,
+pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)>, wmos: W,
                      textures: HashMap<String, BlpImage>,
                      terrain_chunk: Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>)
 where
@@ -120,25 +127,10 @@ where
   let mut object_list = Vec::new(); // we need to prevent object handles from getting dropped.
 
   for (transform, rc) in placed_doodads {
-    let ( _mesh, blp_opt) = rc.deref();
+    let ( _mesh, _material, blp_opt) = rc.deref();
     // Create mesh and calculate smooth normals based on vertices
-    let mesh = Rend3BackendConverter::create_mesh_from_ir(&_mesh).unwrap();
-
-    // Add mesh to renderer's world.
-    //
-    // All handles are refcounted, so we only need to hang onto the handle until we
-    // make an object.
+    let mesh = Rend3BackendConverter::create_mesh_from_ir(_mesh).unwrap();
     let mesh_handle = renderer.add_mesh(mesh);
-
-    let _material = Material {
-      albedo:
-      match blp_opt {
-        Some(texture_handle) => AlbedoType::Texture/*(TODO)*/,
-        None =>  AlbedoType::Value(Vec4::new(0.6, 0.6, 0.6, 1.0))
-      },
-      is_unlit: true,
-      transparency: TransparencyType::Cutout { cutout: 0.1 },
-    };
 
     // TODO: concept work for textures
     let mapped_tex = blp_opt.as_ref().map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
@@ -200,8 +192,6 @@ where
           is_unlit: true,
           transparency: TransparencyType::Opaque
         };
-
-        dbg!(&_material);
 
         // TODO: concept work for textures
         let mapped_tex = blp_opt.as_ref().map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
@@ -433,13 +423,4 @@ where
     // Other events we don't care about
     _ => {}
   });
-}
-
-fn create_object(transform: Affine3A, mesh_handle: MeshHandle, material_handle: MaterialHandle) -> Object {
-  dbg!(transform.to_scale_rotation_translation());
-  rend3::types::Object {
-    mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
-    material: material_handle,
-    transform: /*Mat4::from_euler(glam::EulerRot::XYZ, 0.0, 1.0 * PI, 0.75 * PI) * */transform.into()
-  }
 }
