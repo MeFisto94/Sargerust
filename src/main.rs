@@ -10,6 +10,7 @@ use image_blp::parser::parse_blp_with_externals;
 use itertools::Itertools;
 use log::warn;
 use mpq::Archive;
+use rend3::types::Mesh;
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::{ADTAsset, MCCVSubChunk, MCNKChunk, SMDoodadDef};
 use sargerust_files::common::types::{C3Vector, C4Quaternion, CImVector};
@@ -20,6 +21,7 @@ use sargerust_files::wmo::reader::WMOReader;
 use sargerust_files::wmo::types::{WMOGroupAsset, WMORootAsset};
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
+use crate::rendering::importer::m2_importer::M2Importer;
 
 mod io;
 mod rendering;
@@ -55,7 +57,7 @@ fn main() {
     // debug_dump_mpq_filelist(data_folder, "expansion.MPQ");
     // debug_dump_mpq_filelist(data_folder, "lichking.MPQ");
 
-    let simple_m2 = false;
+    let simple_m2 = true;
     let simple_wmo = false;
     let simple_adt = false;
 
@@ -85,8 +87,8 @@ fn main() {
 
 
 /// Extracts the doodads (i.e. M2 models that have been placed into the world at a specific position) that are defined in the WMO Root
-fn collect_dooads(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> {
-    let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
+fn collect_dooads(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(rendering::common::types::Mesh, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Option<BlpImage>)>)> {
+    let mut render_list: Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Option<BlpImage>)>)> = Vec::new();
     for mods in &wmo.mods.doodadSetList {
         let start = mods.startIndex as usize;
         let end = (mods.startIndex + mods.count) as usize;
@@ -110,7 +112,8 @@ fn collect_dooads(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(M2A
     render_list
 }
 
-fn load_m2_doodad(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, name: &String) -> Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)> {
+fn load_m2_doodad(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(rendering::common::types::Mesh, Option<BlpImage>)>>, name: &String) -> Rc<(rendering::common::types::Mesh, Option<BlpImage>)> {
+    // TODO: this should be called by the simple_m2 path
     let entry = m2_cache.entry(name.clone()).or_insert_with(|| {
         let mut m2_file = std::io::Cursor::new(loader.load_raw_owned(&name).unwrap());
         let m2_asset = M2Reader::parse_asset(&mut m2_file).unwrap();
@@ -123,7 +126,10 @@ fn load_m2_doodad(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(M2A
             blp_opt = load_blp_from_ldr(loader, &m2_asset.textures[0].filename);
         }
 
-        Rc::new((m2_asset, vec![skin], blp_opt))
+        let imported_mesh = M2Importer::create_mesh(&m2_asset, &skin);
+        dbg!(&imported_mesh);
+
+        Rc::new((imported_mesh, blp_opt))
     });
     entry.clone()
 }
@@ -163,10 +169,12 @@ fn main_simple_m2(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     let m2 = M2Reader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(m2_path).unwrap()))?;
     let skin = M2Reader::parse_skin_profile(&mut std::io::Cursor::new(loader.load_raw_owned(skin_path).unwrap()))?;
     let blp_opt = load_blp_from_ldr(loader, tex_path);
+    let imported_mesh = M2Importer::create_mesh(&m2, &skin);
+    dbg!(&imported_mesh);
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
     rendering::render(vec![(Affine3A::from_translation(Vec3::new(0.0, 0.0, 0.0)),
-                            Rc::new((m2, vec![skin], blp_opt)))], vec![],
+                            Rc::new((imported_mesh, blp_opt)))], vec![],
                       HashMap::new(), vec![]);
     Ok(())
 }
@@ -182,7 +190,7 @@ fn main_simple_wmo(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
 
     // TODO: m2_cache should become an implementation detail of the struct that provides collect_doodads?
     // TODO: collect_doodads shouldn't contain the cache loading logic anyway.
-    let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
+    let mut m2_cache: HashMap<String, Rc<( rendering::common::types::Mesh, Option<BlpImage>)>> = HashMap::new();
 
     let dooads = collect_dooads(loader, &mut m2_cache, &mut wmo);
     let group_list = load_wmo_groups(loader, &wmo, wmo_path);
@@ -207,8 +215,8 @@ fn main_simple_wmo(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
 fn main_simple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(r"World\Maps\Kalimdor\Kalimdor_1_1.adt").unwrap()))?;
 
-    let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
-    let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
+    let mut m2_cache: HashMap<String, Rc<(rendering::common::types::Mesh, Option<BlpImage>)>> = HashMap::new();
+    let mut render_list: Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Option<BlpImage>)>)> = Vec::new();
     let mut texture_map = HashMap::new();
     let mut wmos: Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)> = Vec::new();
 
@@ -221,8 +229,8 @@ fn main_multiple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     // technically, wdt loading doesn't differ all too much, because if it has terrain, it doesn't have it's own dooads
     // and then all you have to check is for existing adt files (MAIN chunk)
     let map_name = r"World\Maps\Kalimdor\Kalimdor";
-    let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
-    let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
+    let mut m2_cache: HashMap<String, Rc<(rendering::common::types::Mesh, Option<BlpImage>)>> = HashMap::new();
+    let mut render_list: Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Option<BlpImage>)>)> = Vec::new();
     let mut texture_map = HashMap::new();
     let mut wmos: Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)> = Vec::new();
     let mut terrain_chunks: Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)> = Vec::new();
@@ -238,7 +246,7 @@ fn main_multiple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, mut m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)>) -> Result<Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>, anyhow::Error> {
+fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap<String, Rc<(rendering::common::types::Mesh, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)>) -> Result<Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>, anyhow::Error> {
     for wmo_ref in adt.modf.mapObjDefs.iter() {
         let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
         //dbg!(&name);
@@ -272,20 +280,18 @@ fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, mut m2_cache: &mut Has
         wmos.push((transform, wmo, group_list));
     }
 
+    // TODO: deduplicate with collect doodads (at least the emitter and m2 name replacement)
     for dad_ref in adt.mddf.doodadDefs {
         let name = &adt.mmdx.filenames[*adt.mmdx.offsets.get(&adt.mmid.mmdx_offsets[dad_ref.nameId as usize]).unwrap()];
         dbg!(&name);
 
         // fix name: currently it ends with .mdx but we need .m2
-        let name = name.to_lowercase().replace(".mdx", ".m2"); // MDL as well, in general this has overlap with wmo loading.
-        if name.to_lowercase().contains("emitter") // ||
-            /*name.to_uppercase().contains("GENERALDIRTYPLATE01") || name.to_uppercase().contains("GENERALCANDELABRA01")
-            || name.to_uppercase().contains("GOLDSHIREINN")
-            || name.to_lowercase().contains("02")*/ {
+        let name = name.to_lowercase().replace(".mdx", ".m2").replace(".mdl", ".m2");
+        if name.to_lowercase().contains("emitter") {
             continue;
         }
 
-        let entry = load_m2_doodad(loader, &mut m2_cache, &name);
+        let entry = load_m2_doodad(loader, m2_cache, &name);
         let transform = transform_for_doodad_ref(dad_ref);
         render_list.push((transform, entry.clone()));
     }

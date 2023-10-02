@@ -16,33 +16,17 @@ use sargerust_files::common::types::{C3Vector, CArgb, CImVector};
 use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
 use sargerust_files::wmo::types::{SMOMaterial, WMOGroupAsset, WMORootAsset};
 use crate::rendering::common::coordinate_systems;
+use crate::rendering::common::types::Mesh;
 
-mod common;
+pub mod common;
+pub mod importer;
 
-// TODO: We have one big weirdness: everything needs to be turned upside down, _but_ this doesn't seem to be a camera setup problem, as one can see by the camera location.
-
-fn create_mesh(asset: &M2Asset, skin: &M2SkinProfile) -> Result<rend3::types::Mesh, anyhow::Error>{
-  let mut verts = Vec::<Vec3>::with_capacity(skin.vertices.len());
-  let mut uvs = Vec::<Vec2>::with_capacity(skin.vertices.len());
-
-  for v in &skin.vertices {
-    let vert = &asset.vertices[*v as usize];
-    // This is still weird, apparently WoW is Z-up, so once shall convert it to y-up with (X, -Z, Y).
-    // at the same time this engine supports a RHS, and after flipping the camera from the X-Z plane into the X-Y, the models render top down
-    verts.push(Vec3::new(vert.pos.x, vert.pos.y, vert.pos.z));
-    uvs.push(Vec2::new(vert.tex_coords[0].x, vert.tex_coords[0].y));
-  }
-
-  let mut indices = Vec::<u32>::with_capacity(skin.indices.len());
-  for &i in &skin.indices {
-    indices.push(i as u32); // maybe flip 2nd and 3rd index for the right winding order? handness should do that though.
-  }
-
-  let mesh = rend3::types::MeshBuilder::new(verts, rend3::types::Handedness::Right) // used to be RIGHT
-      .with_indices(indices)
-      .with_vertex_texture_coordinates_0(uvs)
-      .build()?;
-  Ok(mesh)
+fn create_mesh_from_ir(mesh: Mesh) -> Result<rend3::types::Mesh, anyhow::Error> {
+  // TODO: introspect the individual buffers, and if they are >0, call .with_foo().
+  Ok(rend3::types::MeshBuilder::new(mesh.vertex_buffers.position_buffer, rend3::types::Handedness::Right) // used to be RIGHT
+         .with_indices(mesh.index_buffer)
+         .with_vertex_texture_coordinates_0(mesh.vertex_buffers.texcoord_buffer_0)
+         .build()?)
 }
 
 fn create_mesh_wmo(asset: &WMOGroupAsset, start_index: usize, index_count: usize, start_vertex: usize, last_vertex: usize) -> Result<rend3::types::Mesh, anyhow::Error> {
@@ -89,11 +73,13 @@ struct App {
 }
 
 // since the current impl doesn't care about RAM (see the mpq crate force-loading all mpqs), we can safely pass a load of (potentially unused) textures
-pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>,
-              wmos: W, textures: HashMap<String, BlpImage>, terrain_chunk: Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>)
+pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(Mesh, Option<BlpImage>)>)>, wmos: W,
+                     textures: HashMap<String, BlpImage>,
+                     terrain_chunk: Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>)
 where
   W: IntoIterator<Item = (&'a Affine3A, &'a WMORootAsset, &'a Vec<WMOGroupAsset>)>,
 {
+  // TODO: shouldn't we expect MeshWithLods already? Could also have a vec<mesh> at least. This conflicts with loading lods on demand, though.
   let mut app = App::default();
 
   // Create event loop and window
@@ -159,9 +145,9 @@ where
   let mut object_list = Vec::new(); // we need to prevent object handles from getting dropped.
 
   for (transform, rc) in placed_doodads {
-    let (asset, skins, blp_opt) = rc.deref();
+    let ( _mesh, blp_opt) = rc.deref();
     // Create mesh and calculate smooth normals based on vertices
-    let mesh = create_mesh(asset, skins.first().unwrap()).unwrap();
+    let mesh = create_mesh_from_ir(_mesh.clone()).unwrap();
 
     // Add mesh to renderer's world.
     //
