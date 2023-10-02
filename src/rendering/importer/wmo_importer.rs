@@ -25,6 +25,7 @@ impl WMOGroupImporter {
             tangents_buffer: vec![],
             texcoord_buffer_0: uv,
             texcoord_buffer_1: vec![],
+            vertex_color_0: vec![]
         }
     }
 

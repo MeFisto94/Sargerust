@@ -33,6 +33,7 @@ impl M2Importer {
                 tangents_buffer: vec![],
                 texcoord_buffer_0: uvs,
                 texcoord_buffer_1: vec![],
+                vertex_color_0: vec![],
             }
         }
     }
@@ -52,6 +53,7 @@ impl M2Importer {
             tangents_buffer: vec![],
             texcoord_buffer_0: uvs,
             texcoord_buffer_1: vec![],
+            vertex_color_0: vec![],
         }
     }
 

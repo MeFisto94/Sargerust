@@ -21,6 +21,7 @@ pub struct VertexBuffers {
     pub tangents_buffer: Vec<Vec3>,
     pub texcoord_buffer_0: Vec<Vec2>,
     pub texcoord_buffer_1: Vec<Vec2>,
+    pub vertex_color_0: Vec<[u8; 4]>,
 }
 
 impl Debug for VertexBuffers {
@@ -29,7 +30,8 @@ impl Debug for VertexBuffers {
         write!(f, "normals_buffer: [{}], ", self.normals_buffer.len())?;
         write!(f, "tangents_buffer: [{}], ", self.tangents_buffer.len())?;
         write!(f, "texcoord_buffer_0: [{}], ", self.texcoord_buffer_0.len())?;
-        write!(f, "texcoord_buffer_1: [{}] }}", self.texcoord_buffer_1.len())
+        write!(f, "texcoord_buffer_1: [{}], ", self.texcoord_buffer_1.len())?;
+        write!(f, "vertex_color_0: [{}] }}", self.vertex_color_0.len())
     }
 }
 

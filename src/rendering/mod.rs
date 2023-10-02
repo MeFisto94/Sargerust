@@ -15,34 +15,37 @@ use sargerust_files::common::types::{C3Vector, CImVector};
 
 use sargerust_files::wmo::types::{SMOMaterial, WMOGroupAsset, WMORootAsset};
 use crate::rendering::common::coordinate_systems;
-use crate::rendering::common::types::{Mesh, MeshWithLod};
+use crate::rendering::common::types::{Mesh, MeshWithLod, VertexBuffers};
 use crate::rendering::importer::wmo_importer::WMOGroupImporter;
 
 pub mod common;
 pub mod importer;
 
-fn create_mesh_from_ir(mesh: Mesh) -> Result<rend3::types::Mesh, anyhow::Error> {
+fn create_mesh_from_ir_internal(vertex_buffers: &VertexBuffers, indices: &Vec<u32>) -> Result<rend3::types::Mesh, anyhow::Error>  {
   // TODO: introspect the individual buffers, and if they are >0, call .with_foo().
-  Ok(rend3::types::MeshBuilder::new(mesh.vertex_buffers.position_buffer, rend3::types::Handedness::Right) // used to be RIGHT
-         .with_indices(mesh.index_buffer)
-         .with_vertex_texture_coordinates_0(mesh.vertex_buffers.texcoord_buffer_0)
-         .build()?)
-}
+  let mut builder = rend3::types::MeshBuilder::new(vertex_buffers.position_buffer.clone(), rend3::types::Handedness::Right);
+  builder = builder.with_indices(indices.clone());
 
-fn create_mesh_from_ir_lod(mesh: &MeshWithLod, lod_level: usize) -> Result<rend3::types::Mesh, anyhow::Error> {
-  // TODO: introspect the individual buffers, and if they are >0, call .with_foo().
-  let mut builder = rend3::types::MeshBuilder::new(mesh.vertex_buffers.position_buffer.clone(), rend3::types::Handedness::Right);
-  builder = builder.with_indices(mesh.index_buffers[lod_level].clone());
-
-  if !mesh.vertex_buffers.texcoord_buffer_0.is_empty() {
-    builder = builder.with_vertex_texture_coordinates_0(mesh.vertex_buffers.texcoord_buffer_0.clone());
+  if !vertex_buffers.texcoord_buffer_0.is_empty() {
+    builder = builder.with_vertex_texture_coordinates_0(vertex_buffers.texcoord_buffer_0.clone());
   }
 
-  if !mesh.vertex_buffers.normals_buffer.is_empty() {
-    builder = builder.with_vertex_normals(mesh.vertex_buffers.normals_buffer.clone());
+  if !vertex_buffers.normals_buffer.is_empty() {
+    builder = builder.with_vertex_normals(vertex_buffers.normals_buffer.clone());
+  }
+
+  if !vertex_buffers.vertex_color_0.is_empty() {
+    builder = builder.with_vertex_color_0(vertex_buffers.vertex_color_0.clone());
   }
 
   Ok(builder.build()?)
+}
+fn create_mesh_from_ir(mesh: &Mesh) -> Result<rend3::types::Mesh, anyhow::Error> {
+  create_mesh_from_ir_internal(&mesh.vertex_buffers, &mesh.index_buffer)
+}
+
+fn create_mesh_from_ir_lod(mesh: &MeshWithLod, lod_level: usize) -> Result<rend3::types::Mesh, anyhow::Error> {
+  create_mesh_from_ir_internal(&mesh.vertex_buffers, &mesh.index_buffers[lod_level])
 }
 
 fn create_texture_rgba8(blp: &BlpImage, mipmap_level: usize) -> rend3::types::Texture {
@@ -144,7 +147,7 @@ where
   for (transform, rc) in placed_doodads {
     let ( _mesh, blp_opt) = rc.deref();
     // Create mesh and calculate smooth normals based on vertices
-    let mesh = create_mesh_from_ir(_mesh.clone()).unwrap();
+    let mesh = create_mesh_from_ir(&_mesh).unwrap();
 
     // Add mesh to renderer's world.
     //
@@ -238,15 +241,24 @@ where
     let (position, verts, indices) = chunk;
 
     // TODO: Submethod
-    let mesh_verts = verts.iter().map(|(v, col)| Vec3::new(v.x, v.y, v.z)).collect_vec();
-    let mesh_col = verts.iter().map(|(v, col)| [col.r, col.g, col.b, col.a]).collect_vec();
+    let mesh_verts = verts.iter().map(|(v, _)| Vec3::new(v.x, v.y, v.z)).collect_vec();
+    let mesh_col = verts.iter().map(|(_, col)| [col.r, col.g, col.b, col.a]).collect_vec();
 
-    let mut mesh = rend3::types::MeshBuilder::new(mesh_verts, rend3::types::Handedness::Left) // used to be RIGHT
-        .with_indices(indices)
-        .with_vertex_color_0(mesh_col)
-        .build().unwrap();
+    let _mesh = Mesh {
+      vertex_buffers: VertexBuffers {
+        position_buffer: mesh_verts,
+        vertex_color_0: mesh_col,
 
-    mesh.double_side();
+        normals_buffer: vec![],
+        tangents_buffer: vec![],
+        texcoord_buffer_0: vec![],
+        texcoord_buffer_1: vec![],
+      },
+      index_buffer: indices
+    };
+
+    let mut mesh = create_mesh_from_ir(&_mesh).unwrap();
+    mesh.flip_winding_order(); // it would be better if the mesh came pre-flipped, I guess (especially since the IR is cached).
 
     let mesh_handle = renderer.add_mesh(mesh);
     let material = PbrMaterial {
