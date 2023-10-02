@@ -5,3 +5,4 @@
 /// multiple times (especially also for instancing), without directly working in the complexity
 /// that is the asset files themselves.
 pub mod m2_importer;
+pub mod wmo_importer;

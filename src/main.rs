@@ -57,7 +57,7 @@ fn main() {
     // debug_dump_mpq_filelist(data_folder, "expansion.MPQ");
     // debug_dump_mpq_filelist(data_folder, "lichking.MPQ");
 
-    let simple_m2 = true;
+    let simple_m2 = false;
     let simple_wmo = false;
     let simple_adt = false;
 

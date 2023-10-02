@@ -8,15 +8,15 @@ use glam::{Affine3A, DVec2, Mat4, Vec2, Vec3, Vec3A, Vec4};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use itertools::Itertools;
-use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, Texture2DHandle, VertexAttribute};
+use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, Texture2DHandle};
 use rend3::util::typedefs::FastHashMap;
 use rend3_routine::pbr::{AlbedoComponent, PbrMaterial};
-use sargerust_files::common::types::{C3Vector, CArgb, CImVector};
+use sargerust_files::common::types::{C3Vector, CImVector};
 
-use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
 use sargerust_files::wmo::types::{SMOMaterial, WMOGroupAsset, WMORootAsset};
 use crate::rendering::common::coordinate_systems;
-use crate::rendering::common::types::Mesh;
+use crate::rendering::common::types::{Mesh, MeshWithLod};
+use crate::rendering::importer::wmo_importer::WMOGroupImporter;
 
 pub mod common;
 pub mod importer;
@@ -29,23 +29,20 @@ fn create_mesh_from_ir(mesh: Mesh) -> Result<rend3::types::Mesh, anyhow::Error> 
          .build()?)
 }
 
-fn create_mesh_wmo(asset: &WMOGroupAsset, start_index: usize, index_count: usize, start_vertex: usize, last_vertex: usize) -> Result<rend3::types::Mesh, anyhow::Error> {
-  /* [start_vertex..last_vertex + 1]: NOTE: Currently, the vertex buffer slicing is disabled,
-   as there seem to be indices that exceed the vertex buffer range, failing validation */
-  let verts: Vec<Vec3> = asset.movt.vertexList.iter().map(|v| Vec3::new(v.x, v.y, v.z)).collect();
-  let normals: Vec<Vec3> = asset.monr.normalList.iter().map(|v| Vec3::new(v.x, v.y, v.z)).collect();
-  let indices: Vec<u32> = asset.movi.indices[start_index..start_index+index_count].iter().map(|&i| i as u32).collect();
-  let uvs: Vec<Vec2> = asset.motv.textureVertexList.iter().map(|v| Vec2::new(v.x, v.y)).collect();
+fn create_mesh_from_ir_lod(mesh: &MeshWithLod, lod_level: usize) -> Result<rend3::types::Mesh, anyhow::Error> {
+  // TODO: introspect the individual buffers, and if they are >0, call .with_foo().
+  let mut builder = rend3::types::MeshBuilder::new(mesh.vertex_buffers.position_buffer.clone(), rend3::types::Handedness::Right);
+  builder = builder.with_indices(mesh.index_buffers[lod_level].clone());
 
-  let mesh = rend3::types::MeshBuilder::new(verts, rend3::types::Handedness::Left) // used to be RIGHT
-      .with_indices(indices)
-      .with_vertex_texture_coordinates_0(uvs)
-      .with_vertex_normals(normals)
-      .build()?;
+  if !mesh.vertex_buffers.texcoord_buffer_0.is_empty() {
+    builder = builder.with_vertex_texture_coordinates_0(mesh.vertex_buffers.texcoord_buffer_0.clone());
+  }
 
-  //mesh.flip_winding_order();
-  //mesh.double_side();
-  Ok(mesh)
+  if !mesh.vertex_buffers.normals_buffer.is_empty() {
+    builder = builder.with_vertex_normals(mesh.vertex_buffers.normals_buffer.clone());
+  }
+
+  Ok(builder.build()?)
 }
 
 fn create_texture_rgba8(blp: &BlpImage, mipmap_level: usize) -> rend3::types::Texture {
@@ -185,15 +182,22 @@ where
 
   for (transform, wmo_root, wmo_groups) in wmos {
     for group in wmo_groups {
-      for batch in &group.moba.batchList {
-        let mesh = create_mesh_wmo(group, batch.startIndex as usize,
-                                   batch.count as usize, batch.minIndex as usize,
-                                   batch.maxIndex as usize).unwrap();
+      let mesh_base = WMOGroupImporter::create_lodable_mesh_base(group);
 
+      let indices = group.moba.batchList.iter()
+          .map(|batch|  WMOGroupImporter::create_lodable_mesh_lod(group,
+                          batch.startIndex as usize, batch.count as usize))
+          .collect_vec();
+
+      let lod_mesh = MeshWithLod { vertex_buffers: mesh_base, index_buffers: indices};
+
+      // we still need the batch for material stuff
+      for (i, batch) in group.moba.batchList.iter().enumerate() {
         // Add mesh to renderer's world.
         //
         // All handles are refcounted, so we only need to hang onto the handle until we
         // make an object.
+        let mesh = create_mesh_from_ir_lod(&lod_mesh, i).unwrap();
         let mesh_handle = renderer.add_mesh(mesh);
 
         let first_material = match batch.material_id {
