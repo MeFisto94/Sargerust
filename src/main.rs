@@ -6,19 +6,19 @@ use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
 use itertools::Itertools;
-use log::warn;
+use log::{trace, warn};
 use mpq::Archive;
-use rendering::importer::wmo_importer;
 use sargerust_files::adt::reader::ADTReader;
-use sargerust_files::adt::types::{ADTAsset, MCCVSubChunk, MCNKChunk, SMDoodadDef};
-use sargerust_files::common::types::{C3Vector, C4Quaternion, CImVector};
+use sargerust_files::adt::types::{ADTAsset, SMDoodadDef};
+use sargerust_files::common::types::{C3Vector, C4Quaternion};
 use sargerust_files::m2::reader::M2Reader;
 use sargerust_files::wdt::types::SMMapObjDef;
 use sargerust_files::wmo::reader::WMOReader;
 use sargerust_files::wmo::types::WMORootAsset;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
-use crate::rendering::common::types::{Material, MeshWithLod};
+use crate::rendering::common::types::{Material, Mesh, MeshWithLod};
+use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::rendering::importer::m2_importer::M2Importer;
 use crate::rendering::importer::wmo_importer::WMOGroupImporter;
 
@@ -45,7 +45,7 @@ fn main() {
     // TODO: perspectively, this folder will be a CLI argument
     let data_folder = std::env::current_dir().expect("Can't read current working directory!").join("_data");
 
-    let mut mpq_loader = io::mpq::loader::MPQLoader::new(data_folder.to_string_lossy().as_ref());
+    let mut mpq_loader = MPQLoader::new(data_folder.to_string_lossy().as_ref());
     //let kalimdor_wdt = mpq_loader.load_raw_owned(r"World\Maps\Kalimdor\Kalimdor.wdt").expect("Could locate kalimdor.wdt");
 
     let simple_m2 = false;
@@ -66,12 +66,12 @@ fn main() {
 
 
 /// Extracts the doodads (i.e. M2 models that have been placed into the world at a specific position) that are defined in the WMO Root
-fn collect_dooads(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>)> {
-    let mut render_list/*: Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>)>*/ = Vec::new();
+fn collect_dooads(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)> {
+    let mut render_list = Vec::new();
     for mods in &wmo.mods.doodadSetList {
         let start = mods.startIndex as usize;
         let end = (mods.startIndex + mods.count) as usize;
-        println!("Doodad Set: {} from {} to {}", mods.name, start, end);
+        trace!("Doodad Set: {} from {} to {}", mods.name, start, end);
         for modd in &wmo.modd.doodadDefList[start..end] {
             let idx = wmo.modn.doodadNameListLookup[&modd.nameIndex];
             let name = wmo.modn.doodadNameList[idx].as_str();
@@ -91,7 +91,7 @@ fn collect_dooads(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(ren
     render_list
 }
 
-fn load_m2_doodad(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>>, name: &String) -> Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)> {
+fn load_m2_doodad(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>>, name: &String) -> Rc<(Mesh, Material, Option<BlpImage>)> {
     // TODO: this should be called by the simple_m2 path
     let entry = m2_cache.entry(name.clone()).or_insert_with(|| {
         let mut m2_file = std::io::Cursor::new(loader.load_raw_owned(&name).unwrap());
@@ -142,7 +142,7 @@ fn main_simple_wmo(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
 
     // TODO: m2_cache should become an implementation detail of the struct that provides collect_doodads?
     // TODO: collect_doodads shouldn't contain the cache loading logic anyway.
-    let mut m2_cache: HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>> = HashMap::new();
+    let mut m2_cache: HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>> = HashMap::new();
 
     let dooads = collect_dooads(loader, &mut m2_cache, &wmo);
     let group_list = WMOGroupImporter::load_wmo_groups(loader, &wmo, wmo_path);
@@ -167,10 +167,10 @@ fn main_simple_wmo(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
 fn main_simple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(r"World\Maps\Kalimdor\Kalimdor_1_1.adt").unwrap()))?;
 
-    let mut m2_cache: HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>> = HashMap::new();
-    let mut render_list: Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>)> = Vec::new();
+    let mut m2_cache: HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>> = HashMap::new();
+    let mut render_list: Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)> = Vec::new();
     let mut texture_map = HashMap::new();
-    let mut wmos/*: Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)>*/ = Vec::new();
+    let mut wmos = Vec::new();
 
     let terrain_chunk = handle_adt(loader, adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?;
     rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunk);
@@ -181,11 +181,11 @@ fn main_multiple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     // technically, wdt loading doesn't differ all too much, because if it has terrain, it doesn't have it's own dooads
     // and then all you have to check is for existing adt files (MAIN chunk)
     let map_name = r"World\Maps\Kalimdor\Kalimdor";
-    let mut m2_cache: HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>> = HashMap::new();
-    let mut render_list: Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>)> = Vec::new();
+    let mut m2_cache: HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>> = HashMap::new();
+    let mut render_list: Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)> = Vec::new();
     let mut texture_map = HashMap::new();
     let mut wmos: Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)> = Vec::new();
-    let mut terrain_chunks: Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)> = Vec::new();
+    let mut terrain_chunks: Vec<(Vec3, Mesh)> = Vec::new();
 
     for row in 0..2 {
         for column in 0..2 {
@@ -198,10 +198,10 @@ fn main_multiple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>) -> Result<Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>, anyhow::Error> {
+fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>) -> Result<Vec<(Vec3, Mesh)>, anyhow::Error> {
     for wmo_ref in adt.modf.mapObjDefs.iter() {
         let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
-        //dbg!(&name);
+        trace!("WMO {} has been referenced from ADT", name);
 
         let wmo = WMOReader::parse_root(&mut std::io::Cursor::new(loader.load_raw_owned(name).unwrap())).unwrap();
         let transform = transform_for_wmo_ref(wmo_ref);
@@ -234,7 +234,7 @@ fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap
     // TODO: deduplicate with collect doodads (at least the emitter and m2 name replacement)
     for dad_ref in adt.mddf.doodadDefs {
         let name = &adt.mmdx.filenames[*adt.mmdx.offsets.get(&adt.mmid.mmdx_offsets[dad_ref.nameId as usize]).unwrap()];
-        dbg!(&name);
+        trace!("M2 {} has been referenced from ADT", name);
 
         // fix name: currently it ends with .mdx but we need .m2
         let name = name.to_lowercase().replace(".mdx", ".m2").replace(".mdl", ".m2");
@@ -248,103 +248,10 @@ fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap
     }
 
     let mut terrain_chunk = vec![];
-
     for mcnk in adt.mcnks {
-        let mut index_buffer = Vec::<u32>::new();
-        let mut vert_list = Vec::new();
-        let mcvt = mcnk.get_mcvt()?.unwrap();
-        let use_vertex_color: bool = true; // In theory with this flag we can turn it off for debug purposes.
-        //let mccv_opt = mcnk.get_mccv()?.filter(|_| use_vertex_color); // smchunk flag has_mccv.
-        let mccv_opt: Option<MCCVSubChunk> = None; // TODO: Fixme
-
-        // Here we're in ADT Terrain space, that is +x -> north, +y -> west. Thus rows grow in -x, columns go to -y.
-        // index of 9x9: 17 * row + column
-        // index of high detail 8x8: 17 * row + column + 9
-        for row in 0..9 {
-            for column in 0..9 {
-                let low = MCNKChunk::get_index_low(row, column);
-                let height = mcvt[low as usize];
-                // TODO: implement MCCV the _rust_ way (can't unwrap in a loop)
-                // let color = if &mccv_opt.is_some() { (mccv_opt.unwrap()[low as usize]) } else { CImVector::from(0x0000FFFFu32) };
-                let color = CImVector::from(0x0000FFFFu32);
-                vert_list.push((Vec3::new(-GRID_SIZE * row as f32, -GRID_SIZE * column as f32, height), color));
-            }
-
-            if row == 8 {
-                continue;
-            }
-
-            for column in 0..8 {
-                let high = MCNKChunk::get_index_high(row, column);
-                let height = mcvt[high as usize];
-                // see above
-                // let color = if use_vertex_color { (&mccv_opt.unwrap()[high as usize]).clone() } else { CImVector::from(0xFF0000FFu32) };
-                let color = CImVector::from(0xFF0000FFu32);
-                vert_list.push((Vec3::new(-GRID_SIZE * (row as f32 + 0.5), -GRID_SIZE * (column as f32 + 0.5), height), color));
-            }
-        }
-
-        // build the index buffer, this is probably the most difficult part.
-        let low_res = false;
-        if low_res {
-            for row in 0..8 { // last row won't work.
-                for column in 0..8 {
-                    // tri 1
-                    index_buffer.push(MCNKChunk::get_index_low(row, column) as u32);
-                    index_buffer.push(MCNKChunk::get_index_low(row, column + 1) as u32);
-                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column) as u32);
-
-                    // tri 2
-                    index_buffer.push(MCNKChunk::get_index_low(row, column + 1) as u32);
-                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column + 1) as u32);
-                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column) as u32);
-                }
-            }
-        } else {
-            for row in 0..8 { // last row won't work.
-                for column in 0..8 {
-                    // W
-                    index_buffer.push(MCNKChunk::get_index_low(row, column) as u32);
-                    index_buffer.push(MCNKChunk::get_index_high(row, column) as u32);
-                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column) as u32);
-
-                    // N
-                    index_buffer.push(MCNKChunk::get_index_low(row, column) as u32);
-                    index_buffer.push(MCNKChunk::get_index_low(row, column + 1) as u32);
-                    index_buffer.push(MCNKChunk::get_index_high(row, column) as u32);
-
-                    // E
-                    index_buffer.push(MCNKChunk::get_index_low(row, column + 1) as u32);
-                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column + 1) as u32);
-                    index_buffer.push(MCNKChunk::get_index_high(row, column) as u32);
-
-                    // S
-                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column) as u32);
-                    index_buffer.push(MCNKChunk::get_index_high(row, column) as u32);
-                    index_buffer.push(MCNKChunk::get_index_low(row + 1, column + 1) as u32);
-                }
-            }
-        }
-
-        // let mut w = BufWriter::new(File::create("./terrain.obj")?);
-        // writeln!(w, "o {}","terrain")?;
-        // for v in vert_list {
-        //     let (vert, col) = v;
-        //     writeln!(w, "v {} {} {}", vert.x, vert.y, vert.z)?;
-        // }
-        //
-        // for i in index_buffer.chunks_exact(3) {
-        //     writeln!(w, "f {} {} {}", i[0] + 1, i[1] + 1, i[2] + 1)?;
-        // }
-
-        let chunk_height = mcnk.header.position.z;
-        let x = mcnk.header.position.x;
-        let y = mcnk.header.position.y;
-        let pos = C3Vector { x, y, z: chunk_height };
-        dbg!(pos);
-
-        terrain_chunk.push((pos, vert_list, index_buffer));
+        terrain_chunk.push(ADTImporter::create_mesh(mcnk)?);
     }
+
     Ok(terrain_chunk)
 }
 
@@ -356,10 +263,7 @@ fn transform_for_doodad_ref(dad_ref: SMDoodadDef) -> Affine3A {
 
     // 32*TILE_SIZE because the map is 64 TS wide, and so we're placing ourselfs into the mid.
     let translation = Vec3::new((32.0 * TILE_SIZE - dad_ref.position.x), -(32.0 * TILE_SIZE - dad_ref.position.z), dad_ref.position.y);
-    dbg!(translation);
-
-    let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
-    transform
+    Affine3A::from_scale_rotation_translation(scale, rotation, translation)
 }
 
 fn transform_for_wmo_ref(wmo_ref: &SMMapObjDef) -> Affine3A {
@@ -381,9 +285,7 @@ fn transform_for_wmo_ref(wmo_ref: &SMMapObjDef) -> Affine3A {
 
     // 32*TILE_SIZE because the map is 64 TS wide, and so we're placing ourselfs into the mid.
     let translation = Vec3::new((32.0 * TILE_SIZE - wmo_ref.pos.x), -(32.0 * TILE_SIZE - wmo_ref.pos.z), wmo_ref.pos.y);
-    dbg!(translation);
-    let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
-    transform
+    Affine3A::from_scale_rotation_translation(scale, rotation, translation)
 }
 
 #[allow(unused)]

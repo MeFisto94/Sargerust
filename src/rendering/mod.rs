@@ -11,7 +11,6 @@ use itertools::Itertools;
 use rend3::Renderer;
 use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, ObjectHandle, Texture2DHandle};
 use rend3::util::typedefs::FastHashMap;
-use sargerust_files::common::types::{C3Vector, CImVector};
 
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, TransparencyType, VertexBuffers};
@@ -54,9 +53,10 @@ struct App {
 }
 
 // since the current impl doesn't care about RAM (see the mpq crate force-loading all mpqs), we can safely pass a load of (potentially unused) textures
-pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)>, wmos: W,
+pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)>,
+                     wmos: W,
                      textures: HashMap<String, BlpImage>,
-                     terrain_chunk: Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>)
+                     terrain_chunk: Vec<(Vec3, Mesh)>)
 where
   W: IntoIterator<Item = (&'a Affine3A, &'a Vec<(MeshWithLod, Vec<Material> /* per lod */)>)>,
 {
@@ -123,59 +123,12 @@ where
     preferred_format,
   );
 
+  let had_terrain = !terrain_chunk.is_empty();
   let mut object_list = Vec::new(); // we need to prevent object handles from getting dropped.
 
   add_placed_doodads(placed_doodads, &renderer, &mut object_list);
   add_wmo_groups(wmos, textures, &renderer, &mut object_list);
-
-  let had_terrain = !terrain_chunk.is_empty();
-  for chunk in terrain_chunk {
-    let (position, verts, indices) = chunk;
-
-    // TODO: Submethod
-    let mesh_verts = verts.iter().map(|(v, _)| Vec3::new(v.x, v.y, v.z)).collect_vec();
-    let mesh_col = verts.iter().map(|(_, col)| [col.r, col.g, col.b, col.a]).collect_vec();
-
-    let _mesh = Mesh {
-      vertex_buffers: VertexBuffers {
-        position_buffer: mesh_verts,
-        vertex_color_0: mesh_col,
-
-        normals_buffer: vec![],
-        tangents_buffer: vec![],
-        texcoord_buffer_0: vec![],
-        texcoord_buffer_1: vec![],
-      },
-      index_buffer: indices
-    };
-
-    let mut mesh = Rend3BackendConverter::create_mesh_from_ir(&_mesh).unwrap();
-    mesh.flip_winding_order(); // it would be better if the mesh came pre-flipped, I guess (especially since the IR is cached).
-    let mesh_handle = renderer.add_mesh(mesh);
-
-    let _material = Material {
-      is_unlit: true,
-      albedo: AlbedoType::Vertex { srgb: true },
-      transparency: TransparencyType::Opaque
-    };
-    let material = Rend3BackendConverter::create_material_from_ir(&_material, None);
-    let material_handle = renderer.add_material(material);
-
-    // Don't ask me where flipping the z and the heightmap values comes from.
-    // Actually, I think I flipped everything there is now, for consistency with ADT and where it should belong (i.e. 16k, 16k; not negative area)
-    let tt = coordinate_systems::adt_to_blender_transform(Vec3A::new(position.x, position.y, position.z));
-    let object = Object {
-      mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
-      material: material_handle,
-      // I think mat * translation rotates our translation and as such is basically always wrong. It can't have ever rotated things as a side effect?
-      //transform: tt * Mat4::from_euler(glam::EulerRot::XYZ, 0.0 * PI, 1.0 * PI, 0.75 * PI)
-      //transform: Mat4::from_euler(glam::EulerRot::XYZ, 0.0 * PI, 1.0 * PI, 0.75 * PI) * tt
-      transform: tt
-    };
-
-    let _object_handle = renderer.add_object(object);
-    object_list.push(_object_handle);
-  }
+  add_terrain_chunks(terrain_chunk, &renderer, &mut object_list);
 
   if !had_terrain {
     app.camera_location = Vec3A::new(0.0, -4.0, 2.0);
@@ -338,6 +291,37 @@ where
     // Other events we don't care about
     _ => {}
   });
+}
+
+fn add_terrain_chunks(terrain_chunk: Vec<(Vec3, Mesh)>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>) {
+  for (position, _mesh) in terrain_chunk {
+    let mut mesh = Rend3BackendConverter::create_mesh_from_ir(&_mesh).unwrap();
+    mesh.flip_winding_order(); // it would be better if the mesh came pre-flipped, I guess (especially since the IR is cached).
+    let mesh_handle = renderer.add_mesh(mesh);
+
+    // TODO: here, the renderer defines the material for the terrain, but why? It should be stored outside of terrain_chunk maybe because it applies for every ADT tile at least? Perspectively...
+    let _material = Material {
+      is_unlit: true,
+      albedo: AlbedoType::Vertex { srgb: true },
+      transparency: TransparencyType::Opaque
+    };
+    let material = Rend3BackendConverter::create_material_from_ir(&_material, None);
+    let material_handle = renderer.add_material(material);
+
+    // TODO: per definition, IR should be in blender-space, so we need to transform the translation at the very least. Or rather directly return "tt"
+    // Don't ask me where flipping the z and the heightmap values comes from.
+    // Actually, I think I flipped everything there is now, for consistency with ADT and where it should belong (i.e. 16k, 16k; not negative area)
+    let tt = coordinate_systems::adt_to_blender_transform(Vec3A::new(position.x, position.y, position.z));
+    let object = Object {
+      mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
+      material: material_handle,
+      // I think mat * translation rotates our translation and as such is basically always wrong. It can't have ever rotated things as a side effect?
+      transform: tt
+    };
+
+    let _object_handle = renderer.add_object(object);
+    object_list.push(_object_handle);
+  }
 }
 
 fn add_wmo_groups<'a, W>(wmos: W, textures: HashMap<String, BlpImage>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>)

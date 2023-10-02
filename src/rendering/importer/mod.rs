@@ -6,3 +6,4 @@
 /// that is the asset files themselves.
 pub mod m2_importer;
 pub mod wmo_importer;
+pub mod adt_importer;

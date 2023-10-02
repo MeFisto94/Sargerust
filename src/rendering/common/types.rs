@@ -7,6 +7,22 @@ pub struct Mesh {
     pub index_buffer: Vec<u32>,
 }
 
+impl Mesh {
+    // TODO: implement in a sane way
+    // let mut w = BufWriter::new(File::create("./terrain.obj")?);
+    // writeln!(w, "o {}","terrain")?;
+    // for v in vert_list {
+    //     let (vert, col) = v;
+    //     writeln!(w, "v {} {} {}", vert.x, vert.y, vert.z)?;
+    // }
+    //
+    // for i in index_buffer.chunks_exact(3) {
+    //     writeln!(w, "f {} {} {}", i[0] + 1, i[1] + 1, i[2] + 1)?;
+    // }
+
+    // TODO: Also note that there's another version flying around that supports normals, tangents and everything in it's faces.
+}
+
 impl Debug for Mesh {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{{ vertex_buffers: {:?}, ", self.vertex_buffers)?;
@@ -32,6 +48,19 @@ impl Debug for VertexBuffers {
         write!(f, "texcoord_buffer_0: [{}], ", self.texcoord_buffer_0.len())?;
         write!(f, "texcoord_buffer_1: [{}], ", self.texcoord_buffer_1.len())?;
         write!(f, "vertex_color_0: [{}] }}", self.vertex_color_0.len())
+    }
+}
+
+impl Default for VertexBuffers {
+    fn default() -> Self {
+        VertexBuffers {
+            position_buffer: vec![],
+            normals_buffer: vec![],
+            tangents_buffer: vec![],
+            texcoord_buffer_0: vec![],
+            texcoord_buffer_1: vec![],
+            vertex_color_0: vec![],
+        }
     }
 }
 
