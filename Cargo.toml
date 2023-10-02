@@ -6,13 +6,15 @@ edition = "2021"
 [workspace]
 members = [
     "sargerust-files",
-    "sargerust-files/sargerust-files-derive-parseable"
+    "sargerust-files/sargerust-files-derive-parseable",
+    "mpq-rust"
 ]
 
 [dependencies]
 # Logging, but getting rid of the regex feature/dependency for regex filters.
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
-mpq = "0.8"
+# mpq = "0.8"
+mpq = { path = "mpq-rust" }
 image-blp = "1"
 sargerust-files = { path = "sargerust-files", features = ["wotlk"] }
 anyhow = "1.0.75"
