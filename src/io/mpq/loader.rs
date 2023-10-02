@@ -21,7 +21,7 @@ pub fn read_mpq_file_into_cursor(archive: &mut Archive, file_name: &str) -> Resu
 }
 
 pub struct MPQLoader {
-    pub prioritized_archives: Vec<(String, Archive)>,
+    prioritized_archives: Vec<(String, Archive)>,
     data_folder: String,
 }
 
@@ -136,6 +136,10 @@ impl RawAssetLoader for MPQLoader {
                 (name, archive, file)
             })
             .find(|(_, _, file)| file.is_ok());
+
+        if opt.is_none() {
+            warn!("Could not locate {}!", path);
+        }
 
         opt.map(|(name, archive, file_res)| {
             trace!("Loading {} from {}", path, name);

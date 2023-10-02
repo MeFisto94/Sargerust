@@ -8,6 +8,7 @@ use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
 use itertools::Itertools;
+use log::warn;
 use mpq::Archive;
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::{ADTAsset, MCCVSubChunk, MCNKChunk, SMDoodadDef};
@@ -58,8 +59,8 @@ fn main() {
     let simple_wmo = false;
     let simple_adt = false;
 
-    let mut common = Archive::open(data_folder.join("common.MPQ")).unwrap();
-    let mut common2 = Archive::open(data_folder.join("common-2.MPQ")).unwrap();
+    // let mut common = Archive::open(data_folder.join("common.MPQ")).unwrap();
+    // let mut common2 = Archive::open(data_folder.join("common-2.MPQ")).unwrap();
 
     // debug_dump_file(&mut common2, r"World\Maps\DeeprunTram\DeeprunTram.wdl");
     // debug_dump_file(&mut common2, r"World\Maps\DeeprunTram\DeeprunTram.wdt");
@@ -71,21 +72,20 @@ fn main() {
     // debug_dump_file(&mut common2, r"World\Maps\Kalimdor\Kalimdor_0_2.adt");
 
     if simple_m2 {
-        let mut expansion = Archive::open(data_folder.join("expansion.MPQ")).unwrap();
-        main_simple_m2(&mut common, &mut expansion).unwrap();
+        main_simple_m2(&mut mpq_loader).unwrap();
     }
     else if simple_wmo {
-        main_simple_wmo(&mut common, &mut common2).unwrap();
+        main_simple_wmo(&mut mpq_loader).unwrap();
     } else if simple_adt {
-        main_simple_adt(&mut common, &mut common2).unwrap();
+        main_simple_adt(&mut mpq_loader).unwrap();
     } else {
-        main_multiple_adt(&mut common, &mut common2).unwrap();
+        main_multiple_adt(&mut mpq_loader).unwrap();
     }
 }
 
 
 /// Extracts the doodads (i.e. M2 models that have been placed into the world at a specific position) that are defined in the WMO Root
-fn collect_dooads(common: &mut Archive, common2: &mut Archive, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> {
+fn collect_dooads(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> {
     let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
     for mods in &wmo.mods.doodadSetList {
         let start = mods.startIndex as usize;
@@ -96,15 +96,12 @@ fn collect_dooads(common: &mut Archive, common2: &mut Archive, m2_cache: &mut Ha
             let name = wmo.modn.doodadNameList[idx].as_str();
 
             // fix name: currently it ends with .mdx but we need .m2
-            let name = name.replace(".MDX", ".m2");
-            if name.to_lowercase().contains("emitter") ||
-                name.to_uppercase().contains("GENERALDIRTYPLATE01") || name.to_uppercase().contains("GENERALCANDELABRA01")
-                || name.to_uppercase().contains("GOLDSHIREINN")
-                || name.to_lowercase().contains("02") || name.to_lowercase().contains("03") || name.to_lowercase().contains("01") {
+            let name = name.replace(".MDX", ".m2").replace(".MDL", ".m2");
+            if name.to_lowercase().contains("emitter") {
                 continue;
             }
 
-            let entry = load_m2_doodad(common, common2, m2_cache, &name);
+            let entry = load_m2_doodad(loader, m2_cache, &name);
             let transform: Affine3A = Affine3A::from_scale_rotation_translation(Vec3::new(modd.scale, modd.scale, modd.scale), from_quat(modd.orientation), from_vec(modd.position));
             render_list.push((transform, entry.clone()));
         }
@@ -113,18 +110,17 @@ fn collect_dooads(common: &mut Archive, common2: &mut Archive, m2_cache: &mut Ha
     render_list
 }
 
-fn load_m2_doodad(common: &mut Archive, common2: &mut Archive, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, name: &String) -> Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)> {
+fn load_m2_doodad(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, name: &String) -> Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)> {
     let entry = m2_cache.entry(name.clone()).or_insert_with(|| {
-        //let m2_file = common2.open_file(&name).unwrap_or_else(|_| panic!("File {} missing!", name));
-        let mut m2_file = io::mpq::loader::read_mpq_file_into_cursor(common2, &name).unwrap();
+        let mut m2_file = std::io::Cursor::new(loader.load_raw_owned(&name).unwrap());
         let m2_asset = M2Reader::parse_asset(&mut m2_file).unwrap();
         // In theory, we could investigate the number of LoD Levels, but we will just use "0"
-        let mut skin_file = io::mpq::loader::read_mpq_file_into_cursor(common2, &name.replace(".m2", "00.skin")).unwrap();
+        let mut skin_file =  std::io::Cursor::new(loader.load_raw_owned(&name.replace(".m2", "00.skin")).unwrap());
         let skin = M2Reader::parse_skin_profile(&mut skin_file).unwrap();
 
         let mut blp_opt = None;
-        if !m2_asset.textures.is_empty() && !name.eq("WORLD\\AZEROTH\\ELWYNN\\PASSIVEDOODADS\\TREES\\ELWYNNTREEMID01.m2") {
-            blp_opt = load_blp_from_mpq(common, &m2_asset.textures[0].filename);
+        if !m2_asset.textures.is_empty() {
+            blp_opt = load_blp_from_ldr(loader, &m2_asset.textures[0].filename);
         }
 
         Rc::new((m2_asset, vec![skin], blp_opt))
@@ -132,7 +128,7 @@ fn load_m2_doodad(common: &mut Archive, common2: &mut Archive, m2_cache: &mut Ha
     entry.clone()
 }
 
-fn load_wmo_groups(common2: &mut Archive, wmo: &WMORootAsset, path: &str) -> Vec<WMOGroupAsset> {
+fn load_wmo_groups(loader: &mut MPQLoader, wmo: &WMORootAsset, path: &str) -> Vec<WMOGroupAsset> {
     for group in &wmo.mogi.groupInfoList {
         if group.nameoffset != -1
         {
@@ -143,8 +139,8 @@ fn load_wmo_groups(common2: &mut Archive, wmo: &WMORootAsset, path: &str) -> Vec
 
     let mut group_list = Vec::new();
     for x in 0..wmo.mohd.nGroups {
-        let cursor = &mut io::mpq::loader::read_mpq_file_into_cursor(common2,
-                                                                       &format!("{}_{:0>3}.wmo", path, x)).unwrap();
+        let cursor = &mut std::io::Cursor::new(
+            loader.load_raw_owned(&format!("{}_{:0>3}.wmo", path, x)).unwrap());
         let group = WMOReader::parse_group(cursor).unwrap();
         group_list.push(group);
     }
@@ -152,7 +148,7 @@ fn load_wmo_groups(common2: &mut Archive, wmo: &WMORootAsset, path: &str) -> Vec
     group_list
 }
 
-fn main_simple_m2(common: &mut Archive, expansion: &mut Archive, loader: MPQLoader) -> Result<(), anyhow::Error> {
+fn main_simple_m2(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     // This method demonstrates very simple m2 rendering (not in the context of wmos or adts).
 
     //debug_dump_blp(&mut expansion, r"WORLD\EXPANSION01\DOODADS\GENERIC\BLOODELF\BENCHES\BE_BENCH_01.BLP");
@@ -164,9 +160,9 @@ fn main_simple_m2(common: &mut Archive, expansion: &mut Archive, loader: MPQLoad
     let skin_path = r"Creature\talbuk\Talbuk00.skin";
     let tex_path = r"Creature\talbuk\TalbukSkinBrown.blp"; // common.mpq!
 
-    let m2 = M2Reader::parse_asset(&mut io::mpq::loader::read_mpq_file_into_cursor(expansion, m2_path)?)?;
-    let skin = M2Reader::parse_skin_profile(&mut io::mpq::loader::read_mpq_file_into_cursor(expansion, skin_path)?)?;
-    let blp_opt = load_blp_from_mpq(common, tex_path);
+    let m2 = M2Reader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(m2_path).unwrap()))?;
+    let skin = M2Reader::parse_skin_profile(&mut std::io::Cursor::new(loader.load_raw_owned(skin_path).unwrap()))?;
+    let blp_opt = load_blp_from_ldr(loader, tex_path);
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
     rendering::render(vec![(Affine3A::from_translation(Vec3::new(0.0, 0.0, 0.0)),
@@ -175,28 +171,28 @@ fn main_simple_m2(common: &mut Archive, expansion: &mut Archive, loader: MPQLoad
     Ok(())
 }
 
-fn main_simple_wmo(common: &mut Archive, common2: &mut Archive) -> Result<(), anyhow::Error> {
+fn main_simple_wmo(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     // This method demonstrates very simple wmo rendering (not in the context of adts).
     //let wmo_path = r"World\wmo\Dungeon\AZ_Subway\Subway";
-    //let wmo_path = r"World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn"; <-- broken due to files loading error
-    //let wmo_path = r"World\wmo\Azeroth\Buildings\GriffonAviary\GriffonAviary"; <-- broken, textures not located, skipping them
+    //let wmo_path = r"World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn"; // good example of how we need to filter doodad sets
+    //let wmo_path = r"World\wmo\Azeroth\Buildings\GriffonAviary\GriffonAviary"; // <-- orange color, no textures?
     let wmo_path = r"World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn_closed";
 
-    let mut wmo: WMORootAsset = WMOReader::parse_root(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, &format!("{}.wmo", wmo_path))?)?;
+    let mut wmo: WMORootAsset = WMOReader::parse_root(&mut std::io::Cursor::new(loader.load_raw_owned(&format!("{}.wmo", wmo_path)).unwrap()))?;
 
     // TODO: m2_cache should become an implementation detail of the struct that provides collect_doodads?
     // TODO: collect_doodads shouldn't contain the cache loading logic anyway.
     let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
 
-    let dooads = collect_dooads(common, common2, &mut m2_cache, &mut wmo);
-    let group_list = load_wmo_groups(common2, &wmo, wmo_path);
+    let dooads = collect_dooads(loader, &mut m2_cache, &mut wmo);
+    let group_list = load_wmo_groups(loader, &wmo, wmo_path);
     let textures = wmo.momt.materialList.iter()
         .map(|tex| wmo.motx.textureNameList[wmo.motx.offsets[&tex.texture_1]].clone())
         .collect_vec();
 
     let mut texture_map = HashMap::new();
     for texture in textures {
-        let blp = load_blp_from_mpq(common, &texture).expect("Texture loading error");
+        let blp = load_blp_from_ldr(loader, &texture).expect("Texture loading error");
         texture_map.insert(texture, blp);
     }
 
@@ -208,20 +204,20 @@ fn main_simple_wmo(common: &mut Archive, common2: &mut Archive) -> Result<(), an
     Ok(())
 }
 
-fn main_simple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), anyhow::Error> {
-    let adt = ADTReader::parse_asset(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, r"World\Maps\Kalimdor\Kalimdor_1_1.adt")?)?;
+fn main_simple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
+    let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(r"World\Maps\Kalimdor\Kalimdor_1_1.adt").unwrap()))?;
 
     let mut m2_cache: HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>> = HashMap::new();
     let mut render_list: Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)> = Vec::new();
     let mut texture_map = HashMap::new();
     let mut wmos: Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)> = Vec::new();
 
-    let terrain_chunk = handle_adt(common, common2, adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?;
+    let terrain_chunk = handle_adt(loader, adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?;
     rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map, terrain_chunk);
     Ok(())
 }
 
-fn main_multiple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), anyhow::Error> {
+fn main_multiple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     // technically, wdt loading doesn't differ all too much, because if it has terrain, it doesn't have it's own dooads
     // and then all you have to check is for existing adt files (MAIN chunk)
     let map_name = r"World\Maps\Kalimdor\Kalimdor";
@@ -233,8 +229,8 @@ fn main_multiple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), 
 
     for row in 0..2 {
         for column in 0..2 {
-            let adt = ADTReader::parse_asset(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, &format!("{}_{}_{}.adt", map_name, row, column))?)?;
-            terrain_chunks.extend(handle_adt(common, common2, adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?);
+            let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(&format!("{}_{}_{}.adt", map_name, row, column)).unwrap()))?;
+            terrain_chunks.extend(handle_adt(loader, adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?);
         }
     }
 
@@ -242,15 +238,15 @@ fn main_multiple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), 
     Ok(())
 }
 
-fn handle_adt(common: &mut Archive, common2: &mut Archive, adt: Box<ADTAsset>, mut m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)>) -> Result<Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>, anyhow::Error> {
+fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, mut m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)>) -> Result<Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>, anyhow::Error> {
     for wmo_ref in adt.modf.mapObjDefs.iter() {
         let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
         //dbg!(&name);
 
-        let wmo = WMOReader::parse_root(&mut io::mpq::loader::read_mpq_file_into_cursor(common2, name).unwrap()).unwrap();
+        let wmo = WMOReader::parse_root(&mut std::io::Cursor::new(loader.load_raw_owned(name).unwrap())).unwrap();
         let transform = transform_for_wmo_ref(wmo_ref);
 
-        let doodads = collect_dooads(common, common2, &mut m2_cache, &wmo);
+        let doodads = collect_dooads(loader, m2_cache, &wmo);
         for dad in doodads {
             // NOTE: Here we loose the relationship between DAD and wmo, that is required for parenting.
             // Since rend3 does not have a scenegraph, we "fake" the parenting for now.
@@ -267,11 +263,11 @@ fn handle_adt(common: &mut Archive, common2: &mut Archive, adt: Box<ADTAsset>, m
             .collect_vec();
 
         for texture in textures {
-            let blp = load_blp_from_mpq(common, &texture).expect("Texture loading error");
+            let blp = load_blp_from_ldr(loader, &texture).expect("Texture loading error");
             texture_map.insert(texture, blp);
         }
 
-        let group_list = load_wmo_groups(common2, &wmo, name.trim_end_matches(".wmo"));
+        let group_list = load_wmo_groups(loader, &wmo, name.trim_end_matches(".wmo").trim_end_matches(".WMO"));
 
         wmos.push((transform, wmo, group_list));
     }
@@ -281,15 +277,15 @@ fn handle_adt(common: &mut Archive, common2: &mut Archive, adt: Box<ADTAsset>, m
         dbg!(&name);
 
         // fix name: currently it ends with .mdx but we need .m2
-        let name = name.to_lowercase().replace(".mdx", ".m2");
-        if name.to_lowercase().contains("emitter") ||
-            name.to_uppercase().contains("GENERALDIRTYPLATE01") || name.to_uppercase().contains("GENERALCANDELABRA01")
+        let name = name.to_lowercase().replace(".mdx", ".m2"); // MDL as well, in general this has overlap with wmo loading.
+        if name.to_lowercase().contains("emitter") // ||
+            /*name.to_uppercase().contains("GENERALDIRTYPLATE01") || name.to_uppercase().contains("GENERALCANDELABRA01")
             || name.to_uppercase().contains("GOLDSHIREINN")
-            || name.to_lowercase().contains("02") {
+            || name.to_lowercase().contains("02")*/ {
             continue;
         }
 
-        let entry = load_m2_doodad(common, common2, &mut m2_cache, &name);
+        let entry = load_m2_doodad(loader, &mut m2_cache, &name);
         let transform = transform_for_doodad_ref(dad_ref);
         render_list.push((transform, entry.clone()));
     }
@@ -464,6 +460,33 @@ fn load_blp_from_mpq(archive: &mut Archive, file_name: &str) -> Option<BlpImage>
     let owned_file = io::mpq::loader::read_mpq_file_into_owned(archive, file_name);
     if owned_file.is_err() {
         dbg!(owned_file.unwrap_err());
+        return None;
+    }
+
+    let root_input = owned_file.unwrap();
+    let image = parse_blp_with_externals(&root_input, |_i| {
+        // This could also be no_mipmaps from the image-blp parser crate.
+        panic!("Loading of BLP Mip Maps is unsupported. File {}", file_name)
+    });
+
+    if image.is_err() {
+        dbg!(image.unwrap_err());
+        return None
+    }
+    Some(image.unwrap().1)
+}
+
+fn load_blp_from_ldr(mpq_loader: &mut MPQLoader, file_name: &str) -> Option<BlpImage> {
+    // TODO: The blp crate has bad error handling, as it doesn't mix with anyhow::Error.
+    // furthermore, the built in error types stem from nom, that we don't have as dependency.
+
+    // load_blp uses the fs to load mip maps next to it.
+    // we don't want to extract blps into temporary files, though, so we use the other API
+    // and there, we either don't support BLP0 Mipmaps or we properly implement the callback at some time
+
+    let owned_file = mpq_loader.load_raw_owned(file_name);
+    if owned_file.is_none() {
+        warn!("Could not load BLP {}", file_name);
         return None;
     }
 
