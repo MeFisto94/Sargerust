@@ -1780,6 +1780,7 @@ dependencies = [
  "glam",
  "image-blp",
  "itertools",
+ "log",
  "mpq",
  "pollster",
  "quick_cache",

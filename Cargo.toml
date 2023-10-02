@@ -33,3 +33,4 @@ winit = "0.28"
 itertools = "0.11.0"
 
 quick_cache = "0.4.0"
+log = "0.4.20"

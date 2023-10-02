@@ -17,6 +17,8 @@ use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
 use sargerust_files::wdt::types::SMMapObjDef;
 use sargerust_files::wmo::reader::WMOReader;
 use sargerust_files::wmo::types::{WMOGroupAsset, WMORootAsset};
+use crate::io::common::loader::RawAssetLoader;
+use crate::io::mpq::loader::MPQLoader;
 
 mod io;
 mod rendering;
@@ -40,6 +42,9 @@ fn main() {
 
     // TODO: perspectively, this folder will be a CLI argument
     let data_folder = std::env::current_dir().expect("Can't read current working directory!").join("_data");
+
+    let mut mpq_loader = io::mpq::loader::MPQLoader::new(data_folder.to_string_lossy().as_ref());
+    //let kalimdor_wdt = mpq_loader.load_raw_owned(r"World\Maps\Kalimdor\Kalimdor.wdt").expect("Could locate kalimdor.wdt");
 
     // debug_dump_mpq_filelist(data_folder, "common.MPQ");
     // debug_dump_mpq_filelist(data_folder, "common-2.MPQ");
@@ -147,7 +152,7 @@ fn load_wmo_groups(common2: &mut Archive, wmo: &WMORootAsset, path: &str) -> Vec
     group_list
 }
 
-fn main_simple_m2(common: &mut Archive, expansion: &mut Archive) -> Result<(), anyhow::Error> {
+fn main_simple_m2(common: &mut Archive, expansion: &mut Archive, loader: MPQLoader) -> Result<(), anyhow::Error> {
     // This method demonstrates very simple m2 rendering (not in the context of wmos or adts).
 
     //debug_dump_blp(&mut expansion, r"WORLD\EXPANSION01\DOODADS\GENERIC\BLOODELF\BENCHES\BE_BENCH_01.BLP");
@@ -237,7 +242,7 @@ fn main_multiple_adt(common: &mut Archive, common2: &mut Archive) -> Result<(), 
     Ok(())
 }
 
-fn handle_adt(common: &mut Archive, common2: &mut Archive, adt: Box<ADTAsset>, mut m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)>) -> Result<Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>, Error> {
+fn handle_adt(common: &mut Archive, common2: &mut Archive, adt: Box<ADTAsset>, mut m2_cache: &mut HashMap<String, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(M2Asset, Vec<M2SkinProfile>, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)>) -> Result<Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>, anyhow::Error> {
     for wmo_ref in adt.modf.mapObjDefs.iter() {
         let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
         //dbg!(&name);
