@@ -34,8 +34,12 @@ impl Rend3BackendConverter {
     }
 
     pub fn create_material_from_ir(material: &Material, texture_handle: Option<Texture2DHandle>) -> PbrMaterial {
-        if let AlbedoType::Texture = material.albedo {
-            if texture_handle.is_none() {
+        if texture_handle.is_none() {
+            // TODO: fail-safe somehow setting the material type differently.
+            if let AlbedoType::Texture = material.albedo {
+                error!("Material requires the presence of a texture");
+            }
+            if let AlbedoType::TextureWithName(_) = material.albedo {
                 error!("Material requires the presence of a texture");
             }
         }
@@ -46,6 +50,7 @@ impl Rend3BackendConverter {
                 AlbedoType::None => AlbedoComponent::None,
                 AlbedoType::Vertex { srgb } => AlbedoComponent::Vertex { srgb },
                 AlbedoType::Texture => AlbedoComponent::Texture(texture_handle.unwrap()),
+                AlbedoType::TextureWithName(_) => AlbedoComponent::Texture(texture_handle.unwrap()),
                 AlbedoType::Value(rgba) => AlbedoComponent::Value(rgba),
                 AlbedoType::ValueVertex {value, srgb} => AlbedoComponent::ValueVertex {value, srgb}
             },

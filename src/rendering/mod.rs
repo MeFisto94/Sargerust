@@ -8,14 +8,13 @@ use glam::{Affine3A, DVec2, Mat4, Vec2, Vec3, Vec3A, Vec4};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use itertools::Itertools;
-use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, Texture2DHandle};
+use rend3::Renderer;
+use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, ObjectHandle, Texture2DHandle};
 use rend3::util::typedefs::FastHashMap;
 use sargerust_files::common::types::{C3Vector, CImVector};
 
-use sargerust_files::wmo::types::{WMOGroupAsset, WMORootAsset};
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, TransparencyType, VertexBuffers};
-use crate::rendering::importer::wmo_importer::WMOGroupImporter;
 use crate::rendering::rend3_backend::Rend3BackendConverter;
 
 pub mod common;
@@ -59,7 +58,7 @@ pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(Mesh, Material, Option<B
                      textures: HashMap<String, BlpImage>,
                      terrain_chunk: Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>)
 where
-  W: IntoIterator<Item = (&'a Affine3A, &'a WMORootAsset, &'a Vec<WMOGroupAsset>)>,
+  W: IntoIterator<Item = (&'a Affine3A, &'a Vec<(MeshWithLod, Vec<Material> /* per lod */)>)>,
 {
   // TODO: shouldn't we expect MeshWithLods already? Could also have a vec<mesh> at least. This conflicts with loading lods on demand, though.
   let mut app = App::default();
@@ -126,90 +125,8 @@ where
 
   let mut object_list = Vec::new(); // we need to prevent object handles from getting dropped.
 
-  for (transform, rc) in placed_doodads {
-    let ( _mesh, _material, blp_opt) = rc.deref();
-    // Create mesh and calculate smooth normals based on vertices
-    let mesh = Rend3BackendConverter::create_mesh_from_ir(_mesh).unwrap();
-    let mesh_handle = renderer.add_mesh(mesh);
-
-    // TODO: concept work for textures
-    let mapped_tex = blp_opt.as_ref().map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
-    let material = Rend3BackendConverter::create_material_from_ir(&_material, mapped_tex);
-    let material_handle = renderer.add_material(material);
-
-    // Combine the mesh and the material with a location to give an object.
-    let object = create_object(transform, mesh_handle, material_handle);
-
-    // Creating an object will hold onto both the mesh and the material
-    // even if they are deleted.
-    //
-    // We need to keep the object handle alive.
-    let _object_handle = renderer.add_object(object);
-    object_list.push(_object_handle);
-  }
-
-  for (transform, wmo_root, wmo_groups) in wmos {
-    for group in wmo_groups {
-      let mesh_base = WMOGroupImporter::create_lodable_mesh_base(group);
-
-      let indices = group.moba.batchList.iter()
-          .map(|batch|  WMOGroupImporter::create_lodable_mesh_lod(group,
-                          batch.startIndex as usize, batch.count as usize))
-          .collect_vec();
-
-      let lod_mesh = MeshWithLod { vertex_buffers: mesh_base, index_buffers: indices};
-
-      // we still need the batch for material stuff
-      for (i, batch) in group.moba.batchList.iter().enumerate() {
-        // Add mesh to renderer's world.
-        //
-        // All handles are refcounted, so we only need to hang onto the handle until we
-        // make an object.
-        let mesh = Rend3BackendConverter::create_mesh_from_ir_lod(&lod_mesh, i).unwrap();
-        let mesh_handle = renderer.add_mesh(mesh);
-
-        let first_material = match batch.material_id {
-          0xFF => None,
-          _ => Some(&wmo_root.momt.materialList[batch.material_id as usize])
-        };
-
-        let blp_opt = first_material.and_then(|mat| {
-          let offset = wmo_root.motx.offsets[&mat.texture_1];
-          textures.get(&wmo_root.motx.textureNameList[offset])
-        });
-
-        let _material = Material {
-          albedo:
-          match first_material {
-            Some(_mat) =>
-              match blp_opt {
-                Some(texture_handle) => AlbedoType::Texture/*(TODO)*/,
-                None => AlbedoType::Value(Vec4::new(_mat.diffColor.r as f32 / 255.0, _mat.diffColor.g as f32 / 255.0,
-                                                    _mat.diffColor.b as f32 / 255.0, _mat.diffColor.a as f32 / 255.0))
-              },
-              None => AlbedoType::Value(Vec4::new(0.6, 0.6, 0.6, 1.0))
-            },
-          is_unlit: true,
-          transparency: TransparencyType::Opaque
-        };
-
-        // TODO: concept work for textures
-        let mapped_tex = blp_opt.as_ref().map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
-        let material = Rend3BackendConverter::create_material_from_ir(&_material, mapped_tex);
-        let material_handle = renderer.add_material(material);
-
-        // Combine the mesh and the material with a location to give an object.
-        let object = create_object(*transform, mesh_handle, material_handle);
-
-        // Creating an object will hold onto both the mesh and the material
-        // even if they are deleted.
-        //
-        // We need to keep the object handle alive.
-        let _object_handle = renderer.add_object(object);
-        object_list.push(_object_handle);
-      }
-    }
-  }
+  add_placed_doodads(placed_doodads, &renderer, &mut object_list);
+  add_wmo_groups(wmos, textures, &renderer, &mut object_list);
 
   let had_terrain = !terrain_chunk.is_empty();
   for chunk in terrain_chunk {
@@ -326,9 +243,7 @@ where
 
       if *app.scancode_status.get(&17u32).unwrap_or(&false)  {
         // W
-        app.camera_location += forward * 30.0/60.0 * 10.0; // fake delta time
-        dbg!(forward);
-        dbg!(app.camera_location);
+        app.camera_location += forward * 30.0/60.0 * 5.0; // fake delta time
       }
       if *app.scancode_status.get(&31u32).unwrap_or(&false)  {
         // S
@@ -423,4 +338,56 @@ where
     // Other events we don't care about
     _ => {}
   });
+}
+
+fn add_wmo_groups<'a, W>(wmos: W, textures: HashMap<String, BlpImage>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>)
+  where W: IntoIterator<Item=(&'a Affine3A, &'a Vec<(MeshWithLod, Vec<Material> /* per lod */)>)> {
+  for (transform, wmo_groups) in wmos {
+    for (lod_mesh, materials) in wmo_groups {
+      // One "lod" has it's own material here, but technically it's a wmo group batch.
+      for (i, material) in materials.iter().enumerate() {
+        let mesh = Rend3BackendConverter::create_mesh_from_ir_lod(lod_mesh, i).unwrap();
+        let mesh_handle = renderer.add_mesh(mesh);
+
+        // TODO: concept work for textures
+        let blp_opt = match &material.albedo {
+          AlbedoType::TextureWithName(tex_name) => textures.get(tex_name),
+          _ => None
+        };
+
+        let mapped_tex = blp_opt.as_ref().map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
+        let material = Rend3BackendConverter::create_material_from_ir(material, mapped_tex);
+        let material_handle = renderer.add_material(material);
+
+        // Combine the mesh and the material with a location to give an object.
+        let object = create_object(*transform, mesh_handle, material_handle);
+        let _object_handle = renderer.add_object(object);
+        object_list.push(_object_handle);
+      }
+    }
+  }
+}
+
+fn add_placed_doodads(placed_doodads: Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>) {
+  for (transform, rc) in placed_doodads {
+    let (_mesh, _material, blp_opt) = rc.deref();
+    // Create mesh and calculate smooth normals based on vertices
+    let mesh = Rend3BackendConverter::create_mesh_from_ir(_mesh).unwrap();
+    let mesh_handle = renderer.add_mesh(mesh);
+
+    // TODO: concept work for textures
+    let mapped_tex = blp_opt.as_ref().map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
+    let material = Rend3BackendConverter::create_material_from_ir(&_material, mapped_tex);
+    let material_handle = renderer.add_material(material);
+
+    // Combine the mesh and the material with a location to give an object.
+    let object = create_object(transform, mesh_handle, material_handle);
+
+    // Creating an object will hold onto both the mesh and the material
+    // even if they are deleted.
+    //
+    // We need to keep the object handle alive.
+    let _object_handle = renderer.add_object(object);
+    object_list.push(_object_handle);
+  }
 }

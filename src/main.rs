@@ -1,28 +1,26 @@
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufWriter, Write};
 use std::ops::Deref;
 use std::rc::Rc;
-use glam::{Affine3A, EulerRot, Quat, Vec3, Vec4};
+use glam::{Affine3A, EulerRot, Quat, Vec3};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
 use itertools::Itertools;
 use log::warn;
 use mpq::Archive;
-use rend3::types::Mesh;
+use rendering::importer::wmo_importer;
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::{ADTAsset, MCCVSubChunk, MCNKChunk, SMDoodadDef};
 use sargerust_files::common::types::{C3Vector, C4Quaternion, CImVector};
 use sargerust_files::m2::reader::M2Reader;
-use sargerust_files::m2::types::{M2Asset, M2SkinProfile};
 use sargerust_files::wdt::types::SMMapObjDef;
 use sargerust_files::wmo::reader::WMOReader;
-use sargerust_files::wmo::types::{WMOGroupAsset, WMORootAsset};
+use sargerust_files::wmo::types::WMORootAsset;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
-use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
+use crate::rendering::common::types::{Material, MeshWithLod};
 use crate::rendering::importer::m2_importer::M2Importer;
+use crate::rendering::importer::wmo_importer::WMOGroupImporter;
 
 mod io;
 mod rendering;
@@ -50,29 +48,9 @@ fn main() {
     let mut mpq_loader = io::mpq::loader::MPQLoader::new(data_folder.to_string_lossy().as_ref());
     //let kalimdor_wdt = mpq_loader.load_raw_owned(r"World\Maps\Kalimdor\Kalimdor.wdt").expect("Could locate kalimdor.wdt");
 
-    // debug_dump_mpq_filelist(data_folder, "common.MPQ");
-    // debug_dump_mpq_filelist(data_folder, "common-2.MPQ");
-    // debug_dump_mpq_filelist(data_folder, "patch.MPQ");
-    // debug_dump_mpq_filelist(data_folder, "patch-2.MPQ");
-    // debug_dump_mpq_filelist(data_folder, "patch-3.MPQ");
-    // debug_dump_mpq_filelist(data_folder, "expansion.MPQ");
-    // debug_dump_mpq_filelist(data_folder, "lichking.MPQ");
-
     let simple_m2 = false;
     let simple_wmo = false;
     let simple_adt = false;
-
-    // let mut common = Archive::open(data_folder.join("common.MPQ")).unwrap();
-    // let mut common2 = Archive::open(data_folder.join("common-2.MPQ")).unwrap();
-
-    // debug_dump_file(&mut common2, r"World\Maps\DeeprunTram\DeeprunTram.wdl");
-    // debug_dump_file(&mut common2, r"World\Maps\DeeprunTram\DeeprunTram.wdt");
-    //debug_dump_file(&mut common2, "World\\wmo\\Dungeon\\AZ_Subway\\Subway.wmo");
-
-    // GM Island ;)
-    // debug_dump_file(&mut common2, r"World\Maps\Kalimdor\Kalimdor_0_0.adt");
-    // debug_dump_file(&mut common2, r"World\Maps\Kalimdor\Kalimdor_0_1.adt");
-    // debug_dump_file(&mut common2, r"World\Maps\Kalimdor\Kalimdor_0_2.adt");
 
     if simple_m2 {
         main_simple_m2(&mut mpq_loader).unwrap();
@@ -134,37 +112,12 @@ fn load_m2_doodad(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(ren
     entry.clone()
 }
 
-fn load_wmo_groups(loader: &mut MPQLoader, wmo: &WMORootAsset, path: &str) -> Vec<WMOGroupAsset> {
-    for group in &wmo.mogi.groupInfoList {
-        if group.nameoffset != -1
-        {
-            let offset = wmo.mogn.offset_lookup[&(group.nameoffset as u32)];
-            dbg!(&wmo.mogn.groupNameList[offset]);
-        }
-    }
-
-    let mut group_list = Vec::new();
-    for x in 0..wmo.mohd.nGroups {
-        let cursor = &mut std::io::Cursor::new(
-            loader.load_raw_owned(&format!("{}_{:0>3}.wmo", path, x)).unwrap());
-        let group = WMOReader::parse_group(cursor).unwrap();
-        group_list.push(group);
-    }
-
-    group_list
-}
-
 fn main_simple_m2(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     // This method demonstrates very simple m2 rendering (not in the context of wmos or adts).
 
-    //debug_dump_blp(&mut expansion, r"WORLD\EXPANSION01\DOODADS\GENERIC\BLOODELF\BENCHES\BE_BENCH_01.BLP");
-    //let m2_path = "World\\EXPANSION01\\DOODADS\\GENERIC\\BLOODELF\\Chairs\\BE_Chair01.m2";
-    //let skin_path =  r"World\EXPANSION01\DOODADS\GENERIC\BLOODELF\Chairs\BE_Chair0100.skin";
-    //let tex_path = r"WORLD\EXPANSION01\DOODADS\GENERIC\BLOODELF\BENCHES\BE_BENCH_01.BLP";
-
     let m2_path = r"Creature\talbuk\Talbuk.m2";
     let skin_path = r"Creature\talbuk\Talbuk00.skin";
-    let tex_path = r"Creature\talbuk\TalbukSkinBrown.blp"; // common.mpq!
+    let tex_path = r"Creature\talbuk\TalbukSkinBrown.blp";
 
     let m2 = M2Reader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(m2_path).unwrap()))?;
     let skin = M2Reader::parse_skin_profile(&mut std::io::Cursor::new(loader.load_raw_owned(skin_path).unwrap()))?;
@@ -185,15 +138,14 @@ fn main_simple_wmo(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     //let wmo_path = r"World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn"; // good example of how we need to filter doodad sets
     //let wmo_path = r"World\wmo\Azeroth\Buildings\GriffonAviary\GriffonAviary"; // <-- orange color, no textures?
     let wmo_path = r"World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn_closed";
-
     let mut wmo: WMORootAsset = WMOReader::parse_root(&mut std::io::Cursor::new(loader.load_raw_owned(&format!("{}.wmo", wmo_path)).unwrap()))?;
 
     // TODO: m2_cache should become an implementation detail of the struct that provides collect_doodads?
     // TODO: collect_doodads shouldn't contain the cache loading logic anyway.
-    let mut m2_cache: HashMap<String, Rc<( rendering::common::types::Mesh, Material, Option<BlpImage>)>> = HashMap::new();
+    let mut m2_cache: HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>> = HashMap::new();
 
-    let dooads = collect_dooads(loader, &mut m2_cache, &mut wmo);
-    let group_list = load_wmo_groups(loader, &wmo, wmo_path);
+    let dooads = collect_dooads(loader, &mut m2_cache, &wmo);
+    let group_list = WMOGroupImporter::load_wmo_groups(loader, &wmo, wmo_path);
     let textures = wmo.momt.materialList.iter()
         .map(|tex| wmo.motx.textureNameList[wmo.motx.offsets[&tex.texture_1]].clone())
         .collect_vec();
@@ -204,10 +156,10 @@ fn main_simple_wmo(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
         texture_map.insert(texture, blp);
     }
 
-    let wmos = vec![(Affine3A::IDENTITY, wmo, group_list)];
+    let wmos = vec![(Affine3A::IDENTITY, group_list)];
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    rendering::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map,
+    rendering::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map,
                       vec![]);
     Ok(())
 }
@@ -218,10 +170,10 @@ fn main_simple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     let mut m2_cache: HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>> = HashMap::new();
     let mut render_list: Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>)> = Vec::new();
     let mut texture_map = HashMap::new();
-    let mut wmos: Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)> = Vec::new();
+    let mut wmos/*: Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)>*/ = Vec::new();
 
     let terrain_chunk = handle_adt(loader, adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?;
-    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map, terrain_chunk);
+    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunk);
     Ok(())
 }
 
@@ -232,7 +184,7 @@ fn main_multiple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     let mut m2_cache: HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>> = HashMap::new();
     let mut render_list: Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>)> = Vec::new();
     let mut texture_map = HashMap::new();
-    let mut wmos: Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)> = Vec::new();
+    let mut wmos: Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)> = Vec::new();
     let mut terrain_chunks: Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)> = Vec::new();
 
     for row in 0..2 {
@@ -242,11 +194,11 @@ fn main_multiple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
         }
     }
 
-    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1, &wmo.2)), texture_map, terrain_chunks);
+    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunks);
     Ok(())
 }
 
-fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, WMORootAsset, Vec<WMOGroupAsset>)>) -> Result<Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>, anyhow::Error> {
+fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap<String, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(rendering::common::types::Mesh, Material, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>) -> Result<Vec<(C3Vector, Vec<(Vec3, CImVector)>, Vec<u32>)>, anyhow::Error> {
     for wmo_ref in adt.modf.mapObjDefs.iter() {
         let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
         //dbg!(&name);
@@ -275,9 +227,8 @@ fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap
             texture_map.insert(texture, blp);
         }
 
-        let group_list = load_wmo_groups(loader, &wmo, name.trim_end_matches(".wmo").trim_end_matches(".WMO"));
-
-        wmos.push((transform, wmo, group_list));
+        let group_list = WMOGroupImporter::load_wmo_groups(loader, &wmo, name.trim_end_matches(".wmo").trim_end_matches(".WMO"));
+        wmos.push((transform, group_list));
     }
 
     // TODO: deduplicate with collect doodads (at least the emitter and m2 name replacement)

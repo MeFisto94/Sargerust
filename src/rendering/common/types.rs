@@ -65,7 +65,8 @@ pub enum AlbedoType {
         /// multiplication.
         srgb: bool,
     },
-    Texture // TODO
+    Texture, // TODO
+    TextureWithName(String)
 }
 
 #[derive(Clone, Copy, Debug)]
