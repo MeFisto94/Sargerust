@@ -28,16 +28,16 @@ mod rendering;
 // TODO mpq crate: get rid of getopts
 // TODO mpq crate: implement Read instead of it's custom read into a Vec and then reading that?
 
-// TODO
-fn from_vec(value: C3Vector) -> Vec3 {
-    Vec3::new(value.x, value.y, value.z)
-}
-
-fn from_quat(value: C4Quaternion) -> Quat { Quat::from_xyzw(value.x, value.y, value.z, value.w) }
-
 const CHUNK_SIZE: f32 = 100.0/3.0; // 33.333 yards (100 feet)
 const GRID_SIZE: f32 = CHUNK_SIZE / 8.0;
 const TILE_SIZE: f32 = 16.0 * CHUNK_SIZE;
+
+enum DemoMode {
+    M2,
+    WMO,
+    ADT,
+    MULTIPLE_ADT
+}
 
 fn main() {
     env_logger::init();
@@ -46,21 +46,13 @@ fn main() {
     let data_folder = std::env::current_dir().expect("Can't read current working directory!").join("_data");
 
     let mut mpq_loader = MPQLoader::new(data_folder.to_string_lossy().as_ref());
-    //let kalimdor_wdt = mpq_loader.load_raw_owned(r"World\Maps\Kalimdor\Kalimdor.wdt").expect("Could locate kalimdor.wdt");
+    let mode = DemoMode::MULTIPLE_ADT;
 
-    let simple_m2 = false;
-    let simple_wmo = false;
-    let simple_adt = false;
-
-    if simple_m2 {
-        main_simple_m2(&mut mpq_loader).unwrap();
-    }
-    else if simple_wmo {
-        main_simple_wmo(&mut mpq_loader).unwrap();
-    } else if simple_adt {
-        main_simple_adt(&mut mpq_loader).unwrap();
-    } else {
-        main_multiple_adt(&mut mpq_loader).unwrap();
+    match mode {
+        DemoMode::M2 => main_simple_m2(&mut mpq_loader).unwrap(),
+        DemoMode::WMO =>  main_simple_wmo(&mut mpq_loader).unwrap(),
+        DemoMode::ADT => main_simple_adt(&mut mpq_loader).unwrap(),
+        DemoMode::MULTIPLE_ADT => main_multiple_adt(&mut mpq_loader).unwrap()
     }
 }
 
@@ -83,7 +75,12 @@ fn collect_dooads(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(Mes
             }
 
             let entry = load_m2_doodad(loader, m2_cache, &name);
-            let transform: Affine3A = Affine3A::from_scale_rotation_translation(Vec3::new(modd.scale, modd.scale, modd.scale), from_quat(modd.orientation), from_vec(modd.position));
+
+            let scale = Vec3::new(modd.scale, modd.scale, modd.scale);
+            let rotation = Quat::from_xyzw(modd.orientation.x, modd.orientation.y, modd.orientation.z, modd.orientation.w);
+            let translation = Vec3::new(modd.position.x, modd.position.y, modd.position.z);
+
+            let transform: Affine3A = Affine3A::from_scale_rotation_translation(scale, rotation, translation);
             render_list.push((transform, entry.clone()));
         }
     }
