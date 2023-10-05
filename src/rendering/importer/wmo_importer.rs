@@ -39,7 +39,7 @@ impl WMOGroupImporter {
 
     // MPQLoader: we dynamically load the WMO Groups based upon WMORootAsset. Could change that but this yields error potential.
     // TODO: Still do it, to separate loading/parsing from importing (which is asset -> IR)
-    pub fn load_wmo_groups(loader: &mut MPQLoader, wmo: &WMORootAsset, path: &str) -> Vec<(MeshWithLod, Vec<Material>)> {
+    pub fn load_wmo_groups(loader: &MPQLoader, wmo: &WMORootAsset, path: &str) -> Vec<(MeshWithLod, Vec<Material>)> {
         // just for debug???
         for group in &wmo.mogi.groupInfoList {
             if group.nameoffset != -1 {

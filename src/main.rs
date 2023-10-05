@@ -69,7 +69,7 @@ fn main() {
 
 
 /// Extracts the doodads (i.e. M2 models that have been placed into the world at a specific position) that are defined in the WMO Root
-fn collect_dooads(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)> {
+fn collect_dooads(loader: &MPQLoader, m2_cache: &mut HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>>, wmo: &WMORootAsset) -> Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)> {
     let mut render_list = Vec::new();
     for mods in &wmo.mods.doodadSetList {
         let start = mods.startIndex as usize;
@@ -99,7 +99,7 @@ fn collect_dooads(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(Mes
     render_list
 }
 
-fn load_m2_doodad(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>>, name: &String) -> Rc<(Mesh, Material, Option<BlpImage>)> {
+fn load_m2_doodad(loader: &MPQLoader, m2_cache: &mut HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>>, name: &String) -> Rc<(Mesh, Material, Option<BlpImage>)> {
     // TODO: this should be called by the simple_m2 path
     let entry = m2_cache.entry(name.clone()).or_insert_with(|| {
         let mut m2_file = std::io::Cursor::new(loader.load_raw_owned(&name).unwrap());
@@ -120,7 +120,7 @@ fn load_m2_doodad(loader: &mut MPQLoader, m2_cache: &mut HashMap<String, Rc<(Mes
     entry.clone()
 }
 
-fn main_simple_m2(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
+fn main_simple_m2(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     // This method demonstrates very simple m2 rendering (not in the context of wmos or adts).
 
     let m2_path = r"Creature\talbuk\Talbuk.m2";
@@ -140,7 +140,7 @@ fn main_simple_m2(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn main_simple_wmo(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
+fn main_simple_wmo(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     // This method demonstrates very simple wmo rendering (not in the context of adts).
     //let wmo_path = r"World\wmo\Dungeon\AZ_Subway\Subway";
     //let wmo_path = r"World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn"; // good example of how we need to filter doodad sets
@@ -172,7 +172,7 @@ fn main_simple_wmo(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn main_simple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
+fn main_simple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(r"World\Maps\Kalimdor\Kalimdor_1_1.adt").unwrap()))?;
 
     let mut m2_cache: HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>> = HashMap::new();
@@ -180,12 +180,12 @@ fn main_simple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     let mut texture_map = HashMap::new();
     let mut wmos = Vec::new();
 
-    let terrain_chunk = handle_adt(loader, adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?;
-    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunk);
+    let terrain_chunk = handle_adt(loader, &adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?;
+    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunk, coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)));
     Ok(())
 }
 
-fn main_multiple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
+fn main_multiple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     // technically, wdt loading doesn't differ all too much, because if it has terrain, it doesn't have it's own dooads
     // and then all you have to check is for existing adt files (MAIN chunk)
     let map_name = r"World\Maps\Kalimdor\Kalimdor";
@@ -198,7 +198,7 @@ fn main_multiple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     for row in 0..2 {
         for column in 0..2 {
             let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(&format!("{}_{}_{}.adt", map_name, row, column)).unwrap()))?;
-            terrain_chunks.extend(handle_adt(loader, adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?);
+            terrain_chunks.extend(handle_adt(loader, &adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?);
         }
     }
 
@@ -206,7 +206,7 @@ fn main_multiple_adt(loader: &mut MPQLoader) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>) -> Result<Vec<(Vec3, Mesh)>, anyhow::Error> {
+fn handle_adt(loader: &MPQLoader, adt: &ADTAsset, m2_cache: &mut HashMap<String, Rc<(Mesh, Material, Option<BlpImage>)>>, render_list: &mut Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>) -> Result<Vec<(Vec3, Mesh)>, anyhow::Error> {
     for wmo_ref in adt.modf.mapObjDefs.iter() {
         let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
         trace!("WMO {} has been referenced from ADT", name);
@@ -240,7 +240,7 @@ fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap
     }
 
     // TODO: deduplicate with collect doodads (at least the emitter and m2 name replacement)
-    for dad_ref in adt.mddf.doodadDefs {
+    for dad_ref in &adt.mddf.doodadDefs {
         let name = &adt.mmdx.filenames[*adt.mmdx.offsets.get(&adt.mmid.mmdx_offsets[dad_ref.nameId as usize]).unwrap()];
         trace!("M2 {} has been referenced from ADT", name);
 
@@ -256,7 +256,7 @@ fn handle_adt(loader: &mut MPQLoader, adt: Box<ADTAsset>, m2_cache: &mut HashMap
     }
 
     let mut terrain_chunk = vec![];
-    for mcnk in adt.mcnks {
+    for mcnk in &adt.mcnks {
         terrain_chunk.push(ADTImporter::create_mesh(mcnk)?);
     }
 
@@ -343,7 +343,7 @@ fn load_blp_from_mpq(archive: &mut Archive, file_name: &str) -> Option<BlpImage>
     Some(image.unwrap().1)
 }
 
-fn load_blp_from_ldr(mpq_loader: &mut MPQLoader, file_name: &str) -> Option<BlpImage> {
+fn load_blp_from_ldr(mpq_loader: &MPQLoader, file_name: &str) -> Option<BlpImage> {
     // TODO: The blp crate has bad error handling, as it doesn't mix with anyhow::Error.
     // furthermore, the built in error types stem from nom, that we don't have as dependency.
 

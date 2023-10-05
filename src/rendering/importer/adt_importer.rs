@@ -9,7 +9,7 @@ pub struct ADTImporter {
 }
 
 impl ADTImporter {
-    pub fn create_mesh(mcnk: MCNKChunk) -> Result<(Vec3, Mesh), Error> {
+    pub fn create_mesh(mcnk: &MCNKChunk) -> Result<(Vec3, Mesh), Error> {
         let mut index_buffer = Vec::<u32>::new();
         let mut position_buffer = Vec::new();
         let mut vertex_color_0 = Vec::new();
