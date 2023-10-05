@@ -48,8 +48,8 @@ impl GameApplication {
 
         let logic_thread = self.run_packet_handlers(receiver);
 
-        net_thread.join().unwrap();
-        logic_thread.join().unwrap();
+        net_thread.join().expect("Network Thread to terminate normally");
+        logic_thread.join().expect("Logic Thread to terminate normally");
         return;
         /*rend3_framework::start(self,
             winit::window::WindowBuilder::new()
