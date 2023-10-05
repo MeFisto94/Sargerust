@@ -249,6 +249,26 @@ impl Archive {
         })
     }
 
+    // TODO: maybe refactor the common parts into a dedicated method.
+    pub fn contains_file(&self, filename: &str) -> bool {
+        let start_index =
+            (hash_string(filename, 0x0) & (self.header.hash_table_count - 1)) as usize;
+        let mut hash;
+
+        let hash_a = hash_string(filename, 0x100);
+        let hash_b = hash_string(filename, 0x200);
+
+        for i in start_index..self.hash_table.len() {
+            hash = &self.hash_table[i];
+
+            if hash.hash_a == hash_a && hash.hash_b == hash_b {
+                return true;
+            }
+        }
+
+        false
+    }
+
     pub fn open_file(&mut self, filename: &str) -> Result<File, Error> {
         let start_index =
             (hash_string(filename, 0x0) & (self.header.hash_table_count - 1)) as usize;
