@@ -68,7 +68,7 @@ impl M2Importer {
             albedo:
                 match blp_opt {
                     Some(texture_handle) => AlbedoType::Texture/*(TODO)*/,
-                    None =>  AlbedoType::Value(Vec4::new(0.6, 0.6, 0.6, 1.0))
+                    None =>  AlbedoType::Value(Vec4::new(1.0, 0.0, 0.5, 1.0))
                 },
             is_unlit: true,
             transparency: TransparencyType::Cutout { cutout: 0.1 },
