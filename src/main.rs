@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use glam::{Affine3A, EulerRot, Quat, Vec3};
+use glam::{Affine3A, EulerRot, Quat, Vec3, Vec3A};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
@@ -18,6 +18,7 @@ use sargerust_files::wmo::types::WMORootAsset;
 use crate::game::application::GameApplication;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
+use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{Material, Mesh, MeshWithLod};
 use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::rendering::importer::m2_importer::M2Importer;
@@ -136,7 +137,7 @@ fn main_simple_m2(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
     rendering::render(vec![(Affine3A::from_translation(Vec3::new(0.0, 0.0, 0.0)),
                             Rc::new((imported_mesh, mat, blp_opt)))], vec![],
-                      HashMap::new(), vec![]);
+                      HashMap::new(), vec![], Vec3A::new(0.0, -4.0, 2.0));
     Ok(())
 }
 
@@ -168,7 +169,7 @@ fn main_simple_wmo(loader: &MPQLoader) -> Result<(), anyhow::Error> {
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
     rendering::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map,
-                      vec![]);
+                      vec![], Vec3A::new(0.0, -4.0, 2.0));
     Ok(())
 }
 
@@ -202,7 +203,7 @@ fn main_multiple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
         }
     }
 
-    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunks);
+    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunks, coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)));
     Ok(())
 }
 
@@ -263,7 +264,7 @@ fn handle_adt(loader: &MPQLoader, adt: &ADTAsset, m2_cache: &mut HashMap<String,
     Ok(terrain_chunk)
 }
 
-fn transform_for_doodad_ref(dad_ref: SMDoodadDef) -> Affine3A {
+fn transform_for_doodad_ref(dad_ref: &SMDoodadDef) -> Affine3A {
     let scale = Vec3::new(dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0);
     //let rotation = Quat::from_euler(EulerRot::ZYX, dad_ref.rotation.x.to_radians(), (dad_ref.rotation.y - 90.0).to_radians(), dad_ref.rotation.z.to_radians());
     let rotation = Quat::from_euler(EulerRot::ZYX, (dad_ref.rotation.y + 180.0).to_radians(), (dad_ref.rotation.x + 0.0).to_radians(), (dad_ref.rotation.z + 0.0).to_radians());

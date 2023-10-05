@@ -56,7 +56,8 @@ struct App {
 pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)>,
                      wmos: W,
                      textures: HashMap<String, BlpImage>,
-                     terrain_chunk: Vec<(Vec3, Mesh)>)
+                     terrain_chunk: Vec<(Vec3, Mesh)>,
+                      camera_location: Vec3A)
 where
   W: IntoIterator<Item = (&'a Affine3A, &'a Vec<(MeshWithLod, Vec<Material> /* per lod */)>)>,
 {
@@ -123,19 +124,13 @@ where
     preferred_format,
   );
 
-  let had_terrain = !terrain_chunk.is_empty();
   let mut object_list = Vec::new(); // we need to prevent object handles from getting dropped.
 
   add_placed_doodads(placed_doodads, &renderer, &mut object_list);
   add_wmo_groups(wmos, textures, &renderer, &mut object_list);
   add_terrain_chunks(terrain_chunk, &renderer, &mut object_list);
 
-  if !had_terrain {
-    app.camera_location = Vec3A::new(0.0, -4.0, 2.0);
-  } else {
-    // For the GM Island, we move to it's world location for convenience
-    app.camera_location = coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0));
-  }
+  app.camera_location = camera_location;
 
   let quat = glam::Quat::from_euler(glam::EulerRot::XYZ, 0.5 * PI, 0.0 * PI, 0.0 * PI);
   let view = Mat4::from_rotation_translation(quat, (-app.camera_location).into());
