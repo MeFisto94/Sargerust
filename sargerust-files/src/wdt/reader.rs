@@ -1,6 +1,5 @@
 use std::io::ErrorKind::UnexpectedEof;
 use std::io::Read;
-use crate::adt::types::MODFChunk;
 
 use crate::common::types::{IffChunk, MVerChunk};
 use crate::ParserError;

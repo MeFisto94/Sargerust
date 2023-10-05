@@ -159,7 +159,7 @@ impl Archive {
         file.read_exact(&mut buf).expect("buffer overflow");
         Self::load(Box::new(Cursor::<Arc<[u8]>>::new(buf.into())))
     }
-    
+
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Archive, Error> {
         let file = fs::File::open(&path).expect("no file found");
         Self::load(Box::new(BufReader::new(file)))
