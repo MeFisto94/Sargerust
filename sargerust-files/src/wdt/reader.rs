@@ -1,5 +1,6 @@
 use std::io::ErrorKind::UnexpectedEof;
 use std::io::Read;
+use crate::adt::types::MODFChunk;
 
 use crate::common::types::{IffChunk, MVerChunk};
 use crate::ParserError;
@@ -55,25 +56,23 @@ impl WDTReader {
 
     // Apparently the following chunks are only there for non-terrain worlds?
     let mwmo_chunk = chunk_list.iter()
-      .find(|chunk| chunk.magic_str().eq("MWMO"))
-      .expect("Missing mandatory MWMO chunk");
-    if mwmo_chunk.size > 0x100 {
+      .find(|chunk| chunk.magic_str().eq("MWMO"));
+
+    if mwmo_chunk.is_some() && mwmo_chunk.unwrap().size > 0x100 {
       return Err(ParserError::FormatError { reason: "Invalid MWMO Chunk size" });
     }
 
-    let mwmo = MWMOChunk::from(mwmo_chunk);
-    dbg!(mwmo);
-
-    // TODO: Isn't this an array?
-    let modf = chunk_list.iter()
+    let mwmo = mwmo_chunk.map(MWMOChunk::from);
+    let modf= chunk_list.iter()
       .find(|chunk| chunk.magic_str().eq("MODF"))
-      .expect("Missing mandatory MODF chunk")
-      .parse::<SMMapObjDef>()?;
-    dbg!(modf);
+      .map(|chunk| chunk.parse::<SMMapObjDef>())
+      .transpose()?;
 
     Ok(WDTAsset {
       mphd,
-      main
+      main,
+      mwmo,
+      modf
     })
   }
 }

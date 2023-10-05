@@ -12,6 +12,8 @@ use crate::ParserError;
 pub struct WDTAsset {
   pub mphd: MPHDChunk,
   pub main: MainChunk,
+  pub modf: Option<SMMapObjDef>,
+  pub mwmo: Option<MWMOChunk>
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -48,12 +50,12 @@ pub struct MainChunk {
 #[derive(Debug, Copy, Clone, Default)]
 pub struct SMAreaInfo {
   // versioning is unclear, according to https://wowdev.wiki/WDT#MAIN_chunk
-  pub offset: u32,
-  pub size: u32,
+  // pub offset: u32,
+  // pub size: u32,
 
   // apparently we either have flags or offset/size combos
-  // pub flags: u32, // potentially HasADT, potentially Loaded.
-  // pub asyncId: u32
+  pub flags: u32, // potentially HasADT, potentially Loaded.
+  pub asyncId: u32
 }
 
 impl Parseable<MainChunk> for MainChunk {
@@ -62,14 +64,14 @@ impl Parseable<MainChunk> for MainChunk {
 
     for x in 0..4096 {
       chunk.map_area_info[x] = SMAreaInfo {
-        offset: rdr.read_u32::<LittleEndian>()?,
-        size: rdr.read_u32::<LittleEndian>()?,
-        // flags: rdr.read_u32::<LittleEndian>()?,
-        // asyncId: rdr.read_u32::<LittleEndian>()?,
+        // offset: rdr.read_u32::<LittleEndian>()?,
+        // size: rdr.read_u32::<LittleEndian>()?,
+        flags: rdr.read_u32::<LittleEndian>()?,
+        asyncId: rdr.read_u32::<LittleEndian>()?,
       };
     }
 
-    return Ok(chunk);
+    Ok(chunk)
   }
 }
 
@@ -106,4 +108,14 @@ pub struct SMMapObjDef {
   pub nameSet: u16,
   /// when in ADT, scale, in WDT potentially padding
   pub scale: u16
+}
+
+impl WDTAsset {
+  pub fn has_chunk(&self, chunk_x: u8, chunk_y: u8) -> bool {
+    let range = 0..64;
+    assert!(range.contains(&chunk_x));
+    assert!(range.contains(&chunk_y));
+
+    self.main.map_area_info[64usize * chunk_y as usize + chunk_x as usize].flags != 0
+  }
 }
