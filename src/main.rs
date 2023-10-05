@@ -267,7 +267,7 @@ fn handle_adt(loader: &MPQLoader, adt: &ADTAsset, m2_cache: &mut HashMap<String,
 fn transform_for_doodad_ref(dad_ref: &SMDoodadDef) -> Affine3A {
     let scale = Vec3::new(dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0);
     //let rotation = Quat::from_euler(EulerRot::ZYX, dad_ref.rotation.x.to_radians(), (dad_ref.rotation.y - 90.0).to_radians(), dad_ref.rotation.z.to_radians());
-    let rotation = Quat::from_euler(EulerRot::ZYX, (dad_ref.rotation.y + 180.0).to_radians(), (dad_ref.rotation.x + 0.0).to_radians(), (dad_ref.rotation.z + 0.0).to_radians());
+    let rotation = Quat::from_euler(EulerRot::ZYX, (dad_ref.rotation.y + 90.0).to_radians(), (dad_ref.rotation.x + 0.0).to_radians(), (dad_ref.rotation.z + 0.0).to_radians());
     // MDDFS (TODO: MODF) uses a completely different coordinate system, so we need to fix up things.
 
     // 32*TILE_SIZE because the map is 64 TS wide, and so we're placing ourselfs into the mid.
@@ -287,10 +287,6 @@ fn transform_for_wmo_ref(wmo_ref: &SMMapObjDef) -> Affine3A {
     // // MODF uses a completely different coordinate system, so we need to fix up things.
     // translation.x = -translation.x; // west is positive X!!
     // std::mem::swap(&mut translation.z, &mut translation.y); // maybe needs inverting.
-
-    // // relative to a corner of the map, but we want to have the center in mid (just alone for rotation etc)
-    // translation.x -= 17066.0; // WOWDEV
-    // translation.y -= 17066.0;
 
     // 32*TILE_SIZE because the map is 64 TS wide, and so we're placing ourselfs into the mid.
     let translation = Vec3::new((32.0 * TILE_SIZE - wmo_ref.pos.x), -(32.0 * TILE_SIZE - wmo_ref.pos.z), wmo_ref.pos.y);
