@@ -3,8 +3,6 @@
 #![allow(non_camel_case_types)]
 
 use std::collections::HashMap;
-use std::fs::read;
-use std::io::ErrorKind::UnexpectedEof;
 use std::io::Read;
 
 use byteorder::{LittleEndian, ReadBytesExt};
