@@ -16,11 +16,12 @@ use wow_world_messages::wrath::{ClientMessage, CMSG_AUTH_SESSION, expect_server_
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
 use crate::game::game_state::GameState;
 use crate::game::packet_handlers::PacketHandlers;
+use crate::io::mpq::loader::MPQLoader;
 use crate::networking::{auth};
 use crate::networking::world::WorldServer;
 
-#[derive(Default)]
 pub struct GameApplication {
+    pub mpq_loader: Arc<MPQLoader>,
     pub world_server: Option<Arc<WorldServer>>,
     // TODO: separation? one would expect the world server to carry all kinds of methods to emit and handle packets.
     // at the same time I want different structs for different threads, makes things easier.
@@ -31,8 +32,14 @@ pub struct GameApplication {
 }
 
 impl GameApplication {
-    pub fn new(weak_self: &Weak<GameApplication>) -> Self {
-        GameApplication { world_server: None, game_state: Arc::new(GameState::new(weak_self.clone())), weak_self: weak_self.clone() }
+    pub fn new(weak_self: &Weak<GameApplication>, mpq_loader: MPQLoader) -> Self {
+        let mpq_loader_arc = Arc::new(mpq_loader);
+        Self {
+            mpq_loader: mpq_loader_arc.clone(),
+            weak_self: weak_self.clone(),
+            world_server: None,
+            game_state: Arc::new(GameState::new(weak_self.clone(), mpq_loader_arc.clone())),
+        }
     }
 
     pub fn realm_logon(&mut self) -> Receiver<Box<ServerOpcodeMessage>> {

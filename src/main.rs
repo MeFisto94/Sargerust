@@ -58,7 +58,7 @@ fn main() {
         DemoMode::NoDemo => {
             let mut recv = None;
             let app = Arc::new_cyclic(|weak| {
-                let mut app = GameApplication::new(weak);
+                let mut app = GameApplication::new(weak, mpq_loader);
                 recv = Some(app.realm_logon());
                 app
             });
