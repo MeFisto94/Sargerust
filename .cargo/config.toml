@@ -1,0 +1,3 @@
+[build]
+# rustflags = "-Zprint-type-sizes"
+rustflags = "-Clink-arg=/STACK:8000000"

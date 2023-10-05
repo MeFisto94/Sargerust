@@ -11,6 +11,7 @@ members = [
 ]
 
 [dependencies]
+log = "0.4.20"
 # Logging, but getting rid of the regex feature/dependency for regex filters.
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
 # mpq = "0.8"
@@ -26,13 +27,22 @@ glam = "0.24"
 rend3 = { git = "https://github.com/BVE-Reborn/rend3" }
 # Programmable render list that dictates how the scene renders
 rend3-routine = { git = "https://github.com/BVE-Reborn/rend3" }
+# Framework that deals with the event loop, setting up the renderer, and platform differences.
+rend3-framework = { git = "https://github.com/BVE-Reborn/rend3" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.3"
 # windowing
 winit = "0.28"
 
-# dedup material_ids in WMO Group files MOPY chunk
+# collect_vec and other niceities
 itertools = "0.11.0"
 
 quick_cache = "0.4.0"
-log = "0.4.20"
+
+
+# Multiplayer/Networking
+# "srp-fast-math" is not supported with the MSVC target. Also rev needs to match the version defined in the messages
+wow_srp = { git = "https://github.com/gtker/wow_srp", rev = "9c5382a2915850efc69f05d7985ab06b3ec13163", default-features = false, features = ["tbc-header", "wrath-header", "srp-default-math"] }
+wow_login_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync"] }
+# wow_world_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync", "wrath"] }
+wow_world_messages = { path = "../wow_messages/wow_world_messages", features = ["sync", "wrath", "print-testcase"] }

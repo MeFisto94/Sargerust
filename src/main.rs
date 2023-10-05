@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use glam::{Affine3A, EulerRot, Quat, Vec3};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
@@ -10,11 +11,11 @@ use log::{trace, warn};
 use mpq::Archive;
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::{ADTAsset, SMDoodadDef};
-use sargerust_files::common::types::{C3Vector, C4Quaternion};
 use sargerust_files::m2::reader::M2Reader;
 use sargerust_files::wdt::types::SMMapObjDef;
 use sargerust_files::wmo::reader::WMOReader;
 use sargerust_files::wmo::types::WMORootAsset;
+use crate::game::application::GameApplication;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::common::types::{Material, Mesh, MeshWithLod};
@@ -24,9 +25,9 @@ use crate::rendering::importer::wmo_importer::WMOGroupImporter;
 
 mod io;
 mod rendering;
+mod game;
 
-// TODO mpq crate: get rid of getopts
-// TODO mpq crate: implement Read instead of it's custom read into a Vec and then reading that?
+pub mod networking;
 
 const CHUNK_SIZE: f32 = 100.0/3.0; // 33.333 yards (100 feet)
 const GRID_SIZE: f32 = CHUNK_SIZE / 8.0;
@@ -36,23 +37,33 @@ enum DemoMode {
     M2,
     WMO,
     ADT,
-    MULTIPLE_ADT
+    MultipleAdt,
+    NoDemo
 }
 
 fn main() {
-    env_logger::init();
+    let mode = DemoMode::NoDemo;
+     env_logger::init();
 
     // TODO: perspectively, this folder will be a CLI argument
     let data_folder = std::env::current_dir().expect("Can't read current working directory!").join("_data");
-
     let mut mpq_loader = MPQLoader::new(data_folder.to_string_lossy().as_ref());
-    let mode = DemoMode::MULTIPLE_ADT;
 
     match mode {
         DemoMode::M2 => main_simple_m2(&mut mpq_loader).unwrap(),
         DemoMode::WMO =>  main_simple_wmo(&mut mpq_loader).unwrap(),
         DemoMode::ADT => main_simple_adt(&mut mpq_loader).unwrap(),
-        DemoMode::MULTIPLE_ADT => main_multiple_adt(&mut mpq_loader).unwrap()
+        DemoMode::MultipleAdt => main_multiple_adt(&mut mpq_loader).unwrap(),
+        DemoMode::NoDemo => {
+            let mut recv = None;
+            let app = Arc::new_cyclic(|weak| {
+                let mut app = GameApplication::new(weak);
+                recv = Some(app.realm_logon());
+                app
+            });
+
+            app.run(recv.unwrap());
+        }
     }
 }
 
