@@ -1,14 +1,15 @@
-use crate::archive::Archive;
 use std::collections::HashSet;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
+
+use crate::archive::Archive;
 
 #[derive(Default)]
 pub struct Chain {
     chain: Vec<Archive>,
 }
-
 impl Chain {
+
     pub fn new() -> Self {
         Chain { chain: Vec::new() }
     }
@@ -22,7 +23,6 @@ impl Chain {
             Ok(v) => self.chain.insert(0, v),
             Err(e) => return Err(e),
         }
-
         Ok(())
     }
 

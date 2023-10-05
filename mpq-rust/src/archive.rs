@@ -9,6 +9,7 @@ use std::io::{prelude::*, Cursor};
 use std::io::{Error, ErrorKind};
 use std::mem;
 use std::path::Path;
+use std::sync::Arc;
 
 const HEADER_SIZE_V1: usize = 0x20;
 //const HEADER_SIZE_V2: usize = 0x2C;
@@ -137,8 +138,10 @@ impl Block {
 pub trait ReadAndSeek: Read+Seek {}
 impl <T: Read + Seek> ReadAndSeek for T {}
 
+type Reader = Box<dyn ReadAndSeek + Sync + Send>;
+
 pub struct Archive {
-    cursor: Box<dyn ReadAndSeek>,
+    cursor: Reader,
     header: Header,
     user_data_header: Option<UserDataHeader>,
     hash_table: Vec<Hash>,
@@ -148,20 +151,21 @@ pub struct Archive {
 }
 
 impl Archive {
+
     pub fn open_owned<P: AsRef<Path>>(path: P) -> Result<Archive, Error> {
         let mut file = fs::File::open(&path).expect("no file found");
         let metadata = fs::metadata(&path).expect("unable to read metadata");
         let mut buf = vec![0; metadata.len() as usize];
         file.read_exact(&mut buf).expect("buffer overflow");
-        Self::load(Box::new(Cursor::new(buf)))
+        Self::load(Box::new(Cursor::<Arc<[u8]>>::new(buf.into())))
     }
-
+    
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Archive, Error> {
         let file = fs::File::open(&path).expect("no file found");
         Self::load(Box::new(BufReader::new(file)))
     }
 
-    pub fn load(mut cursor: Box<dyn ReadAndSeek>) -> Result<Archive, Error> {
+    pub fn load(mut cursor: Reader) -> Result<Archive, Error> {
         let mut buffer: [u8; HEADER_SIZE_V1] = [0; HEADER_SIZE_V1];
         let mut offset: u64 = 0;
         let mut user_data_header = None;
@@ -498,7 +502,7 @@ impl File {
     fn read_single_unit_file(
         &self,
         buff_size: usize,
-        file: &mut Box<dyn ReadAndSeek>,
+        file: &mut Reader,
         offset: u64,
         out_buf: &mut [u8],
     ) -> Result<usize, Error> {
