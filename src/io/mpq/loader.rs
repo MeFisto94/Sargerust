@@ -3,11 +3,12 @@ use std::fs;
 use std::io::Cursor;
 use std::ops::DerefMut;
 use std::path::Path;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, RwLock};
+
 use itertools::Itertools;
+use log::{trace, warn};
 
 use mpq::Archive;
-use log::{trace, warn};
 
 use crate::io::common::loader::RawAssetLoader;
 
@@ -23,7 +24,7 @@ pub fn read_mpq_file_into_cursor(archive: &mut Archive, file_name: &str) -> Resu
 }
 
 pub struct MPQLoader {
-    prioritized_archives: Vec<(String, Mutex<Archive>)>,
+    prioritized_archives: Vec<(String, RwLock<Archive>)>,
     data_folder: String,
 }
 
@@ -51,7 +52,7 @@ impl MPQLoader {
             .sorted_by(MPQLoader::sorting_order)
             .map(|file| {
                 let path = Path::new(data_folder).join(Path::new(&file));
-                (file.clone(), Mutex::new(Archive::open(path).expect(&format!("Failed to load MPQ {}", &file))))
+                (file.clone(), RwLock::new(Archive::open(path).expect(&format!("Failed to load MPQ {}", &file))))
             }).collect_vec();
 
         MPQLoader {
@@ -134,8 +135,8 @@ impl RawAssetLoader for MPQLoader {
         // the very bad API design of the mpq crate currently loads the file as soon as we try to open it.
         let opt = self.prioritized_archives.iter()
             .map(|(name, archive)| {
-                let exists = archive.lock().map(|ar| ar.contains_file(name));
-                (name, archive, exists.unwrap_or(false))
+                let exists = archive.read().map(|ar| ar.contains_file(path)).unwrap_or(false);
+                (name, archive, exists)
             })
             .find(|(_, _, exists)| *exists)
             .map(|(name, archive, _)| (name, archive));
@@ -146,8 +147,9 @@ impl RawAssetLoader for MPQLoader {
 
         opt.map(|(name, archive_guard)| {
             trace!("Loading {} from {}", path, name);
-            let archive = archive_guard.lock().unwrap().deref_mut();
-            let file = archive.open_file(name).unwrap();
+            let mut guard = archive_guard.write().unwrap();
+            let archive = guard.deref_mut();
+            let file = archive.open_file(path).unwrap();
             let mut buf: Vec<u8> = vec![0; file.size() as usize];
             file.read(archive, &mut buf).expect("I/O Error. TODO: Error handling");
             buf
