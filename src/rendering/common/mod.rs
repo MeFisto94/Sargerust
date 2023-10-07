@@ -3,3 +3,6 @@
 pub mod coordinate_systems;
 /// basic types (e.g. mesh) to abstract away from both the asset format and the render backend.
 pub mod types;
+/// The objects that are used in the game logic part of the renderer (e.g. MapManager).
+/// They represent fully parsed objects, ready to be rendered/transferred into backend specific types.
+pub mod highlevel_types;

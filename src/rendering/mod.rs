@@ -13,11 +13,13 @@ use rend3::types::{Backend, MaterialHandle, MeshHandle, Object, ObjectHandle, Te
 use rend3::util::typedefs::FastHashMap;
 
 use crate::rendering::common::coordinate_systems;
+use crate::rendering::common::highlevel_types::PlacedDoodad;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, TransparencyType, VertexBuffers};
 use crate::rendering::rend3_backend::Rend3BackendConverter;
 
 pub mod common;
 pub mod importer;
+pub mod loader;
 pub mod rend3_backend;
 
 fn create_texture_rgba8(blp: &BlpImage, mipmap_level: usize) -> rend3::types::Texture {
@@ -53,7 +55,7 @@ struct App {
 }
 
 // since the current impl doesn't care about RAM (see the mpq crate force-loading all mpqs), we can safely pass a load of (potentially unused) textures
-pub fn render<'a, W>(placed_doodads: Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)>,
+pub fn render<'a, W>(placed_doodads: Vec<PlacedDoodad>,
                      wmos: W,
                      textures: HashMap<String, BlpImage>,
                      terrain_chunk: Vec<(Vec3, Mesh)>,
@@ -347,20 +349,20 @@ fn add_wmo_groups<'a, W>(wmos: W, textures: HashMap<String, BlpImage>, renderer:
   }
 }
 
-fn add_placed_doodads(placed_doodads: Vec<(Affine3A, Rc<(Mesh, Material, Option<BlpImage>)>)>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>) {
-  for (transform, rc) in placed_doodads {
-    let (_mesh, _material, blp_opt) = rc.deref();
+fn add_placed_doodads(placed_doodads: Vec<PlacedDoodad>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>) {
+  for dad in placed_doodads {
+    let m2 = dad.m2.deref();
     // Create mesh and calculate smooth normals based on vertices
-    let mesh = Rend3BackendConverter::create_mesh_from_ir(_mesh).unwrap();
+    let mesh = Rend3BackendConverter::create_mesh_from_ir(&m2.mesh).unwrap();
     let mesh_handle = renderer.add_mesh(mesh);
 
     // TODO: concept work for textures
-    let mapped_tex = blp_opt.as_ref().map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
-    let material = Rend3BackendConverter::create_material_from_ir(&_material, mapped_tex);
+    let mapped_tex = m2.blp_opt.as_ref().map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
+    let material = Rend3BackendConverter::create_material_from_ir(&m2.material, mapped_tex);
     let material_handle = renderer.add_material(material);
 
     // Combine the mesh and the material with a location to give an object.
-    let object = create_object(transform, mesh_handle, material_handle);
+    let object = create_object(dad.transform, mesh_handle, material_handle);
 
     // Creating an object will hold onto both the mesh and the material
     // even if they are deleted.

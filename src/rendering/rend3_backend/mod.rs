@@ -39,12 +39,12 @@ impl Rend3BackendConverter {
             if let AlbedoType::Texture = material.albedo {
                 error!("Material requires the presence of a texture");
             }
-            if let AlbedoType::TextureWithName(_) = material.albedo {
-                error!("Material requires the presence of a texture");
+            if let AlbedoType::TextureWithName(name) = &material.albedo {
+                error!("Material requires the presence of texture {name}");
             }
         }
 
-        let mut ret = PbrMaterial {
+        let ret = PbrMaterial {
             unlit: material.is_unlit,
             albedo: match material.albedo {
                 AlbedoType::None => AlbedoComponent::None,
