@@ -3,6 +3,7 @@ use glam::Affine3A;
 use crate::rendering::common::types::{Material, MeshWithLod};
 use crate::rendering::loader::m2_loader::LoadedM2;
 
+#[derive(Debug, Clone)]
 pub struct PlacedDoodad {
     pub transform: Affine3A,
 
@@ -11,12 +12,14 @@ pub struct PlacedDoodad {
     pub m2: Arc<LoadedM2>
 }
 
+#[derive(Debug, Clone)]
 /// A doodad that has been referenced somewhere, but whos M2 is not loaded yet.
 pub struct PlaceableDoodad {
     pub transform: Affine3A,
     pub m2_ref: String
 }
 
+#[derive(Clone)]
 pub struct PlaceableWMO {
     pub doodads: Vec<PlaceableDoodad>,
     pub loaded_groups: Vec<(MeshWithLod, Vec<Material>)>

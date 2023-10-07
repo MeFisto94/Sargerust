@@ -36,9 +36,7 @@ winit = "0.28"
 
 # collect_vec and other niceities
 itertools = "0.11.0"
-
 quick_cache = "0.4.0"
-
 
 # Multiplayer/Networking
 # "srp-fast-math" is not supported with the MSVC target. Also rev needs to match the version defined in the messages

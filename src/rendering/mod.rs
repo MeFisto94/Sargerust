@@ -21,6 +21,7 @@ pub mod common;
 pub mod importer;
 pub mod loader;
 pub mod rend3_backend;
+pub mod application;
 
 fn create_texture_rgba8(blp: &BlpImage, mipmap_level: usize) -> rend3::types::Texture {
   let image = blp_to_image(blp, mipmap_level).expect("decode");
@@ -128,9 +129,9 @@ where
 
   let mut object_list = Vec::new(); // we need to prevent object handles from getting dropped.
 
-  add_placed_doodads(placed_doodads, &renderer, &mut object_list);
-  add_wmo_groups(wmos, textures, &renderer, &mut object_list);
-  add_terrain_chunks(terrain_chunk, &renderer, &mut object_list);
+  add_placed_doodads(&placed_doodads, &renderer, &mut object_list);
+  add_wmo_groups(wmos, &textures, &renderer, &mut object_list);
+  add_terrain_chunks(&terrain_chunk, &renderer, &mut object_list);
 
   app.camera_location = camera_location;
 
@@ -290,7 +291,7 @@ where
   });
 }
 
-fn add_terrain_chunks(terrain_chunk: Vec<(Vec3, Mesh)>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>) {
+pub fn add_terrain_chunks(terrain_chunk: &Vec<(Vec3, Mesh)>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>) {
   for (position, _mesh) in terrain_chunk {
     let mut mesh = Rend3BackendConverter::create_mesh_from_ir(&_mesh).unwrap();
     mesh.flip_winding_order(); // it would be better if the mesh came pre-flipped, I guess (especially since the IR is cached).
@@ -321,7 +322,7 @@ fn add_terrain_chunks(terrain_chunk: Vec<(Vec3, Mesh)>, renderer: &Arc<Renderer>
   }
 }
 
-fn add_wmo_groups<'a, W>(wmos: W, textures: HashMap<String, BlpImage>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>)
+pub fn add_wmo_groups<'a, W>(wmos: W, textures: &HashMap<String, BlpImage>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>)
   where W: IntoIterator<Item=(&'a Affine3A, &'a Vec<(MeshWithLod, Vec<Material> /* per lod */)>)> {
   for (transform, wmo_groups) in wmos {
     for (lod_mesh, materials) in wmo_groups {
@@ -349,7 +350,7 @@ fn add_wmo_groups<'a, W>(wmos: W, textures: HashMap<String, BlpImage>, renderer:
   }
 }
 
-fn add_placed_doodads(placed_doodads: Vec<PlacedDoodad>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>) {
+pub fn add_placed_doodads(placed_doodads: &Vec<PlacedDoodad>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>) {
   for dad in placed_doodads {
     let m2 = dad.m2.deref();
     // Create mesh and calculate smooth normals based on vertices

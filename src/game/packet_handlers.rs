@@ -31,7 +31,6 @@ impl PacketHandlers {
 
             match res.unwrap().as_ref() {
                 ServerOpcodeMessage::SMSG_LOGIN_VERIFY_WORLD(pkt) => {
-                    trace!("LOGIN: {:?}", &pkt);
                     // pkt.as_int() and then manual DBC logic at some point, to support custom maps.
 
                     self.app().game_state.change_map(pkt.map, pkt.position, pkt.orientation);

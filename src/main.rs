@@ -1,21 +1,21 @@
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Instant;
+
 use glam::{Affine3A, EulerRot, Quat, Vec3, Vec3A};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
 use itertools::Itertools;
-use log::{error, trace, warn};
+use log::{trace, warn};
+
 use mpq::Archive;
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::{ADTAsset, SMDoodadDef};
 use sargerust_files::m2::reader::M2Reader;
 use sargerust_files::wdt::types::SMMapObjDef;
-use sargerust_files::wmo::reader::WMOReader;
-use sargerust_files::wmo::types::WMORootAsset;
+
 use crate::game::application::GameApplication;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
@@ -24,7 +24,6 @@ use crate::rendering::common::highlevel_types::PlacedDoodad;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod};
 use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::rendering::importer::m2_importer::M2Importer;
-use crate::rendering::importer::wmo_importer::WMOGroupImporter;
 use crate::rendering::loader::blp_loader::BLPLoader;
 use crate::rendering::loader::m2_loader::{LoadedM2, M2Loader};
 use crate::rendering::loader::wmo_loader::WMOLoader;
@@ -47,7 +46,7 @@ enum DemoMode {
 }
 
 fn main() {
-    let mode = DemoMode::MultipleAdt;
+    let mode = DemoMode::NoDemo;
     env_logger::init();
 
     // TODO: perspectively, this folder will be a CLI argument
@@ -63,7 +62,7 @@ fn main() {
             let mut recv = None;
             let app = Arc::new_cyclic(|weak| {
                 let mut app = GameApplication::new(weak, mpq_loader);
-                recv = Some(app.realm_logon());
+                recv = Some(app.realm_logon("127.0.0.1:3724"));
                 app
             });
 

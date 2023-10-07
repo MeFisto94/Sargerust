@@ -8,7 +8,7 @@ use itertools::Itertools;
 use log::{info, trace, warn};
 use wow_srp::wrath_header::{ClientDecrypterHalf, ClientEncrypterHalf};
 use wow_world_messages::errors::ExpectedOpcodeError;
-use wow_world_messages::wrath::{ClientMessage, CMSG_TIME_SYNC_RESP, SMSG_CLIENTCACHE_VERSION, SMSG_TUTORIAL_FLAGS};
+use wow_world_messages::wrath::{ClientMessage, CMSG_TIME_SYNC_RESP, SMSG_CLIENTCACHE_VERSION, SMSG_TUTORIAL_FLAGS, SMSG_WARDEN_DATA};
 use wow_world_messages::wrath::{
     CMSG_CHAR_ENUM, CMSG_PLAYER_LOGIN, SMSG_AUTH_RESPONSE,
     SMSG_AUTH_RESPONSE_WorldResult, SMSG_CHAR_ENUM,
@@ -49,8 +49,9 @@ impl WorldServer {
         {
             let mut dec = self.decrypter.lock().unwrap();
             let mut enc = self.encrypter.lock().unwrap();
-            let s = expect_server_message_encryption::<SMSG_AUTH_RESPONSE, _>(&mut self.stream(), dec.deref_mut())
-                    .unwrap();
+
+            let warden = expect_server_message_encryption::<SMSG_WARDEN_DATA, _>(&mut self.stream(), dec.deref_mut()).unwrap();
+            let s = expect_server_message_encryption::<SMSG_AUTH_RESPONSE, _>(&mut self.stream(), dec.deref_mut()).unwrap();
 
             if !matches!(s.result, SMSG_AUTH_RESPONSE_WorldResult::AuthOk { .. }) {
                 panic!()

@@ -6,6 +6,7 @@ use crate::rendering::common::types::{Material, Mesh};
 use crate::rendering::importer::m2_importer::M2Importer;
 use crate::rendering::loader::blp_loader::BLPLoader;
 
+#[derive(Debug, Clone)]
 pub struct LoadedM2 {
     pub mesh: Mesh,
     pub material: Material,
