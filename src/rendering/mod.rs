@@ -8,7 +8,6 @@ use image_blp::convert::blp_to_image;
 use itertools::Itertools;
 use rend3::Renderer;
 use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectHandle};
-use winit::platform::windows::EventLoopBuilderExtWindows;
 
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::highlevel_types::PlacedDoodad;

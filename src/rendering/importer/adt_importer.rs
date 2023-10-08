@@ -2,7 +2,7 @@ use anyhow::Error;
 use glam::{Vec3};
 use sargerust_files::adt::types::{MCCVSubChunk, MCNKChunk};
 use sargerust_files::common::types::{CImVector};
-use crate::GRID_SIZE;
+use crate::rendering::common::coordinate_systems::GRID_SIZE;
 use crate::rendering::common::types::{Mesh, VertexBuffers};
 
 pub struct ADTImporter {

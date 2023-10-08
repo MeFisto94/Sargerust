@@ -1,7 +1,6 @@
 use std::f32::consts::PI;
 use std::ops::Add;
 use glam::{EulerRot, Mat4, Vec3, Vec3A};
-use crate::TILE_SIZE;
 
 /// ADT is RH, Up: Z, East: -Y, North: +X
 #[inline]
@@ -34,3 +33,8 @@ pub fn adt_world_to_tiles(position: Vec3) -> (u8, u8) {
     let chunk_coords = (position / -TILE_SIZE).floor().add(Vec3::new(32.0, 32.0, 0.0));
     (chunk_coords.x as u8, chunk_coords.y as u8)
 }
+
+const CHUNK_SIZE: f32 = 100.0/3.0;
+// 33.333 yards (100 feet)
+pub const GRID_SIZE: f32 = CHUNK_SIZE / 8.0;
+pub const TILE_SIZE: f32 = 16.0 * CHUNK_SIZE;

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
+
 use glam::{Affine3A, EulerRot, Quat, Vec3};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
@@ -9,11 +10,11 @@ use itertools::Itertools;
 use log::trace;
 
 use mpq::Archive;
+use rendering::common::coordinate_systems::TILE_SIZE;
 use sargerust_files::adt::types::{ADTAsset, SMDoodadDef};
 use sargerust_files::wdt::types::SMMapObjDef;
 
 use crate::game::application::GameApplication;
-use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::common::highlevel_types::PlacedDoodad;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod};
@@ -27,10 +28,6 @@ mod rendering;
 mod game;
 pub mod networking;
 mod demos; // Containing the rendering/application for the Asset Viewers.
-
-const CHUNK_SIZE: f32 = 100.0/3.0; // 33.333 yards (100 feet)
-const GRID_SIZE: f32 = CHUNK_SIZE / 8.0;
-const TILE_SIZE: f32 = 16.0 * CHUNK_SIZE;
 
 enum DemoMode {
     M2,
