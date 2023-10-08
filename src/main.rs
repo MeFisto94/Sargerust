@@ -84,8 +84,10 @@ fn handle_adt(loader: &MPQLoader, adt: &ADTAsset, m2_cache: &mut HashMap<String,
             }).collect_vec();
 
         for texture in textures {
-            let blp = BLPLoader::load_blp_from_ldr(loader, &texture).expect("Texture loading error");
-            texture_map.insert(texture, blp);
+            if !texture_map.contains_key(&texture) {
+                let blp = BLPLoader::load_blp_from_ldr(loader, &texture).expect("Texture loading error");
+                texture_map.insert(texture, blp);
+            }
         }
 
         let transform = transform_for_wmo_ref(wmo_ref);

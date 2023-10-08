@@ -314,8 +314,10 @@ pub fn main_simple_wmo(loader: &MPQLoader) -> Result<(), anyhow::Error> {
 
     let mut texture_map = HashMap::new();
     for texture in textures {
-        let blp = BLPLoader::load_blp_from_ldr(loader, &texture).expect("Texture loading error");
-        texture_map.insert(texture, blp);
+        if !texture_map.contains_key(&texture) {
+            let blp = BLPLoader::load_blp_from_ldr(loader, &texture).expect("Texture loading error");
+            texture_map.insert(texture, blp);
+        }
     }
 
     let mut m2_cache= HashMap::new();
@@ -330,8 +332,8 @@ pub fn main_simple_wmo(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     let wmos = vec![(Affine3A::IDENTITY, group_list)];
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map,
-           vec![], Vec3A::new(0.0, -4.0, 2.0));
+    render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)),
+           texture_map, vec![], Vec3A::new(0.0, -4.0, 2.0));
     Ok(())
 }
 
