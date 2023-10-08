@@ -1,29 +1,23 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
-use std::time::Instant;
-
-use glam::{Affine3A, EulerRot, Quat, Vec3, Vec3A};
+use glam::{Affine3A, EulerRot, Quat, Vec3};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
 use itertools::Itertools;
-use log::{trace, warn};
+use log::trace;
 
 use mpq::Archive;
-use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::{ADTAsset, SMDoodadDef};
-use sargerust_files::m2::reader::M2Reader;
 use sargerust_files::wdt::types::SMMapObjDef;
 
 use crate::game::application::GameApplication;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
-use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::highlevel_types::PlacedDoodad;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod};
 use crate::rendering::importer::adt_importer::ADTImporter;
-use crate::rendering::importer::m2_importer::M2Importer;
 use crate::rendering::loader::blp_loader::BLPLoader;
 use crate::rendering::loader::m2_loader::{LoadedM2, M2Loader};
 use crate::rendering::loader::wmo_loader::WMOLoader;
@@ -55,10 +49,10 @@ fn main() {
     let mpq_loader = MPQLoader::new(data_folder.to_string_lossy().as_ref());
 
     match mode {
-        DemoMode::M2 => main_simple_m2(&mpq_loader).unwrap(),
-        DemoMode::WMO =>  main_simple_wmo(&mpq_loader).unwrap(),
-        DemoMode::ADT => main_simple_adt(&mpq_loader).unwrap(),
-        DemoMode::MultipleAdt => main_multiple_adt(&mpq_loader).unwrap(),
+        DemoMode::M2 => demos::main_simple_m2(&mpq_loader).unwrap(),
+        DemoMode::WMO =>  demos::main_simple_wmo(&mpq_loader).unwrap(),
+        DemoMode::ADT => demos::main_simple_adt(&mpq_loader).unwrap(),
+        DemoMode::MultipleAdt => demos::main_multiple_adt(&mpq_loader).unwrap(),
         DemoMode::NoDemo => {
             let mut recv = None;
             let app = Arc::new_cyclic(|weak| {
@@ -70,112 +64,6 @@ fn main() {
             app.run(recv.unwrap());
         }
     }
-}
-
-fn main_simple_m2(loader: &MPQLoader) -> Result<(), anyhow::Error> {
-    // This method demonstrates very simple m2 rendering (not in the context of wmos or adts).
-    // It typically makes more sense to use load_m2_doodad, however this a) shows the process involved
-    // and b) overrides the tex_path (Talbuks, but Creatures in general) have color variations
-
-    let m2_path = r"Creature\talbuk\Talbuk.m2";
-    let skin_path = r"Creature\talbuk\Talbuk00.skin";
-    let tex_path = r"Creature\talbuk\TalbukSkinBrown.blp";
-
-    let m2 = M2Reader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(m2_path).unwrap()))?;
-    let skin = M2Reader::parse_skin_profile(&mut std::io::Cursor::new(loader.load_raw_owned(skin_path).unwrap()))?;
-    let blp_opt = BLPLoader::load_blp_from_ldr(loader, tex_path);
-    let imported_mesh = M2Importer::create_mesh(&m2, &skin);
-    let mat = M2Importer::create_material(&blp_opt);
-
-    let dad = PlacedDoodad {
-        transform: Affine3A::IDENTITY,
-        m2: Arc::new(LoadedM2 {
-            mesh: imported_mesh,
-            material: mat,
-            blp_opt
-        })
-    };
-
-    // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    demos::render(vec![dad], vec![], HashMap::new(), vec![], Vec3A::new(0.0, -4.0, 2.0));
-    Ok(())
-}
-
-fn main_simple_wmo(loader: &MPQLoader) -> Result<(), anyhow::Error> {
-    // This method demonstrates very simple wmo rendering (not in the context of adts).
-    // let wmo_path = r"World\wmo\Dungeon\AZ_Subway\Subway.wmo";
-    // let wmo_path = r"World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn.wmo"; // good example of how we need to filter doodad sets
-    // let wmo_path = r"World\wmo\Azeroth\Buildings\GriffonAviary\GriffonAviary.WMO"; // <-- orange color, no textures?
-    let wmo_path = r"World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn_closed.WMO";
-    let loaded = WMOLoader::load(loader, wmo_path)?;
-
-    // TODO: currently, only WMO makes use of texture names, M2s load their textures in load_m2_doodad (when the doodad becomes placeable).
-    let textures = loaded.loaded_groups.iter()
-        .flat_map(|(_, mats)|mats)
-        .filter_map(|mat| {
-            match &mat.albedo {
-                AlbedoType::TextureWithName(tex_name) => Some(tex_name.clone()),
-                _ => None
-            }
-        }).collect_vec();
-
-    let mut texture_map = HashMap::new();
-    for texture in textures {
-        let blp = BLPLoader::load_blp_from_ldr(loader, &texture).expect("Texture loading error");
-        texture_map.insert(texture, blp);
-    }
-
-    let mut m2_cache= HashMap::new();
-    let dooads = loaded.doodads.iter()
-        // Resolve references
-        .map(|dad| PlacedDoodad {
-            transform: dad.transform,
-            m2: load_m2_doodad(loader, &mut m2_cache, &dad.m2_ref)
-        }).collect_vec();
-
-    let group_list = loaded.loaded_groups;
-    let wmos = vec![(Affine3A::IDENTITY, group_list)];
-
-    // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    demos::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map,
-                      vec![], Vec3A::new(0.0, -4.0, 2.0));
-    Ok(())
-}
-
-fn main_simple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
-    let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(r"World\Maps\Kalimdor\Kalimdor_1_1.adt").unwrap()))?;
-
-    let mut m2_cache = HashMap::new();
-    let mut render_list= Vec::new();
-    let mut texture_map = HashMap::new();
-    let mut wmos = Vec::new();
-
-    let terrain_chunk = handle_adt(loader, &adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?;
-    demos::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunk, coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)));
-    Ok(())
-}
-
-fn main_multiple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
-    let now = Instant::now();
-    // technically, wdt loading doesn't differ all too much, because if it has terrain, it doesn't have it's own dooads
-    // and then all you have to check is for existing adt files (MAIN chunk)
-    let map_name = r"World\Maps\Kalimdor\Kalimdor";
-    let mut m2_cache = HashMap::new();
-    let mut render_list= Vec::new();
-    let mut texture_map = HashMap::new();
-    let mut wmos = Vec::new();
-    let mut terrain_chunks: Vec<(Vec3, Mesh)> = Vec::new();
-
-    for row in 0..2 {
-        for column in 0..2 {
-            let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(&format!("{}_{}_{}.adt", map_name, row, column)).unwrap()))?;
-            terrain_chunks.extend(handle_adt(loader, &adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?);
-        }
-    }
-
-    warn!("Loading took {}ms", now.elapsed().as_millis());
-    demos::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunks, coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)));
-    Ok(())
 }
 
 fn handle_adt(loader: &MPQLoader, adt: &ADTAsset, m2_cache: &mut HashMap<String, Arc<LoadedM2>>, render_list: &mut Vec<PlacedDoodad>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>) -> Result<Vec<(Vec3, Mesh)>, anyhow::Error> {
