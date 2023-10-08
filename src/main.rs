@@ -32,6 +32,7 @@ mod io;
 mod rendering;
 mod game;
 pub mod networking;
+mod demos; // Containing the rendering/application for the Asset Viewers.
 
 const CHUNK_SIZE: f32 = 100.0/3.0; // 33.333 yards (100 feet)
 const GRID_SIZE: f32 = CHUNK_SIZE / 8.0;
@@ -96,7 +97,7 @@ fn main_simple_m2(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     };
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    rendering::render(vec![dad], vec![], HashMap::new(), vec![], Vec3A::new(0.0, -4.0, 2.0));
+    demos::render(vec![dad], vec![], HashMap::new(), vec![], Vec3A::new(0.0, -4.0, 2.0));
     Ok(())
 }
 
@@ -136,7 +137,7 @@ fn main_simple_wmo(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     let wmos = vec![(Affine3A::IDENTITY, group_list)];
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    rendering::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map,
+    demos::render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map,
                       vec![], Vec3A::new(0.0, -4.0, 2.0));
     Ok(())
 }
@@ -150,7 +151,7 @@ fn main_simple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     let mut wmos = Vec::new();
 
     let terrain_chunk = handle_adt(loader, &adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?;
-    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunk, coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)));
+    demos::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunk, coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)));
     Ok(())
 }
 
@@ -173,7 +174,7 @@ fn main_multiple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     }
 
     warn!("Loading took {}ms", now.elapsed().as_millis());
-    rendering::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunks, coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)));
+    demos::render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunks, coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)));
     Ok(())
 }
 
