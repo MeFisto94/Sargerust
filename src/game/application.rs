@@ -1,15 +1,15 @@
+use rend3::Renderer;
 use std::net::TcpStream;
-use std::sync::{Arc, OnceLock, Weak};
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, OnceLock, Weak};
 use std::thread::JoinHandle;
-use rend3::Renderer;
 
 use winit::dpi::LogicalSize;
 use wow_srp::normalized_string::NormalizedString;
 use wow_srp::wrath_header::ProofSeed;
-use wow_world_messages::wrath::{ClientMessage, CMSG_AUTH_SESSION, expect_server_message, SMSG_AUTH_CHALLENGE};
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
+use wow_world_messages::wrath::{expect_server_message, ClientMessage, CMSG_AUTH_SESSION, SMSG_AUTH_CHALLENGE};
 
 use crate::game::game_state::GameState;
 use crate::game::packet_handlers::PacketHandlers;
@@ -51,23 +51,33 @@ impl GameApplication {
 
     pub fn run(&self, receiver: Receiver<Box<ServerOpcodeMessage>>) {
         let ws = self.world_server.as_ref().unwrap().clone();
-        let net_thread = std::thread::Builder::new().name("Network".into())
-            .stack_size(8000000).spawn(move || { ws.run(); }).unwrap();
+        let net_thread = std::thread::Builder::new()
+            .name("Network".into())
+            .stack_size(8000000)
+            .spawn(move || {
+                ws.run();
+            })
+            .unwrap();
 
         let logic_thread = self.run_packet_handlers(receiver);
 
-        let wnd = winit::window::WindowBuilder::new().with_title("Sargerust: Wrath of the Rust King")
+        let wnd = winit::window::WindowBuilder::new()
+            .with_title("Sargerust: Wrath of the Rust King")
             .with_inner_size(LogicalSize::new(1024, 768));
         let render_app = RenderingApplication::new(self.weak_self.clone());
         rend3_framework::start(render_app, wnd);
 
-        net_thread.join().expect("Network Thread to terminate normally");
-        logic_thread.join().expect("Logic Thread to terminate normally");
+        net_thread
+            .join()
+            .expect("Network Thread to terminate normally");
+        logic_thread
+            .join()
+            .expect("Logic Thread to terminate normally");
     }
 
     fn prepare_network(&mut self, packet_handler_sender: Sender<Box<ServerOpcodeMessage>>, address: &str) {
         let (session_key, world_server_stream, server_id) = {
-            let mut auth_server = TcpStream::connect(address).unwrap();
+            let mut auth_server = TcpStream::connect(address).expect("Connecting to the Server succeeds");
             let (session_key, realms) = auth::auth(&mut auth_server, "user", "user");
             dbg!(&realms.realms[0].name);
             (
@@ -83,7 +93,10 @@ impl GameApplication {
         let seed = ProofSeed::new();
         let seed_value = seed.seed();
         let (client_proof, crypto) = seed.into_client_header_crypto(
-            &NormalizedString::new("user").unwrap(), session_key, s.server_seed);
+            &NormalizedString::new("user").unwrap(),
+            session_key,
+            s.server_seed,
+        );
 
         // Caution, crypto implements Copy and then encryption breaks! Do not access encrypt/decrypt here, use the world server.
         let (encrypter, decrypter) = crypto.split();
@@ -108,15 +121,25 @@ impl GameApplication {
             battleground_id: 0,
             realm_id: server_id as u32,
             dos_response: 0,
-        }.write_unencrypted_client(&mut &world_server_stream).unwrap();
+        }
+        .write_unencrypted_client(&mut &world_server_stream)
+        .unwrap();
 
-        self.world_server = Some(Arc::new(WorldServer::new(world_server_stream, encrypter, decrypter, packet_handler_sender)));
+        self.world_server = Some(Arc::new(WorldServer::new(
+            world_server_stream,
+            encrypter,
+            decrypter,
+            packet_handler_sender,
+        )));
     }
 
     pub fn run_packet_handlers(&self, receiver: Receiver<Box<ServerOpcodeMessage>>) -> JoinHandle<()> {
         let weak = self.weak_self.clone();
-        std::thread::Builder::new().name("Packet Handlers".into()).spawn(|| {
-            PacketHandlers::new(weak, receiver).run();
-        }).unwrap()
+        std::thread::Builder::new()
+            .name("Packet Handlers".into())
+            .spawn(|| {
+                PacketHandlers::new(weak, receiver).run();
+            })
+            .unwrap()
     }
 }

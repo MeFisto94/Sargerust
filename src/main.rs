@@ -3,9 +3,9 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use glam::{Affine3A, EulerRot, Quat, Vec3};
-use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
+use image_blp::BlpImage;
 use itertools::Itertools;
 use log::trace;
 
@@ -23,18 +23,18 @@ use crate::rendering::loader::blp_loader::BLPLoader;
 use crate::rendering::loader::m2_loader::{LoadedM2, M2Loader};
 use crate::rendering::loader::wmo_loader::WMOLoader;
 
-mod io;
-mod rendering;
+mod demos;
 mod game;
+mod io;
 pub mod networking;
-mod demos; // Containing the rendering/application for the Asset Viewers.
+mod rendering; // Containing the rendering/application for the Asset Viewers.
 
 enum DemoMode {
     M2,
     WMO,
     ADT,
     MultipleAdt,
-    NoDemo
+    NoDemo,
 }
 
 fn main() {
@@ -42,12 +42,14 @@ fn main() {
     env_logger::init();
 
     // TODO: perspectively, this folder will be a CLI argument
-    let data_folder = std::env::current_dir().expect("Can't read current working directory!").join("_data");
+    let data_folder = std::env::current_dir()
+        .expect("Can't read current working directory!")
+        .join("_data");
     let mpq_loader = MPQLoader::new(data_folder.to_string_lossy().as_ref());
 
     match mode {
         DemoMode::M2 => demos::main_simple_m2(&mpq_loader).unwrap(),
-        DemoMode::WMO =>  demos::main_simple_wmo(&mpq_loader).unwrap(),
+        DemoMode::WMO => demos::main_simple_wmo(&mpq_loader).unwrap(),
         DemoMode::ADT => demos::main_simple_adt(&mpq_loader).unwrap(),
         DemoMode::MultipleAdt => demos::main_multiple_adt(&mpq_loader).unwrap(),
         DemoMode::NoDemo => {
@@ -63,9 +65,20 @@ fn main() {
     }
 }
 
-fn handle_adt(loader: &MPQLoader, adt: &ADTAsset, m2_cache: &mut HashMap<String, Arc<LoadedM2>>, render_list: &mut Vec<PlacedDoodad>, texture_map: &mut HashMap<String, BlpImage>, wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>) -> Result<Vec<(Vec3, Mesh)>, anyhow::Error> {
+fn handle_adt(
+    loader: &MPQLoader,
+    adt: &ADTAsset,
+    m2_cache: &mut HashMap<String, Arc<LoadedM2>>,
+    render_list: &mut Vec<PlacedDoodad>,
+    texture_map: &mut HashMap<String, BlpImage>,
+    wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>,
+) -> Result<Vec<(Vec3, Mesh)>, anyhow::Error> {
     for wmo_ref in adt.modf.mapObjDefs.iter() {
-        let name = &adt.mwmo.filenames[*adt.mwmo.offsets.get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize]).unwrap()];
+        let name = &adt.mwmo.filenames[*adt
+            .mwmo
+            .offsets
+            .get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize])
+            .unwrap()];
         trace!("WMO {} has been referenced from ADT", name);
 
         if name.ends_with("STORMWIND.WMO") {
@@ -74,14 +87,15 @@ fn handle_adt(loader: &MPQLoader, adt: &ADTAsset, m2_cache: &mut HashMap<String,
 
         let loaded = WMOLoader::load(loader, name)?;
         // TODO: currently, only WMO makes use of texture names, M2s load their textures in load_m2_doodad (when the doodad becomes placeable).
-        let textures = loaded.loaded_groups.iter()
-            .flat_map(|(_, mats)|mats)
-            .filter_map(|mat| {
-                match &mat.albedo {
-                    AlbedoType::TextureWithName(tex_name) => Some(tex_name.clone()),
-                    _ => None
-                }
-            }).collect_vec();
+        let textures = loaded
+            .loaded_groups
+            .iter()
+            .flat_map(|(_, mats)| mats)
+            .filter_map(|mat| match &mat.albedo {
+                AlbedoType::TextureWithName(tex_name) => Some(tex_name.clone()),
+                _ => None,
+            })
+            .collect_vec();
 
         for texture in textures {
             if !texture_map.contains_key(&texture) {
@@ -106,17 +120,27 @@ fn handle_adt(loader: &MPQLoader, adt: &ADTAsset, m2_cache: &mut HashMap<String,
 
     // TODO: deduplicate with collect doodads (at least the emitter and m2 name replacement)
     for dad_ref in &adt.mddf.doodadDefs {
-        let name = &adt.mmdx.filenames[*adt.mmdx.offsets.get(&adt.mmid.mmdx_offsets[dad_ref.nameId as usize]).unwrap()];
+        let name = &adt.mmdx.filenames[*adt
+            .mmdx
+            .offsets
+            .get(&adt.mmid.mmdx_offsets[dad_ref.nameId as usize])
+            .unwrap()];
         trace!("M2 {} has been referenced from ADT", name);
 
         // fix name: currently it ends with .mdx but we need .m2
-        let name = name.to_lowercase().replace(".mdx", ".m2").replace(".mdl", ".m2");
+        let name = name
+            .to_lowercase()
+            .replace(".mdx", ".m2")
+            .replace(".mdl", ".m2");
         if name.to_lowercase().contains("emitter") {
             continue;
         }
 
         let entry = load_m2_doodad(loader, m2_cache, &name);
-        render_list.push(PlacedDoodad { transform: transform_for_doodad_ref(dad_ref), m2: entry });
+        render_list.push(PlacedDoodad {
+            transform: transform_for_doodad_ref(dad_ref),
+            m2: entry,
+        });
     }
 
     let mut terrain_chunk = vec![];
@@ -131,19 +155,32 @@ fn load_m2_doodad(loader: &MPQLoader, m2_cache: &mut HashMap<String, Arc<LoadedM
     // Caching M2s is unavoidable in some way, especially when loading multiple chunks in parallel.
     // Otherwise, m2s could be loaded multiple times, but the important thing is to deduplicate
     // them before sending them to the render thread. Share meshes and textures!
-    let entry = m2_cache.entry(name.to_string()).or_insert_with(|| {
-        Arc::new(M2Loader::load_no_lod(loader, name))
-    });
+    let entry = m2_cache
+        .entry(name.to_string())
+        .or_insert_with(|| Arc::new(M2Loader::load_no_lod(loader, name)));
     entry.clone()
 }
 
 fn transform_for_doodad_ref(dad_ref: &SMDoodadDef) -> Affine3A {
-    let scale = Vec3::new(dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0, dad_ref.scale as f32 / 1024.0);
-    let rotation = Quat::from_euler(EulerRot::ZYX, (dad_ref.rotation.y + 90.0).to_radians(), (dad_ref.rotation.x + 0.0).to_radians(), (dad_ref.rotation.z + 0.0).to_radians());
+    let scale = Vec3::new(
+        dad_ref.scale as f32 / 1024.0,
+        dad_ref.scale as f32 / 1024.0,
+        dad_ref.scale as f32 / 1024.0,
+    );
+    let rotation = Quat::from_euler(
+        EulerRot::ZYX,
+        (dad_ref.rotation.y + 90.0).to_radians(),
+        (dad_ref.rotation.x + 0.0).to_radians(),
+        (dad_ref.rotation.z + 0.0).to_radians(),
+    );
     // MDDFS (TODO: MODF) uses a completely different coordinate system, so we need to fix up things.
 
     // 32*TILE_SIZE because the map is 64 TS wide, and so we're placing ourselfs into the mid.
-    let translation = Vec3::new(32.0 * TILE_SIZE - dad_ref.position.x, -(32.0 * TILE_SIZE - dad_ref.position.z), dad_ref.position.y);
+    let translation = Vec3::new(
+        32.0 * TILE_SIZE - dad_ref.position.x,
+        -(32.0 * TILE_SIZE - dad_ref.position.z),
+        dad_ref.position.y,
+    );
     Affine3A::from_scale_rotation_translation(scale, rotation, translation)
 }
 
@@ -151,10 +188,19 @@ fn transform_for_wmo_ref(wmo_ref: &SMMapObjDef) -> Affine3A {
     // cfg[feature = "legion")] // Apparently, this scale is only valid starting legion, before it is padding (and probably 0)
     // let scale = Vec3::new(wmo_ref.scale as f32 / 1024.0, wmo_ref.scale as f32 / 1024.0, wmo_ref.scale as f32 / 1024.0);
     let scale = Vec3::new(1.0, 1.0, 1.0);
-    let rotation = Quat::from_euler(EulerRot::ZYX, (wmo_ref.rot.y + 0.5*180.0).to_radians(), (wmo_ref.rot.x).to_radians(), (wmo_ref.rot.z + 0.0).to_radians());
+    let rotation = Quat::from_euler(
+        EulerRot::ZYX,
+        (wmo_ref.rot.y + 0.5 * 180.0).to_radians(),
+        (wmo_ref.rot.x).to_radians(),
+        (wmo_ref.rot.z + 0.0).to_radians(),
+    );
 
     // 32*TILE_SIZE because the map is 64 TS wide, and so we're placing ourselfs into the mid.
-    let translation = Vec3::new(32.0 * TILE_SIZE - wmo_ref.pos.x, -(32.0 * TILE_SIZE - wmo_ref.pos.z), wmo_ref.pos.y);
+    let translation = Vec3::new(
+        32.0 * TILE_SIZE - wmo_ref.pos.x,
+        -(32.0 * TILE_SIZE - wmo_ref.pos.z),
+        wmo_ref.pos.y,
+    );
     Affine3A::from_scale_rotation_translation(scale, rotation, translation)
 }
 
@@ -168,7 +214,9 @@ fn debug_dump_file(archive: &mut Archive, file: &str) {
 fn debug_dump_blp(archive: &mut Archive, file_name: &str) {
     let blp = load_blp_from_mpq(archive, file_name).unwrap();
     let image = blp_to_image(&blp, 0).expect("decode");
-    image.save(format!("{}.png", file_name.replace("\\", "_"))).expect("saved");
+    image
+        .save(format!("{}.png", file_name.replace("\\", "_")))
+        .expect("saved");
 }
 
 #[allow(unused)]
@@ -200,7 +248,7 @@ fn load_blp_from_mpq(archive: &mut Archive, file_name: &str) -> Option<BlpImage>
 
     if image.is_err() {
         dbg!(image.unwrap_err());
-        return None
+        return None;
     }
     Some(image.unwrap().1)
 }

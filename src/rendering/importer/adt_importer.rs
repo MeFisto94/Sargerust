@@ -1,12 +1,11 @@
-use anyhow::Error;
-use glam::{Vec3};
-use sargerust_files::adt::types::{MCCVSubChunk, MCNKChunk};
-use sargerust_files::common::types::{CImVector};
 use crate::rendering::common::coordinate_systems::GRID_SIZE;
 use crate::rendering::common::types::{Mesh, VertexBuffers};
+use anyhow::Error;
+use glam::Vec3;
+use sargerust_files::adt::types::{MCCVSubChunk, MCNKChunk};
+use sargerust_files::common::types::CImVector;
 
-pub struct ADTImporter {
-}
+pub struct ADTImporter {}
 
 impl ADTImporter {
     pub fn create_mesh(mcnk: &MCNKChunk, low_res: bool) -> Result<(Vec3, Mesh), Error> {
@@ -15,7 +14,7 @@ impl ADTImporter {
         let mut vertex_color_0 = Vec::new();
         let mcvt = mcnk.get_mcvt()?.unwrap();
         let use_vertex_color: bool = true; // In theory with this flag we can turn it off for debug purposes.
-        //let mccv_opt = mcnk.get_mccv()?.filter(|_| use_vertex_color); // smchunk flag has_mccv.
+                                           //let mccv_opt = mcnk.get_mccv()?.filter(|_| use_vertex_color); // smchunk flag has_mccv.
         let mccv_opt: Option<MCCVSubChunk> = None; // TODO: Fixme
 
         // Here we're in ADT Terrain space, that is +x -> north, +y -> west. Thus rows grow in -x, columns go to -y.
@@ -28,7 +27,11 @@ impl ADTImporter {
                 // TODO: implement MCCV the _rust_ way (can't unwrap in a loop)
                 // let color = if &mccv_opt.is_some() { (mccv_opt.unwrap()[low as usize]) } else { CImVector::from(0x0000FFFFu32) };
 
-                position_buffer.push(Vec3::new(-GRID_SIZE * row as f32, -GRID_SIZE * column as f32, height));
+                position_buffer.push(Vec3::new(
+                    -GRID_SIZE * row as f32,
+                    -GRID_SIZE * column as f32,
+                    height,
+                ));
                 let color = CImVector::from(0x0000FFFFu32);
                 vertex_color_0.push([color.r, color.g, color.b, color.a]); // TODO: Where is the format defined?
             }
@@ -44,7 +47,11 @@ impl ADTImporter {
                 // see above
                 // let color = if use_vertex_color { (&mccv_opt.unwrap()[high as usize]).clone() } else { CImVector::from(0xFF0000FFu32) };
 
-                position_buffer.push(Vec3::new(-GRID_SIZE * (row as f32 + 0.5), -GRID_SIZE * (column as f32 + 0.5), height));
+                position_buffer.push(Vec3::new(
+                    -GRID_SIZE * (row as f32 + 0.5),
+                    -GRID_SIZE * (column as f32 + 0.5),
+                    height,
+                ));
                 let color = CImVector::from(0xFF0000FFu32);
                 vertex_color_0.push([color.r, color.g, color.b, color.a]); // TODO: Where is the format defined?
             }
@@ -55,7 +62,8 @@ impl ADTImporter {
         // TODO: apparently this is exactly the wrong index buffer winding order. FIx it here insstead of the lazy way further down.
 
         if low_res {
-            for row in 0..8 { // last row won't work.
+            for row in 0..8 {
+                // last row won't work.
                 for column in 0..8 {
                     // tri 1
                     index_buffer.push(MCNKChunk::get_index_low(row, column) as u32);
@@ -69,7 +77,8 @@ impl ADTImporter {
                 }
             }
         } else {
-            for row in 0..8 { // last row won't work.
+            for row in 0..8 {
+                // last row won't work.
                 for column in 0..8 {
                     // W
                     index_buffer.push(MCNKChunk::get_index_low(row, column) as u32);
@@ -106,9 +115,13 @@ impl ADTImporter {
                 vertex_color_0,
                 ..VertexBuffers::default()
             },
-            index_buffer
+            index_buffer,
         };
-        let pos = Vec3::new(mcnk.header.position.x, mcnk.header.position.y, mcnk.header.position.z);
+        let pos = Vec3::new(
+            mcnk.header.position.x,
+            mcnk.header.position.y,
+            mcnk.header.position.z,
+        );
         Ok((pos, mesh))
     }
 }
