@@ -45,8 +45,8 @@ fn create_object(transform: Affine3A, mesh_handle: MeshHandle, material_handle: 
 
 pub fn add_terrain_chunks(terrain_chunk: &Vec<(Vec3, Mesh)>, renderer: &Arc<Renderer>, object_list: &mut Vec<ObjectHandle>) {
   for (position, _mesh) in terrain_chunk {
-    let mut mesh = Rend3BackendConverter::create_mesh_from_ir(&_mesh).unwrap();
-    mesh.flip_winding_order(); // it would be better if the mesh came pre-flipped, I guess (especially since the IR is cached).
+        let mesh = Rend3BackendConverter::create_mesh_from_ir(_mesh).unwrap();
+
     let mesh_handle = renderer.add_mesh(mesh);
 
     // TODO: here, the renderer defines the material for the terrain, but why? It should be stored outside of terrain_chunk maybe because it applies for every ADT tile at least? Perspectively...

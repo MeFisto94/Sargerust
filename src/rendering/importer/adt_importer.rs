@@ -52,6 +52,9 @@ impl ADTImporter {
 
         // build the index buffer, this is probably the most difficult part.
         let low_res = false;
+        // TODO: technically, this could be multiple index buffers and swapping them
+        // TODO: apparently this is exactly the wrong index buffer winding order. FIx it here insstead of the lazy way further down.
+
         if low_res {
             for row in 0..8 { // last row won't work.
                 for column in 0..8 {
@@ -90,6 +93,12 @@ impl ADTImporter {
                     index_buffer.push(MCNKChunk::get_index_low(row + 1, column + 1) as u32);
                 }
             }
+        }
+
+        // TODO: as outlined above, just fix the statements instead.
+        assert_eq!(index_buffer.len() % 3, 0);
+        for chunk in index_buffer.chunks_exact_mut(3) {
+            chunk.swap(1, 2);
         }
 
         let mesh = Mesh {
