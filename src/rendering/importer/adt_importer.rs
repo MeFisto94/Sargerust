@@ -9,7 +9,7 @@ pub struct ADTImporter {
 }
 
 impl ADTImporter {
-    pub fn create_mesh(mcnk: &MCNKChunk) -> Result<(Vec3, Mesh), Error> {
+    pub fn create_mesh(mcnk: &MCNKChunk, low_res: bool) -> Result<(Vec3, Mesh), Error> {
         let mut index_buffer = Vec::<u32>::new();
         let mut position_buffer = Vec::new();
         let mut vertex_color_0 = Vec::new();
@@ -51,7 +51,6 @@ impl ADTImporter {
         }
 
         // build the index buffer, this is probably the most difficult part.
-        let low_res = false;
         // TODO: technically, this could be multiple index buffers and swapping them
         // TODO: apparently this is exactly the wrong index buffer winding order. FIx it here insstead of the lazy way further down.
 

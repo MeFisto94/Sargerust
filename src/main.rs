@@ -121,7 +121,7 @@ fn handle_adt(loader: &MPQLoader, adt: &ADTAsset, m2_cache: &mut HashMap<String,
 
     let mut terrain_chunk = vec![];
     for mcnk in &adt.mcnks {
-        terrain_chunk.push(ADTImporter::create_mesh(mcnk)?);
+        terrain_chunk.push(ADTImporter::create_mesh(mcnk, false)?);
     }
 
     Ok(terrain_chunk)
