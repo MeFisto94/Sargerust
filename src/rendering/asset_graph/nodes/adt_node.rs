@@ -1,14 +1,16 @@
 use crate::rendering::common::types::{Material, Mesh};
-use glam::{Mat4, Vec3A};
+use glam::{Affine3A, Mat4, Vec3A};
 use image_blp::BlpImage;
 use rend3::types::{MaterialHandle, MeshHandle, Texture2DHandle};
 use sargerust_files::m2::types::M2Texture;
+use sargerust_files::wdt::types::SMMapObjDef;
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug)]
 pub struct ADTNode {
     pub doodads: Vec<DoodadReference>,
     pub terrain: Vec<(Vec3A, RwLock<IRMesh>)>,
+    pub wmos: Vec<WMOReference>,
 }
 
 // TODO: commons.rs in nodes?
@@ -35,6 +37,37 @@ pub struct M2Node {
     pub material: RwLock<IRMaterial>, // TODO: RWLock inside IRMaterial#handle instead? As no-one should modify the material contents and whenever a node has resolved it's reference, it has to be existant/loaded?
 }
 
+#[derive(Debug)]
+pub struct WMOReference {
+    pub map_obj_def: SMMapObjDef,
+    pub transform: Affine3A,
+    pub reference: NodeReference<WMONode>,
+}
+
+impl WMOReference {
+    pub fn new(map_obj_def: SMMapObjDef, transform: Affine3A, reference: String) -> Self {
+        Self {
+            map_obj_def,
+            transform,
+            reference: NodeReference::new(reference),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct WMONode {
+    // TODO: transform of a WMONode, much like with doodads, comes from it's references
+    // TODO: dooad references also need to be translated based on the transform of this nodes references transform.
+    pub doodads: Vec<DoodadReference>, // TODO: They have DoodadSets that are referenced in the ADT
+    // TODO: direct texture references here?
+    pub subgroups: Vec<NodeReference<WMOGroupNode>>,
+}
+
+#[derive(Debug)]
+pub struct WMOGroupNode {}
+
+/// DO NOT DERIVCE CLONE FOR NODE REFERENCES, it breaks the renderer. As the renderer polls the lock
+/// to see if it has been loaded async in the meantime.
 #[derive(Debug)]
 pub struct NodeReference<T> {
     pub reference_str: String,

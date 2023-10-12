@@ -17,13 +17,15 @@ use sargerust_files::wdt::types::WDTAsset;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::m2_generator::M2Generator;
-use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, IRTexture, M2Node};
+use crate::rendering::asset_graph::nodes::adt_node::{
+    ADTNode, DoodadReference, IRTexture, M2Node, NodeReference, WMONode, WMOReference,
+};
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
-use crate::rendering::common::highlevel_types::{PlaceableDoodad, PlacedDoodad};
+use crate::rendering::common::highlevel_types::PlacedDoodad;
 use crate::rendering::common::types::{Material, Mesh, MeshWithLod};
 use crate::rendering::importer::adt_importer::ADTImporter;
-use crate::transform_for_doodad_ref;
+use crate::{transform_for_doodad_ref, transform_for_wmo_ref};
 
 pub struct MapManager {
     mpq_loader: Arc<MPQLoader>,
@@ -41,6 +43,7 @@ pub struct MapManager {
     pub tile_graph: HashMap<(u8, u8), Arc<ADTNode>>,
     pub m2_resolver: Resolver<M2Generator, M2Node>,
     pub tex_resolver: Resolver<M2Generator, RwLock<Option<IRTexture>>>, /* failably */
+    pub wmo_resolver: Resolver<M2Generator, WMONode>,
 }
 
 impl MapManager {
@@ -51,7 +54,8 @@ impl MapManager {
             loaded_tiles: HashMap::new(),
             tile_graph: HashMap::new(),
             m2_resolver: Resolver::new(M2Generator::new(mpq_loader.clone())),
-            tex_resolver: Resolver::new(M2Generator::new(mpq_loader)),
+            tex_resolver: Resolver::new(M2Generator::new(mpq_loader.clone())),
+            wmo_resolver: Resolver::new(M2Generator::new(mpq_loader)),
         }
     }
 
@@ -97,6 +101,7 @@ impl MapManager {
                             .map(|chunk| (chunk.0.into(), RwLock::new(chunk.1.into())))
                             .collect_vec(),
                         doodads: render_list,
+                        wmos,
                     };
 
                     self.tile_graph.insert(chunk_coords, Arc::new(graph));
@@ -114,8 +119,8 @@ impl MapManager {
     fn handle_adt_lazy(
         &self,
         adt: &ADTAsset,
-        render_list: &mut Vec<DoodadReference>,
-        wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>,
+        direct_doodad_refs: &mut Vec<DoodadReference>,
+        wmos: &mut Vec<WMOReference>,
     ) -> Result<Vec<(Vec3, Mesh)>, anyhow::Error> {
         for dad_ref in &adt.mddf.doodadDefs {
             let name = &adt.mmdx.filenames[*adt
@@ -136,56 +141,27 @@ impl MapManager {
                 continue;
             }
 
-            render_list.push(DoodadReference::new(
+            direct_doodad_refs.push(DoodadReference::new(
                 transform_for_doodad_ref(dad_ref).into(),
                 name,
             ));
         }
 
-        // for wmo_ref in adt.modf.mapObjDefs.iter() {
-        //     let name = &adt.mwmo.filenames[*adt
-        //         .mwmo
-        //         .offsets
-        //         .get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize])
-        //         .unwrap()];
-        //     trace!("WMO {} has been referenced from ADT", name);
-        //
-        //     if name.ends_with("STORMWIND.WMO") {
-        //         continue; // TODO: Temporary performance optimization
-        //     }
-        //
-        //     let loaded = WMOLoader::load(loader, name)?;
-        //     // TODO: currently, only WMO makes use of texture names, M2s load their textures in load_m2_doodad (when the doodad becomes placeable).
-        //     let textures = loaded
-        //         .loaded_groups
-        //         .iter()
-        //         .flat_map(|(_, mats)| mats)
-        //         .filter_map(|mat| match &mat.albedo {
-        //             AlbedoType::TextureWithName(tex_name) => Some(tex_name.clone()),
-        //             _ => None,
-        //         })
-        //         .collect_vec();
-        //
-        //     for texture in textures {
-        //         if !texture_map.contains_key(&texture) {
-        //             let blp = BLPLoader::load_blp_from_ldr(loader, &texture).expect("Texture loading error");
-        //             texture_map.insert(texture, blp);
-        //         }
-        //     }
-        //
-        //     let transform = transform_for_wmo_ref(wmo_ref);
-        //     for dad in loaded.doodads {
-        //         // NOTE: Here we loose the relationship between DAD and wmo, that is required for parenting.
-        //         // Since rend3 does not have a scenegraph, we "fake" the parenting for now.
-        //         // Also we need to resolve m2 references.
-        //         render_list.push(PlacedDoodad {
-        //             transform: transform * dad.transform,
-        //             m2: load_m2_doodad(loader, m2_cache, &dad.m2_ref),
-        //         });
-        //     }
-        //
-        //     wmos.push((transform, loaded.loaded_groups));
-        // }
+        for &wmo_ref in adt.modf.mapObjDefs.iter() {
+            let name = &adt.mwmo.filenames[*adt
+                .mwmo
+                .offsets
+                .get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize])
+                .unwrap()];
+            trace!("WMO {} has been referenced from ADT", name);
+
+            if name.ends_with("STORMWIND.WMO") {
+                continue; // TODO: Temporary performance optimization
+            }
+
+            let transform = transform_for_wmo_ref(&wmo_ref);
+            wmos.push(WMOReference::new(wmo_ref, transform, name.to_owned()));
+        }
 
         let mut terrain_chunk = vec![];
         for mcnk in &adt.mcnks {
@@ -193,7 +169,46 @@ impl MapManager {
         }
 
         // TODO: Resolving would be enqueued as futures on a tokio runtime
-        for dad in render_list {
+        // TODO: Resolving should be a matter of the rendering app, not this code here? But then their code relies on things being preloaded?
+
+        let mut wmo_arcs = Vec::new(); // used to load doodads after all wmos have been resolved
+        for wmo in wmos {
+            let result = self
+                .wmo_resolver
+                .resolve(wmo.reference.reference_str.clone());
+
+            // // TODO: currently, only WMO makes use of texture names, M2s load their textures in load_m2_doodad (when the doodad becomes placeable).
+            // let textures = loaded
+            //     .loaded_groups
+            //     .iter()
+            //     .flat_map(|(_, mats)| mats)
+            //     .filter_map(|mat| match &mat.albedo {
+            //         AlbedoType::TextureWithName(tex_name) => Some(tex_name.clone()),
+            //         _ => None,
+            //     })
+            //     .collect_vec();
+            //
+            // for texture in textures {
+            //     if !texture_map.contains_key(&texture) {
+            //         let blp = BLPLoader::load_blp_from_ldr(loader, &texture).expect("Texture loading error");
+            //         texture_map.insert(texture, blp);
+            //     }
+            // }
+
+            wmo_arcs.push(result.clone());
+            let mut write_lock = wmo
+                .reference
+                .reference
+                .write()
+                .expect("Write lock on wmo reference");
+
+            *write_lock.deref_mut() = Some(result);
+        }
+
+        let wmo_dads = wmo_arcs.iter().flat_map(|wmo| &wmo.doodads).collect_vec();
+
+        for dad in direct_doodad_refs.iter().interleave(wmo_dads) {
+            // TODO: PERF: get rid of duplicated references here, make DoodadReference#reference an Arc and cache them at least adt wide.
             let result = self
                 .m2_resolver
                 .resolve(dad.reference.reference_str.clone());

@@ -1,5 +1,5 @@
 use crate::game::application::GameApplication;
-use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, IRMaterial, IRMesh, IRTexture};
+use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, IRMaterial, IRMesh, IRTexture};
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::highlevel_types::PlacedDoodad;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, TransparencyType};
@@ -20,7 +20,6 @@ use rend3_routine::base::BaseRenderGraph;
 use sargerust_files::adt::types::ADTAsset;
 use std::collections::HashMap;
 use std::f32::consts::PI;
-use std::fmt::Debug;
 use std::hash::BuildHasher;
 use std::ops::DerefMut;
 use std::sync::atomic::Ordering;
@@ -208,7 +207,28 @@ impl RenderingApplication {
             }
         }
 
-        for doodad in &graph.doodads {
+        self.load_doodads(renderer, &graph.doodads, None);
+
+        for wmo_ref in &graph.wmos {
+            if let Some(wmo) = wmo_ref
+                .reference
+                .reference
+                .read()
+                .expect("WMO Read Lock")
+                .as_ref()
+            {
+                self.load_doodads(renderer, &wmo.doodads, Some(wmo_ref.transform.into()));
+            } // else: not loaded yet?
+        }
+    }
+
+    fn load_doodads(
+        &mut self,
+        renderer: &Arc<Renderer>,
+        doodads: &Vec<DoodadReference>,
+        parent_transform: Option<Mat4>,
+    ) {
+        for doodad in doodads {
             // TODO: we need a better logic to express the desire to actually render something, because then we can explicitly load to the gpu
 
             if let Some(m2) = doodad
@@ -255,13 +275,18 @@ impl RenderingApplication {
                 let object = rend3::types::Object {
                     mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
                     material: material_handle.clone(),
-                    transform: doodad.transform,
+                    transform: (parent_transform.unwrap_or(Mat4::IDENTITY) * doodad.transform),
                 };
 
                 // TODO: the object handle has to reside in the graph for auto freeing.
                 let _object_handle = renderer.add_object(object);
                 self.object_list.push(_object_handle);
-            } // else: not loaded yet?
+            } else {
+                log::warn!(
+                    "Doodad couldn't be rendered because it wasn't resolved yet. Solve when going async. {}",
+                    &doodad.reference.reference_str
+                );
+            }
         }
     }
 
