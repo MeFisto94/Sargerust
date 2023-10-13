@@ -4,16 +4,18 @@ use crate::rendering;
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::highlevel_types::PlacedDoodad;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod};
+use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::rendering::importer::m2_importer::M2Importer;
 use crate::rendering::loader::blp_loader::BLPLoader;
-use crate::rendering::loader::m2_loader::LoadedM2;
+use crate::rendering::loader::m2_loader::{LoadedM2, M2Loader};
 use crate::rendering::loader::wmo_loader::WMOLoader;
 use glam::{Affine3A, DVec2, Mat4, Vec3, Vec3A};
 use image_blp::BlpImage;
 use itertools::Itertools;
-use log::warn;
+use log::{trace, warn};
 use rend3::util::typedefs::FastHashMap;
 use sargerust_files::adt::reader::ADTReader;
+use sargerust_files::adt::types::ADTAsset;
 use sargerust_files::m2::reader::M2Reader;
 use std::collections::HashMap;
 use std::f32::consts::PI;
@@ -380,7 +382,7 @@ pub fn main_simple_wmo(loader: &MPQLoader) -> Result<(), anyhow::Error> {
         // Resolve references
         .map(|dad| PlacedDoodad {
             transform: dad.transform,
-            m2: crate::load_m2_doodad(loader, &mut m2_cache, &dad.m2_ref),
+            m2: load_m2_doodad(loader, &mut m2_cache, &dad.m2_ref),
         })
         .collect_vec();
 
@@ -410,7 +412,7 @@ pub fn main_simple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     let mut texture_map = HashMap::new();
     let mut wmos = Vec::new();
 
-    let terrain_chunk = crate::handle_adt(
+    let terrain_chunk = handle_adt(
         loader,
         &adt,
         &mut m2_cache,
@@ -446,7 +448,7 @@ pub fn main_multiple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
                     .load_raw_owned(&format!("{}_{}_{}.adt", map_name, row, column))
                     .unwrap(),
             ))?;
-            terrain_chunks.extend(crate::handle_adt(
+            terrain_chunks.extend(handle_adt(
                 loader,
                 &adt,
                 &mut m2_cache,
@@ -466,4 +468,101 @@ pub fn main_multiple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
         coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)),
     );
     Ok(())
+}
+
+fn handle_adt(
+    loader: &MPQLoader,
+    adt: &ADTAsset,
+    m2_cache: &mut HashMap<String, Arc<LoadedM2>>,
+    render_list: &mut Vec<PlacedDoodad>,
+    texture_map: &mut HashMap<String, BlpImage>,
+    wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>,
+) -> Result<Vec<(Vec3, Mesh)>, anyhow::Error> {
+    for wmo_ref in adt.modf.mapObjDefs.iter() {
+        let name = &adt.mwmo.filenames[*adt
+            .mwmo
+            .offsets
+            .get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize])
+            .unwrap()];
+        trace!("WMO {} has been referenced from ADT", name);
+
+        if name.ends_with("STORMWIND.WMO") {
+            continue; // TODO: Temporary performance optimization
+        }
+
+        let loaded = WMOLoader::load(loader, name)?;
+        // TODO: currently, only WMO makes use of texture names, M2s load their textures in load_m2_doodad (when the doodad becomes placeable).
+        let textures = loaded
+            .loaded_groups
+            .iter()
+            .flat_map(|(_, mats)| mats)
+            .filter_map(|mat| match &mat.albedo {
+                AlbedoType::TextureWithName(tex_name) => Some(tex_name.clone()),
+                _ => None,
+            })
+            .collect_vec();
+
+        for texture in textures {
+            if !texture_map.contains_key(&texture) {
+                let blp = BLPLoader::load_blp_from_ldr(loader, &texture).expect("Texture loading error");
+                texture_map.insert(texture, blp);
+            }
+        }
+
+        let transform = crate::transform_for_wmo_ref(wmo_ref);
+        for dad in loaded.doodads {
+            // NOTE: Here we loose the relationship between DAD and wmo, that is required for parenting.
+            // Since rend3 does not have a scenegraph, we "fake" the parenting for now.
+            // Also we need to resolve m2 references.
+            render_list.push(PlacedDoodad {
+                transform: transform * dad.transform,
+                m2: load_m2_doodad(loader, m2_cache, &dad.m2_ref),
+            });
+        }
+
+        wmos.push((transform, loaded.loaded_groups));
+    }
+
+    // TODO: deduplicate with collect doodads (at least the emitter and m2 name replacement)
+    for dad_ref in &adt.mddf.doodadDefs {
+        let name = &adt.mmdx.filenames[*adt
+            .mmdx
+            .offsets
+            .get(&adt.mmid.mmdx_offsets[dad_ref.nameId as usize])
+            .unwrap()];
+        trace!("M2 {} has been referenced from ADT", name);
+
+        // fix name: currently it ends with .mdx but we need .m2
+        let name = name
+            .to_lowercase()
+            .replace(".mdx", ".m2")
+            .replace(".mdl", ".m2");
+        if name.to_lowercase().contains("emitter") {
+            continue;
+        }
+
+        let entry = load_m2_doodad(loader, m2_cache, &name);
+        render_list.push(PlacedDoodad {
+            transform: crate::transform_for_doodad_ref(dad_ref),
+            m2: entry,
+        });
+    }
+
+    let mut terrain_chunk = vec![];
+    for mcnk in &adt.mcnks {
+        terrain_chunk.push(ADTImporter::create_mesh(mcnk, false)?);
+    }
+
+    Ok(terrain_chunk)
+}
+
+#[allow(deprecated)] // only for the demo, we load m2s in non-graph style, which is easier for us
+fn load_m2_doodad(loader: &MPQLoader, m2_cache: &mut HashMap<String, Arc<LoadedM2>>, name: &str) -> Arc<LoadedM2> {
+    // Caching M2s is unavoidable in some way, especially when loading multiple chunks in parallel.
+    // Otherwise, m2s could be loaded multiple times, but the important thing is to deduplicate
+    // them before sending them to the render thread. Share meshes and textures!
+    let entry = m2_cache
+        .entry(name.to_string())
+        .or_insert_with(|| Arc::new(M2Loader::load_no_lod(loader, name)));
+    entry.clone()
 }
