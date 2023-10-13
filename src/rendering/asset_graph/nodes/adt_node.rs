@@ -1,4 +1,4 @@
-use crate::rendering::common::types::{Material, Mesh};
+use crate::rendering::common::types::{Material, Mesh, MeshWithLod};
 use glam::{Affine3A, Mat4, Vec3A};
 use image_blp::BlpImage;
 use rend3::types::{MaterialHandle, MeshHandle, Texture2DHandle};
@@ -59,12 +59,18 @@ pub struct WMONode {
     // TODO: transform of a WMONode, much like with doodads, comes from it's references
     // TODO: dooad references also need to be translated based on the transform of this nodes references transform.
     pub doodads: Vec<DoodadReference>, // TODO: They have DoodadSets that are referenced in the ADT
-    // TODO: direct texture references here?
+    // IF this was a dedicated GroupReference, it could carry the group name
     pub subgroups: Vec<NodeReference<WMOGroupNode>>,
+    pub materials: Vec<RwLock<IRMaterial>>,
+    pub tex_references: Vec<IRTextureReference>,
 }
 
 #[derive(Debug)]
-pub struct WMOGroupNode {}
+pub struct WMOGroupNode {
+    /// API trickery: One LoD Level is one batch
+    pub mesh_batches: Vec<RwLock<IRMesh>>,
+    pub material_ids: Vec<u8>,
+}
 
 /// DO NOT DERIVCE CLONE FOR NODE REFERENCES, it breaks the renderer. As the renderer polls the lock
 /// to see if it has been loaded async in the meantime.

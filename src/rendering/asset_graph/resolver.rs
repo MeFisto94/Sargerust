@@ -20,6 +20,7 @@ impl<G: GraphNodeGenerator<T>, T> Resolver<G, T> {
     }
 
     // TODO: maybe take name by reference and only own it when inserting
+    // TODO: also canonicalize paths: uppercase and forward slashes as in MPQ?
     pub fn resolve(&self, name: String) -> Arc<T> {
         // Easy path: The cache contains a weak reference
         if let Some(weak_lock) = self

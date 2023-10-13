@@ -1,5 +1,7 @@
 use crate::game::application::GameApplication;
-use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, IRMaterial, IRMesh, IRTexture};
+use crate::rendering::asset_graph::nodes::adt_node::{
+    ADTNode, DoodadReference, IRMaterial, IRMesh, IRTexture, IRTextureReference, M2Node,
+};
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::highlevel_types::PlacedDoodad;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, TransparencyType};
@@ -10,8 +12,8 @@ use image_blp::BlpImage;
 use itertools::Itertools;
 use log::trace;
 use rend3::types::{
-    Camera, CameraProjection, Handedness, MaterialHandle, MeshHandle, ObjectHandle, PresentMode, SampleCount, Surface,
-    Texture2DHandle, TextureFormat,
+    Camera, CameraProjection, Handedness, MaterialHandle, MaterialTag, MeshHandle, ObjectHandle, PresentMode,
+    ResourceHandle, SampleCount, Surface, Texture2DHandle, TextureFormat,
 };
 use rend3::util::typedefs::FastHashMap;
 use rend3::Renderer;
@@ -218,6 +220,51 @@ impl RenderingApplication {
                 .as_ref()
             {
                 self.load_doodads(renderer, &wmo.doodads, Some(wmo_ref.transform.into()));
+                for material in &wmo.materials {
+                    self.load_material(renderer, material, &wmo.tex_references);
+                }
+
+                for subgroup_ref in &wmo.subgroups {
+                    if let Some(subgroup) = subgroup_ref
+                        .reference
+                        .read()
+                        .expect("Subgroup Read Lock")
+                        .as_ref()
+                    {
+                        for (idx, batch) in subgroup.mesh_batches.iter().enumerate() {
+                            let mat_id = subgroup.material_ids[idx];
+
+                            let material_handle = if mat_id != 0xFF {
+                                let mat_rw = wmo.materials[mat_id as usize]
+                                    .read()
+                                    .expect("Material read lock");
+                                mat_rw
+                                    .handle
+                                    .as_ref()
+                                    .expect("Material to be loaded (right above)")
+                                    .clone()
+                            } else {
+                                // TODO: this is not exactly correct, we should probably have a "no mat" material.
+                                //  and especially for WMO Groups, they probably have a default material anyway
+                                self.missing_texture_material
+                                    .as_ref()
+                                    .expect("Missing Texture Material to be initialized")
+                                    .clone()
+                            };
+
+                            let mesh_handle = Self::gpu_load_mesh(renderer, batch);
+                            let object = rend3::types::Object {
+                                mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
+                                material: material_handle.clone(),
+                                transform: wmo_ref.transform.into(),
+                            };
+
+                            // TODO: the object handle has to reside in the graph for auto freeing.
+                            let _object_handle = renderer.add_object(object);
+                            self.object_list.push(_object_handle);
+                        }
+                    }
+                }
             } // else: not loaded yet?
         }
     }
@@ -240,37 +287,7 @@ impl RenderingApplication {
             {
                 let mesh_handle = Self::gpu_load_mesh(renderer, &m2.mesh);
 
-                // I think here we have the first important "lazy" design: we'll only gpu load the
-                // texture that we need for our material.
-                let tex_name_opt = {
-                    let mat_rlock = m2.material.read().expect("Material read lock");
-                    match &mat_rlock.data.albedo {
-                        AlbedoType::TextureWithName(name) => Some(name.clone()),
-                        _ => None,
-                    }
-                };
-
-                let texture_handle_opt: Option<Texture2DHandle> = match &tex_name_opt {
-                    Some(tex_name) => m2
-                        .tex_reference
-                        .iter()
-                        .find(|tex_ref| tex_name.eq(&tex_ref.reference_str))
-                        .and_then(|tex_ref| Self::gpu_load_texture(renderer, &tex_ref.reference)),
-                    _ => None,
-                };
-
-                let material_handle = if tex_name_opt.is_some() && texture_handle_opt.is_none() {
-                    // warn!(
-                    //     "Failed loading texture {}, falling back",
-                    //     tex_name_opt.unwrap()
-                    // );
-                    self.missing_texture_material
-                        .as_ref()
-                        .expect("Missing Texture Material to be initialized already")
-                        .clone()
-                } else {
-                    Self::gpu_load_material(renderer, &m2.material, texture_handle_opt)
-                };
+                let material_handle = self.load_material(renderer, &m2.material, &m2.tex_reference);
 
                 let object = rend3::types::Object {
                     mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
@@ -288,6 +305,45 @@ impl RenderingApplication {
                 );
             }
         }
+    }
+
+    fn load_material(
+        &mut self,
+        renderer: &Arc<Renderer>,
+        material: &RwLock<IRMaterial>,
+        tex_references: &Vec<IRTextureReference>,
+    ) -> MaterialHandle {
+        // I think here we have the first important "lazy" design: we'll only gpu load the
+        // texture that we need for our material.
+        let tex_name_opt = {
+            let mat_rlock = material.read().expect("Material read lock");
+            match &mat_rlock.data.albedo {
+                AlbedoType::TextureWithName(name) => Some(name.clone()),
+                _ => None,
+            }
+        };
+
+        let texture_handle_opt: Option<Texture2DHandle> = match &tex_name_opt {
+            Some(tex_name) => tex_references
+                .iter()
+                .find(|tex_ref| tex_name.eq(&tex_ref.reference_str))
+                .and_then(|tex_ref| Self::gpu_load_texture(renderer, &tex_ref.reference)),
+            _ => None,
+        };
+
+        let material_handle = if tex_name_opt.is_some() && texture_handle_opt.is_none() {
+            // warn!(
+            //     "Failed loading texture {}, falling back",
+            //     tex_name_opt.unwrap()
+            // );
+            self.missing_texture_material
+                .as_ref()
+                .expect("Missing Texture Material to be initialized already")
+                .clone()
+        } else {
+            Self::gpu_load_material(renderer, material, texture_handle_opt)
+        };
+        material_handle
     }
 
     fn gpu_load_mesh(renderer: &Arc<Renderer>, mesh: &RwLock<IRMesh>) -> MeshHandle {

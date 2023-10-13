@@ -1,5 +1,5 @@
-use std::fmt::{Debug, Formatter};
 use glam::{Vec2, Vec3, Vec4};
+use std::fmt::{Debug, Formatter};
 
 #[derive(Clone)]
 pub struct Mesh {
@@ -65,12 +65,11 @@ impl Default for VertexBuffers {
 }
 
 // TODO: How would we model LODDABLE Meshes? One vertex buffer, multiple index buffers, Importers can support that
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MeshWithLod {
     pub vertex_buffers: VertexBuffers,
-    pub index_buffers: Vec<Vec<u32>>
+    pub index_buffers: Vec<Vec<u32>>,
 }
-
 
 /// Note: The structs in here are very much driven by the current backend/use-case and as such may change
 /// quite often. This is especially true for the material, that has a complex structure.
@@ -85,7 +84,7 @@ pub struct Material {
 pub enum AlbedoType {
     None,
     Vertex {
-        srgb: bool
+        srgb: bool,
     },
     Value(Vec4),
     ValueVertex {
@@ -95,7 +94,7 @@ pub enum AlbedoType {
         srgb: bool,
     },
     Texture, // TODO
-    TextureWithName(String)
+    TextureWithName(String),
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -18,12 +18,12 @@ use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::m2_generator::M2Generator;
 use crate::rendering::asset_graph::nodes::adt_node::{
-    ADTNode, DoodadReference, IRTexture, M2Node, NodeReference, WMONode, WMOReference,
+    ADTNode, DoodadReference, IRTexture, IRTextureReference, M2Node, NodeReference, WMOGroupNode, WMONode, WMOReference,
 };
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::highlevel_types::PlacedDoodad;
-use crate::rendering::common::types::{Material, Mesh, MeshWithLod};
+use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod};
 use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::{transform_for_doodad_ref, transform_for_wmo_ref};
 
@@ -44,6 +44,7 @@ pub struct MapManager {
     pub m2_resolver: Resolver<M2Generator, M2Node>,
     pub tex_resolver: Resolver<M2Generator, RwLock<Option<IRTexture>>>, /* failably */
     pub wmo_resolver: Resolver<M2Generator, WMONode>,
+    pub wmo_group_resolver: Resolver<M2Generator, WMOGroupNode>,
 }
 
 impl MapManager {
@@ -55,7 +56,8 @@ impl MapManager {
             tile_graph: HashMap::new(),
             m2_resolver: Resolver::new(M2Generator::new(mpq_loader.clone())),
             tex_resolver: Resolver::new(M2Generator::new(mpq_loader.clone())),
-            wmo_resolver: Resolver::new(M2Generator::new(mpq_loader)),
+            wmo_resolver: Resolver::new(M2Generator::new(mpq_loader.clone())),
+            wmo_group_resolver: Resolver::new(M2Generator::new(mpq_loader)),
         }
     }
 
@@ -177,23 +179,22 @@ impl MapManager {
                 .wmo_resolver
                 .resolve(wmo.reference.reference_str.clone());
 
-            // // TODO: currently, only WMO makes use of texture names, M2s load their textures in load_m2_doodad (when the doodad becomes placeable).
-            // let textures = loaded
-            //     .loaded_groups
-            //     .iter()
-            //     .flat_map(|(_, mats)| mats)
-            //     .filter_map(|mat| match &mat.albedo {
-            //         AlbedoType::TextureWithName(tex_name) => Some(tex_name.clone()),
-            //         _ => None,
-            //     })
-            //     .collect_vec();
-            //
-            // for texture in textures {
-            //     if !texture_map.contains_key(&texture) {
-            //         let blp = BLPLoader::load_blp_from_ldr(loader, &texture).expect("Texture loading error");
-            //         texture_map.insert(texture, blp);
-            //     }
-            // }
+            // TODO: should we resolve WMO Groups right here or rather after all WMOs are resolved? Technically groups could even be lazily resolved?
+            for sub_group in &result.subgroups {
+                let group_result = self
+                    .wmo_group_resolver
+                    .resolve(sub_group.reference_str.to_string());
+
+                let mut write_lock_group = sub_group
+                    .reference
+                    .write()
+                    .expect("Write lock on sub group reference");
+
+                *write_lock_group.deref_mut() = Some(group_result);
+            }
+
+            // TODO: optimize. Since all materials and textures reside on the WMO level, they are loaded, even when the subgroup that needs them isn't.
+            self.resolve_tex_reference(&result.tex_references);
 
             wmo_arcs.push(result.clone());
             let mut write_lock = wmo
@@ -214,18 +215,7 @@ impl MapManager {
                 .resolve(dad.reference.reference_str.clone());
 
             // TODO: yet another enqueue for tokio
-            for tex_reference in result.tex_reference.iter() {
-                let result_tex = self
-                    .tex_resolver
-                    .resolve(tex_reference.reference_str.clone());
-
-                let mut ref_wlock = tex_reference
-                    .reference
-                    .write()
-                    .expect("texture reference write lock");
-
-                *ref_wlock.deref_mut() = Some(result_tex);
-            }
+            self.resolve_tex_reference(&result.tex_reference);
 
             let mut write_lock = dad
                 .reference
@@ -237,5 +227,20 @@ impl MapManager {
         }
 
         Ok(terrain_chunk)
+    }
+
+    fn resolve_tex_reference(&self, references: &Vec<IRTextureReference>) {
+        for tex_reference in references.iter() {
+            let result_tex = self
+                .tex_resolver
+                .resolve(tex_reference.reference_str.clone());
+
+            let mut ref_wlock = tex_reference
+                .reference
+                .write()
+                .expect("texture reference write lock");
+
+            *ref_wlock.deref_mut() = Some(result_tex);
+        }
     }
 }
