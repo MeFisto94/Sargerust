@@ -3,7 +3,10 @@ use wow_srp::wrath_header::ClientDecrypterHalf;
 pub mod auth;
 pub mod world;
 
-pub fn skip_encrypted<R: std::io::Read>(mut r: R, d: &mut ClientDecrypterHalf) -> Result<u16, wow_world_messages::errors::ExpectedOpcodeError> {
+pub fn skip_encrypted<R: std::io::Read>(
+    mut r: R,
+    d: &mut ClientDecrypterHalf,
+) -> Result<u16, wow_world_messages::errors::ExpectedOpcodeError> {
     let mut header = [0_u8; 4];
     r.read_exact(&mut header)?;
     d.decrypt(&mut header);
@@ -16,9 +19,10 @@ pub fn skip_encrypted<R: std::io::Read>(mut r: R, d: &mut ClientDecrypterHalf) -
         d.decrypt(&mut last_byte);
         let opcode = u16::from_le_bytes([header[3], last_byte[0]]);
         (size, opcode)
-    }
-    else {
-        let size = u16::from_be_bytes([header[0], header[1]]).saturating_sub(2).into();
+    } else {
+        let size = u16::from_be_bytes([header[0], header[1]])
+            .saturating_sub(2)
+            .into();
         let opcode = u16::from_le_bytes([header[2], header[3]]);
         (size, opcode)
     };

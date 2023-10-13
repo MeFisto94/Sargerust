@@ -3,7 +3,7 @@ extern crate proc_macro2;
 use proc_macro2::{Span, TokenStream};
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{quote, quote_spanned};
-use syn::{Data, DeriveInput, Fields, Ident, parse_macro_input, spanned::Spanned};
+use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Fields, Ident};
 
 #[proc_macro_derive(Parse)]
 pub fn derive_parseable(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -52,8 +52,11 @@ pub(crate) fn derive_parse_internal(input: DeriveInput) -> TokenStream {
                     }
                 });
                 quote! { #(#recurse)* }
-            },
-            _ => panic!("#[derive(Parse)]` only supports named struct fields at the moment: {}", ident),
+            }
+            _ => panic!(
+                "#[derive(Parse)]` only supports named struct fields at the moment: {}",
+                ident
+            ),
         },
         Data::Enum(_) => panic!("`#[derive(Parse)]` is only available on structs: {}", ident),
     };

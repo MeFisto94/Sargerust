@@ -35,7 +35,7 @@ enum MPQType {
     TBC,
     WOTLK,
     Common,
-    Unknown
+    Unknown,
 }
 
 impl MPQLoader {
@@ -45,19 +45,28 @@ impl MPQLoader {
 
         // TODO: not considering path here makes us fail at subfolders (i.e. locales)
         let prioritized_archives = fs::read_dir(data_folder)
-            .unwrap_or_else(|_| panic!("MPQLoader: Failed to enumerate data folder: {}", data_folder))
+            .unwrap_or_else(|_| {
+                panic!(
+                    "MPQLoader: Failed to enumerate data folder: {}",
+                    data_folder
+                )
+            })
             .filter(|file| file.is_ok())
             .map(|file| file.unwrap().file_name().into_string().unwrap())
             .filter(|file| file.to_ascii_lowercase().ends_with("mpq"))
             .sorted_by(MPQLoader::sorting_order)
             .map(|file| {
                 let path = Path::new(data_folder).join(Path::new(&file));
-                (file.clone(), RwLock::new(Archive::open(path).expect(&format!("Failed to load MPQ {}", &file))))
-            }).collect_vec();
+                (
+                    file.clone(),
+                    RwLock::new(Archive::open(path).expect(&format!("Failed to load MPQ {}", &file))),
+                )
+            })
+            .collect_vec();
 
         MPQLoader {
             prioritized_archives,
-            data_folder: data_folder.into()
+            data_folder: data_folder.into(),
         }
     }
 
@@ -133,9 +142,14 @@ impl RawAssetLoader for MPQLoader {
 
     fn load_raw_owned(&self, path: &str) -> Option<Vec<u8>> {
         // the very bad API design of the mpq crate currently loads the file as soon as we try to open it.
-        let opt = self.prioritized_archives.iter()
+        let opt = self
+            .prioritized_archives
+            .iter()
             .map(|(name, archive)| {
-                let exists = archive.read().map(|ar| ar.contains_file(path)).unwrap_or(false);
+                let exists = archive
+                    .read()
+                    .map(|ar| ar.contains_file(path))
+                    .unwrap_or(false);
                 (name, archive, exists)
             })
             .find(|(_, _, exists)| *exists)
@@ -151,7 +165,8 @@ impl RawAssetLoader for MPQLoader {
             let archive = guard.deref_mut();
             let file = archive.open_file(path).unwrap();
             let mut buf: Vec<u8> = vec![0; file.size() as usize];
-            file.read(archive, &mut buf).expect("I/O Error. TODO: Error handling");
+            file.read(archive, &mut buf)
+                .expect("I/O Error. TODO: Error handling");
             buf
         })
     }

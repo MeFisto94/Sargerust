@@ -1,10 +1,11 @@
-  use std::fs::File;
-  use std::io::{BufReader, BufWriter};
 
-  use crate::m2::reader::M2Reader;
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
 
-  # [test]
-  fn m2_parsing_and_obj_dumping() -> Result<(), anyhow::Error> {
+use crate::m2::reader::M2Reader;
+
+#[test]
+fn m2_parsing_and_obj_dumping() -> Result<(), anyhow::Error> {
     let test_data = std::env::current_dir()?.join("test-data");
 
     let mut file = BufReader::new(File::open(test_data.join("Chair01.m2"))?);
@@ -17,4 +18,4 @@
     asset.dump_to_wavefront_obj(&mut w, &skin)?;
 
     Ok(())
-  }
+}

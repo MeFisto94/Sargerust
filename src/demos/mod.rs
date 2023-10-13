@@ -1,14 +1,3 @@
-use std::collections::HashMap;
-use std::f32::consts::PI;
-use std::sync::Arc;
-use glam::{Affine3A, DVec2, Mat4, Vec3, Vec3A};
-use image_blp::BlpImage;
-use rend3::util::typedefs::FastHashMap;
-use sargerust_files::adt::reader::ADTReader;
-use sargerust_files::m2::reader::M2Reader;
-use std::time::Instant;
-use log::warn;
-use itertools::Itertools;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering;
@@ -19,6 +8,17 @@ use crate::rendering::importer::m2_importer::M2Importer;
 use crate::rendering::loader::blp_loader::BLPLoader;
 use crate::rendering::loader::m2_loader::LoadedM2;
 use crate::rendering::loader::wmo_loader::WMOLoader;
+use glam::{Affine3A, DVec2, Mat4, Vec3, Vec3A};
+use image_blp::BlpImage;
+use itertools::Itertools;
+use log::warn;
+use rend3::util::typedefs::FastHashMap;
+use sargerust_files::adt::reader::ADTReader;
+use sargerust_files::m2::reader::M2Reader;
+use std::collections::HashMap;
+use std::f32::consts::PI;
+use std::sync::Arc;
+use std::time::Instant;
 
 #[derive(Default)]
 struct DemoApplication {
@@ -30,13 +30,19 @@ struct DemoApplication {
 }
 
 // since this is a demo, we can safely pass a load of (potentially unused) textures
-pub fn render<'a, W>(placed_doodads: Vec<PlacedDoodad>,
-                     wmos: W,
-                     textures: HashMap<String, BlpImage>,
-                     terrain_chunk: Vec<(Vec3, Mesh)>,
-                     camera_location: Vec3A)
-    where
-        W: IntoIterator<Item = (&'a Affine3A, &'a Vec<(MeshWithLod, Vec<Material> /* per lod */)>)>,
+pub fn render<'a, W>(
+    placed_doodads: Vec<PlacedDoodad>,
+    wmos: W,
+    textures: HashMap<String, BlpImage>,
+    terrain_chunk: Vec<(Vec3, Mesh)>,
+    camera_location: Vec3A,
+) where
+    W: IntoIterator<
+        Item = (
+            &'a Affine3A,
+            &'a Vec<(MeshWithLod, Vec<Material> /* per lod */)>,
+        ),
+    >,
 {
     // TODO: shouldn't we expect MeshWithLods already? Could also have a vec<mesh> at least. This conflicts with loading lods on demand, though.
     let mut app = DemoApplication::default();
@@ -53,8 +59,7 @@ pub fn render<'a, W>(placed_doodads: Vec<PlacedDoodad>,
 
     // Create the Instance, Adapter, and Device. We can specify preferred backend,
     // device name, or rendering profile. In this case we let rend3 choose for us.
-    let iad = pollster::block_on(rend3::create_iad(None,
-                                                   None, None, None)).unwrap();
+    let iad = pollster::block_on(rend3::create_iad(None, None, None, None)).unwrap();
 
     // The one line of unsafe needed. We just need to guarentee that the window
     // outlives the use of the surface.
@@ -81,7 +86,8 @@ pub fn render<'a, W>(placed_doodads: Vec<PlacedDoodad>,
         iad,
         rend3::types::Handedness::Right,
         Some(window_size.width as f32 / window_size.height as f32),
-    ).unwrap();
+    )
+    .unwrap();
 
     // Create the shader preprocessor with all the default shaders added.
     let mut spp = rend3::ShaderPreProcessor::new();
@@ -91,8 +97,12 @@ pub fn render<'a, W>(placed_doodads: Vec<PlacedDoodad>,
     let base_rendergraph = rend3_routine::base::BaseRenderGraph::new(&renderer, &spp);
 
     let mut data_core = renderer.data_core.lock();
-    let pbr_routine =
-        rend3_routine::pbr::PbrRoutine::new(&renderer, &mut data_core, &spp, &base_rendergraph.interfaces);
+    let pbr_routine = rend3_routine::pbr::PbrRoutine::new(
+        &renderer,
+        &mut data_core,
+        &spp,
+        &base_rendergraph.interfaces,
+    );
     drop(data_core);
     let tonemapping_routine = rend3_routine::tonemapping::TonemappingRoutine::new(
         &renderer,
@@ -114,7 +124,10 @@ pub fn render<'a, W>(placed_doodads: Vec<PlacedDoodad>,
 
     // Set camera's location
     renderer.set_camera_data(rend3::types::Camera {
-        projection: rend3::types::CameraProjection::Perspective { vfov: 90.0, near: 0.1 },
+        projection: rend3::types::CameraProjection::Perspective {
+            vfov: 90.0,
+            near: 0.1,
+        },
         view,
     });
 
@@ -161,52 +174,65 @@ pub fn render<'a, W>(placed_doodads: Vec<PlacedDoodad>,
         winit::event::Event::MainEventsCleared => {
             // Don't ask me why the rotation is so different here, _but_ the camera by default looks down,
             // so it is rotated differently than the carthesian that moves it.
-            let rotation = glam::Mat3A::from_euler(glam::EulerRot::XYZ, -app.camera_pitch * PI, 0.0 /* roll */ * PI,  -app.camera_yaw * PI);
+            let rotation = glam::Mat3A::from_euler(
+                glam::EulerRot::XYZ,
+                -app.camera_pitch * PI,
+                0.0 /* roll */ * PI,
+                -app.camera_yaw * PI,
+            );
             let forward: Vec3A = rotation.y_axis;
             let right: Vec3A = rotation.x_axis;
             let up: Vec3A = rotation.z_axis;
 
-            if *app.scancode_status.get(&17u32).unwrap_or(&false)  {
+            if *app.scancode_status.get(&17u32).unwrap_or(&false) {
                 // W
-                app.camera_location += forward * 30.0/60.0 * 5.0; // fake delta time
+                app.camera_location += forward * 30.0 / 60.0 * 5.0; // fake delta time
             }
-            if *app.scancode_status.get(&31u32).unwrap_or(&false)  {
+            if *app.scancode_status.get(&31u32).unwrap_or(&false) {
                 // S
-                app.camera_location -= forward * 30.0/60.0; // fake delta time
+                app.camera_location -= forward * 30.0 / 60.0; // fake delta time
             }
-            if *app.scancode_status.get(&30u32).unwrap_or(&false)  {
+            if *app.scancode_status.get(&30u32).unwrap_or(&false) {
                 // A
-                app.camera_location -= right * 20.0/60.0;
+                app.camera_location -= right * 20.0 / 60.0;
             }
-            if *app.scancode_status.get(&32u32).unwrap_or(&false)  {
+            if *app.scancode_status.get(&32u32).unwrap_or(&false) {
                 // D
-                app.camera_location += right * 20.0/60.0;
+                app.camera_location += right * 20.0 / 60.0;
             }
             if *app.scancode_status.get(&42u32).unwrap_or(&false) {
                 // LSHIFT
-                app.camera_location += up * 20.0/60.0;
+                app.camera_location += up * 20.0 / 60.0;
             }
             if *app.scancode_status.get(&29u32).unwrap_or(&false) {
-                app.camera_location -= up * 20.0/60.0;
+                app.camera_location -= up * 20.0 / 60.0;
             }
             if *app.scancode_status.get(&57421u32).unwrap_or(&false) {
                 // arrow right
-                app.camera_yaw += 1.0/60.0;
+                app.camera_yaw += 1.0 / 60.0;
             }
             if *app.scancode_status.get(&57419u32).unwrap_or(&false) {
-                app.camera_yaw -= 1.0/60.0;
+                app.camera_yaw -= 1.0 / 60.0;
             }
 
             // TODO: the following is under redraw requested in https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/lib.rs#L572
             // technically, we could also invert the view rotation (remember this is not the cams matrix, but the _view_ matrix, so how do you transform
             // the world to get to the screen (i.e. 0, 0). Hence we also need to invert the camera_location. Inverting the rotation isn't a deal though,
             // as we can just control the input angles.
-            let view = Mat4::from_euler(glam::EulerRot::XYZ, (-0.5 - app.camera_pitch) * PI, 0.0 /* roll */ * PI,  app.camera_yaw * PI);
+            let view = Mat4::from_euler(
+                glam::EulerRot::XYZ,
+                (-0.5 - app.camera_pitch) * PI,
+                0.0 /* roll */ * PI,
+                app.camera_yaw * PI,
+            );
             let view = view * Mat4::from_translation((-app.camera_location).into());
 
             // Set camera's location
             renderer.set_camera_data(rend3::types::Camera {
-                projection: rend3::types::CameraProjection::Perspective { vfov: 90.0, near: 0.1 },
+                projection: rend3::types::CameraProjection::Perspective {
+                    vfov: 90.0,
+                    near: 0.1,
+                },
                 view,
             });
 
@@ -222,8 +248,11 @@ pub fn render<'a, W>(placed_doodads: Vec<PlacedDoodad>,
             let mut graph = rend3::graph::RenderGraph::new();
 
             // Import the surface texture into the render graph.
-            let frame_handle =
-                graph.add_imported_render_target(&frame, 0..1, rend3::graph::ViewportRect::from_size(resolution));
+            let frame_handle = graph.add_imported_render_target(
+                &frame,
+                0..1,
+                rend3::graph::ViewportRect::from_size(resolution),
+            );
             // Add the default rendergraph without a skybox
             base_rendergraph.add_to_graph(
                 &mut graph,
@@ -245,20 +274,33 @@ pub fn render<'a, W>(placed_doodads: Vec<PlacedDoodad>,
             frame.present();
         }
         winit::event::Event::WindowEvent {
-            event: winit::event::WindowEvent::KeyboardInput {
-                input: winit::event::KeyboardInput { scancode, state, ..},
-                ..
-            },
+            event:
+                winit::event::WindowEvent::KeyboardInput {
+                    input:
+                        winit::event::KeyboardInput {
+                            scancode, state, ..
+                        },
+                    ..
+                },
             ..
         } => {
-            if scancode != 17 && (scancode < 30 || scancode > 32) && scancode != 29 && scancode != 42 && scancode != 57419 && scancode != 57421 {
+            if scancode != 17
+                && (scancode < 30 || scancode > 32)
+                && scancode != 29
+                && scancode != 42
+                && scancode != 57419
+                && scancode != 57421
+            {
                 dbg!(scancode);
             }
 
-            app.scancode_status.insert(scancode, match state {
-                winit::event::ElementState::Pressed => true,
-                winit::event::ElementState::Released => false,
-            });
+            app.scancode_status.insert(
+                scancode,
+                match state {
+                    winit::event::ElementState::Pressed => true,
+                    winit::event::ElementState::Released => false,
+                },
+            );
         }
         // Other events we don't care about
         _ => {}
@@ -274,8 +316,12 @@ pub fn main_simple_m2(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     let skin_path = r"Creature\talbuk\Talbuk00.skin";
     let tex_path = r"Creature\talbuk\TalbukSkinBrown.blp";
 
-    let m2 = M2Reader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(m2_path).unwrap()))?;
-    let skin = M2Reader::parse_skin_profile(&mut std::io::Cursor::new(loader.load_raw_owned(skin_path).unwrap()))?;
+    let m2 = M2Reader::parse_asset(&mut std::io::Cursor::new(
+        loader.load_raw_owned(m2_path).unwrap(),
+    ))?;
+    let skin = M2Reader::parse_skin_profile(&mut std::io::Cursor::new(
+        loader.load_raw_owned(skin_path).unwrap(),
+    ))?;
     let blp_opt = BLPLoader::load_blp_from_ldr(loader, tex_path);
     let imported_mesh = M2Importer::create_mesh(&m2, &skin);
     let mat = M2Importer::create_material(&blp_opt);
@@ -285,12 +331,18 @@ pub fn main_simple_m2(loader: &MPQLoader) -> Result<(), anyhow::Error> {
         m2: Arc::new(LoadedM2 {
             mesh: imported_mesh,
             material: mat,
-            blp_opt
-        })
+            blp_opt,
+        }),
     };
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    render(vec![dad], vec![], HashMap::new(), vec![], Vec3A::new(0.0, -4.0, 2.0));
+    render(
+        vec![dad],
+        vec![],
+        HashMap::new(),
+        vec![],
+        Vec3A::new(0.0, -4.0, 2.0),
+    );
     Ok(())
 }
 
@@ -303,14 +355,15 @@ pub fn main_simple_wmo(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     let loaded = WMOLoader::load(loader, wmo_path)?;
 
     // TODO: currently, only WMO makes use of texture names, M2s load their textures in load_m2_doodad (when the doodad becomes placeable).
-    let textures = loaded.loaded_groups.iter()
-        .flat_map(|(_, mats)|mats)
-        .filter_map(|mat| {
-            match &mat.albedo {
-                AlbedoType::TextureWithName(tex_name) => Some(tex_name.clone()),
-                _ => None
-            }
-        }).collect_vec();
+    let textures = loaded
+        .loaded_groups
+        .iter()
+        .flat_map(|(_, mats)| mats)
+        .filter_map(|mat| match &mat.albedo {
+            AlbedoType::TextureWithName(tex_name) => Some(tex_name.clone()),
+            _ => None,
+        })
+        .collect_vec();
 
     let mut texture_map = HashMap::new();
     for texture in textures {
@@ -320,33 +373,58 @@ pub fn main_simple_wmo(loader: &MPQLoader) -> Result<(), anyhow::Error> {
         }
     }
 
-    let mut m2_cache= HashMap::new();
-    let dooads = loaded.doodads.iter()
+    let mut m2_cache = HashMap::new();
+    let dooads = loaded
+        .doodads
+        .iter()
         // Resolve references
         .map(|dad| PlacedDoodad {
             transform: dad.transform,
-            m2: crate::load_m2_doodad(loader, &mut m2_cache, &dad.m2_ref)
-        }).collect_vec();
+            m2: crate::load_m2_doodad(loader, &mut m2_cache, &dad.m2_ref),
+        })
+        .collect_vec();
 
     let group_list = loaded.loaded_groups;
     let wmos = vec![(Affine3A::IDENTITY, group_list)];
 
     // Note: This API is already a bad monstrosity, it WILL go, but it makes prototyping easier.
-    render(dooads, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)),
-           texture_map, vec![], Vec3A::new(0.0, -4.0, 2.0));
+    render(
+        dooads,
+        wmos.iter().map(|wmo| (&wmo.0, &wmo.1)),
+        texture_map,
+        vec![],
+        Vec3A::new(0.0, -4.0, 2.0),
+    );
     Ok(())
 }
 
 pub fn main_simple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
-    let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(r"World\Maps\Kalimdor\Kalimdor_1_1.adt").unwrap()))?;
+    let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(
+        loader
+            .load_raw_owned(r"World\Maps\Kalimdor\Kalimdor_1_1.adt")
+            .unwrap(),
+    ))?;
 
     let mut m2_cache = HashMap::new();
-    let mut render_list= Vec::new();
+    let mut render_list = Vec::new();
     let mut texture_map = HashMap::new();
     let mut wmos = Vec::new();
 
-    let terrain_chunk = crate::handle_adt(loader, &adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?;
-    render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunk, coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)));
+    let terrain_chunk = crate::handle_adt(
+        loader,
+        &adt,
+        &mut m2_cache,
+        &mut render_list,
+        &mut texture_map,
+        &mut wmos,
+    )?;
+    render(
+        render_list,
+        wmos.iter().map(|wmo| (&wmo.0, &wmo.1)),
+        texture_map,
+        terrain_chunk,
+        coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)),
+    );
     Ok(())
 }
 
@@ -356,19 +434,36 @@ pub fn main_multiple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     // and then all you have to check is for existing adt files (MAIN chunk)
     let map_name = r"World\Maps\Kalimdor\Kalimdor";
     let mut m2_cache = HashMap::new();
-    let mut render_list= Vec::new();
+    let mut render_list = Vec::new();
     let mut texture_map = HashMap::new();
     let mut wmos = Vec::new();
     let mut terrain_chunks: Vec<(Vec3, Mesh)> = Vec::new();
 
     for row in 0..2 {
         for column in 0..2 {
-            let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(loader.load_raw_owned(&format!("{}_{}_{}.adt", map_name, row, column)).unwrap()))?;
-            terrain_chunks.extend(crate::handle_adt(loader, &adt, &mut m2_cache, &mut render_list, &mut texture_map, &mut wmos)?);
+            let adt = ADTReader::parse_asset(&mut std::io::Cursor::new(
+                loader
+                    .load_raw_owned(&format!("{}_{}_{}.adt", map_name, row, column))
+                    .unwrap(),
+            ))?;
+            terrain_chunks.extend(crate::handle_adt(
+                loader,
+                &adt,
+                &mut m2_cache,
+                &mut render_list,
+                &mut texture_map,
+                &mut wmos,
+            )?);
         }
     }
 
     warn!("Loading took {}ms", now.elapsed().as_millis());
-    render(render_list, wmos.iter().map(|wmo| (&wmo.0, &wmo.1)), texture_map, terrain_chunks, coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)));
+    render(
+        render_list,
+        wmos.iter().map(|wmo| (&wmo.0, &wmo.1)),
+        texture_map,
+        terrain_chunks,
+        coordinate_systems::adt_to_blender(Vec3A::new(16000.0, 16000.0, 42.0)),
+    );
     Ok(())
 }

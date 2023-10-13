@@ -1,2 +1,2 @@
-pub mod mpq;
 pub mod common;
+pub mod mpq;

@@ -69,6 +69,6 @@
 //! construct a [`rend3::types::ObjectHandle`] on the GPU side.
 //!
 //!
-pub mod resolver;
-pub mod nodes;
 pub mod m2_generator;
+pub mod nodes;
+pub mod resolver;
