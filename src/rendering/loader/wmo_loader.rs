@@ -10,7 +10,7 @@ use glam::{Affine3A, Quat, Vec3, Vec4};
 use log::debug;
 use sargerust_files::wmo::reader::WMOReader;
 use sargerust_files::wmo::types::WMORootAsset;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 pub struct WMOLoader {}
 
@@ -42,7 +42,10 @@ impl WMOLoader {
         // TODO: doodad sets?
         let mut doodads = Vec::new();
         for dad in WMOLoader::collect_dooads_for_wmo_root(&wmo) {
-            doodads.push(DoodadReference::new(dad.transform.into(), dad.m2_ref));
+            doodads.push(Arc::new(DoodadReference::new(
+                dad.transform.into(),
+                dad.m2_ref,
+            )));
         }
 
         let mut subgroups = Vec::with_capacity(wmo.mohd.nGroups as usize);
@@ -77,10 +80,10 @@ impl WMOLoader {
                 // TODO: Since everything is behind RwLocks anyway, can we maybe construct TexReferences to be Arc?
                 //  Then we could share them (e.g when multiple materials reference the same texture), but the gain
                 //  is rather minor, just some locking and resolving.
-                tex_references.push(IRTextureReference {
+                tex_references.push(Arc::new(IRTextureReference {
                     reference_str: texname_1,
                     reference: RwLock::new(None),
-                })
+                }))
             }
         }
 
@@ -88,10 +91,10 @@ impl WMOLoader {
         let path = path_upper.trim_end_matches(".WMO");
 
         for x in 0..wmo.mohd.nGroups {
-            subgroups.push(NodeReference::<WMOGroupNode> {
+            subgroups.push(Arc::new(NodeReference::<WMOGroupNode> {
                 reference_str: format!("{}_{:0>3}.wmo", path, x),
                 reference: Default::default(),
-            });
+            }));
         }
 
         Ok(WMONode {

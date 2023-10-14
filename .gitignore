@@ -10,3 +10,5 @@ target/
 *.skin
 .idea/
 sargerust-files/test-data
+# Intel V-Tune Profiling data
+vtune/

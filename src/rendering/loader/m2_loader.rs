@@ -7,6 +7,7 @@ use crate::rendering::loader::blp_loader::BLPLoader;
 use image_blp::BlpImage;
 use itertools::Itertools;
 use sargerust_files::m2::reader::M2Reader;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct LoadedM2 {
@@ -21,7 +22,7 @@ pub struct LoadedM2 {
 pub struct LoadedM2Graph {
     pub mesh: Mesh,
     pub material: Material,
-    pub textures: Vec<IRTextureReference>,
+    pub textures: Vec<Arc<IRTextureReference>>,
 }
 
 pub struct M2Loader {}
@@ -72,10 +73,10 @@ impl M2Loader {
         let skin = M2Reader::parse_skin_profile(&mut skin_file).unwrap();
         let mesh = M2Importer::create_mesh(&m2_asset, &skin);
 
-        let textures: Vec<IRTextureReference> = m2_asset
+        let textures: Vec<Arc<IRTextureReference>> = m2_asset
             .textures
             .into_iter()
-            .map(|tex| tex.into())
+            .map(|tex| Arc::new(tex.into()))
             .collect();
 
         let material = M2Importer::create_material_texname(&textures.get(0).map(|tex| tex.reference_str.clone()));

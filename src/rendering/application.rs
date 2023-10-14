@@ -224,7 +224,7 @@ impl RenderingApplication {
                     self.load_material(renderer, material, &wmo.tex_references);
                 }
 
-                for subgroup_ref in &wmo.subgroups {
+                for subgroup_ref in wmo.subgroups.iter() {
                     if let Some(subgroup) = subgroup_ref
                         .reference
                         .read()
@@ -272,7 +272,7 @@ impl RenderingApplication {
     fn load_doodads(
         &mut self,
         renderer: &Arc<Renderer>,
-        doodads: &Vec<DoodadReference>,
+        doodads: &Vec<Arc<DoodadReference>>,
         parent_transform: Option<Mat4>,
     ) {
         for doodad in doodads {
@@ -311,7 +311,7 @@ impl RenderingApplication {
         &mut self,
         renderer: &Arc<Renderer>,
         material: &RwLock<IRMaterial>,
-        tex_references: &Vec<IRTextureReference>,
+        tex_references: &Vec<Arc<IRTextureReference>>,
     ) -> MaterialHandle {
         // I think here we have the first important "lazy" design: we'll only gpu load the
         // texture that we need for our material.

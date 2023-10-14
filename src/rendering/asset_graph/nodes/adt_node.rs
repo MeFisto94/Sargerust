@@ -8,7 +8,7 @@ use std::sync::{Arc, RwLock};
 
 #[derive(Debug)]
 pub struct ADTNode {
-    pub doodads: Vec<DoodadReference>,
+    pub doodads: Vec<Arc<DoodadReference>>,
     pub terrain: Vec<(Vec3A, RwLock<IRMesh>)>,
     pub wmos: Vec<WMOReference>,
 }
@@ -32,7 +32,7 @@ impl DoodadReference {
 #[derive(Debug)]
 pub struct M2Node {
     // the vec is immutable after creation, just the tex_reference#reference needs RwLocking
-    pub tex_reference: Vec<IRTextureReference>,
+    pub tex_reference: Vec<Arc<IRTextureReference>>,
     pub mesh: RwLock<IRMesh>,
     pub material: RwLock<IRMaterial>, // TODO: RWLock inside IRMaterial#handle instead? As no-one should modify the material contents and whenever a node has resolved it's reference, it has to be existant/loaded?
 }
@@ -56,13 +56,13 @@ impl WMOReference {
 
 #[derive(Debug)]
 pub struct WMONode {
-    // TODO: transform of a WMONode, much like with doodads, comes from it's references
-    // TODO: dooad references also need to be translated based on the transform of this nodes references transform.
-    pub doodads: Vec<DoodadReference>, // TODO: They have DoodadSets that are referenced in the ADT
-    // IF this was a dedicated GroupReference, it could carry the group name
-    pub subgroups: Vec<NodeReference<WMOGroupNode>>,
+    // Arcs are for the async loaders.
+    pub doodads: Vec<Arc<DoodadReference>>, // TODO: They have DoodadSets that are referenced in the ADT
+    // If this was a dedicated GroupReference struct, it could carry the group name. But currently we don't need the names anyway,
+    // they are debug only.
+    pub subgroups: Vec<Arc<NodeReference<WMOGroupNode>>>,
     pub materials: Vec<RwLock<IRMaterial>>,
-    pub tex_references: Vec<IRTextureReference>,
+    pub tex_references: Vec<Arc<IRTextureReference>>,
 }
 
 #[derive(Debug)]

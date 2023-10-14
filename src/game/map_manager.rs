@@ -4,10 +4,11 @@ use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use glam::{Affine3A, Vec3};
-use image_blp::BlpImage;
+use glam::Vec3;
 use itertools::Itertools;
 use log::{error, info, trace, warn};
+use tokio::runtime::{Builder, Handle, Runtime};
+use tokio::task::JoinSet;
 
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::ADTAsset;
@@ -18,33 +19,22 @@ use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::m2_generator::M2Generator;
 use crate::rendering::asset_graph::nodes::adt_node::{
-    ADTNode, DoodadReference, IRTexture, IRTextureReference, M2Node, NodeReference, WMOGroupNode, WMONode, WMOReference,
+    ADTNode, DoodadReference, IRTexture, IRTextureReference, M2Node, WMOGroupNode, WMONode, WMOReference,
 };
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
-use crate::rendering::common::highlevel_types::PlacedDoodad;
-use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod};
 use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::{transform_for_doodad_ref, transform_for_wmo_ref};
 
 pub struct MapManager {
+    runtime: Runtime,
     mpq_loader: Arc<MPQLoader>,
     pub current_map: Option<(String, WDTAsset)>,
-    pub loaded_tiles: HashMap<
-        (u8, u8),
-        (
-            Arc<ADTAsset>,
-            /* Terrain */ Vec<(Vec3, Mesh)>,
-            Vec<PlacedDoodad>,
-            /* WMO */ Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>,
-            HashMap<String, BlpImage>,
-        ),
-    >,
     pub tile_graph: HashMap<(u8, u8), Arc<ADTNode>>,
-    pub m2_resolver: Resolver<M2Generator, M2Node>,
-    pub tex_resolver: Resolver<M2Generator, RwLock<Option<IRTexture>>>, /* failably */
-    pub wmo_resolver: Resolver<M2Generator, WMONode>,
-    pub wmo_group_resolver: Resolver<M2Generator, WMOGroupNode>,
+    pub m2_resolver: Arc<Resolver<M2Generator, M2Node>>,
+    pub tex_resolver: Arc<Resolver<M2Generator, RwLock<Option<IRTexture>>>>, /* failably */
+    pub wmo_resolver: Arc<Resolver<M2Generator, WMONode>>,
+    pub wmo_group_resolver: Arc<Resolver<M2Generator, WMOGroupNode>>,
 }
 
 impl MapManager {
@@ -52,15 +42,19 @@ impl MapManager {
         Self {
             mpq_loader: mpq_loader.clone(),
             current_map: None,
-            loaded_tiles: HashMap::new(),
             tile_graph: HashMap::new(),
-            m2_resolver: Resolver::new(M2Generator::new(mpq_loader.clone())),
-            tex_resolver: Resolver::new(M2Generator::new(mpq_loader.clone())),
-            wmo_resolver: Resolver::new(M2Generator::new(mpq_loader.clone())),
-            wmo_group_resolver: Resolver::new(M2Generator::new(mpq_loader)),
+            // TODO: work on sharing the M2Generator.
+            m2_resolver: Arc::new(Resolver::new(M2Generator::new(mpq_loader.clone()))),
+            tex_resolver: Arc::new(Resolver::new(M2Generator::new(mpq_loader.clone()))),
+            wmo_resolver: Arc::new(Resolver::new(M2Generator::new(mpq_loader.clone()))),
+            wmo_group_resolver: Arc::new(Resolver::new(M2Generator::new(mpq_loader))),
+            runtime: Builder::new_multi_thread()
+                .build()
+                .expect("Tokio Runtime to be built"),
         }
     }
 
+    // TODO: I am not sure if the whole preloading shouldn't be the responsibility of the render thread and if we as src\game should at best care about building the graph.
     pub fn preload_map(&mut self, map: String, position: Vec3, orientation: f32) {
         let now = Instant::now();
         info!("Loading map {} @ {}", map, position);
@@ -89,23 +83,7 @@ impl MapManager {
                     let adt = ADTReader::parse_asset(&mut Cursor::new(adt_buf.expect("Cannot load map adt")))
                         .expect("Error parsing ADT");
                     trace!("Loaded tile {}_{}_{}", map, chunk_coords.1, chunk_coords.0);
-
-                    let mut render_list = Vec::new();
-                    let mut wmos = Vec::new();
-
-                    let terrain_chunk = self
-                        .handle_adt_lazy(&adt, &mut render_list, &mut wmos)
-                        .unwrap();
-
-                    let graph = ADTNode {
-                        terrain: terrain_chunk
-                            .into_iter()
-                            .map(|chunk| (chunk.0.into(), RwLock::new(chunk.1.into())))
-                            .collect_vec(),
-                        doodads: render_list,
-                        wmos,
-                    };
-
+                    let graph = self.handle_adt_lazy(&adt).unwrap();
                     self.tile_graph.insert(chunk_coords, Arc::new(graph));
                 } else {
                     error!("We load into the world on unmapped terrain?!");
@@ -116,14 +94,13 @@ impl MapManager {
         self.current_map = Some((map, wdt));
         warn!("Loading took {}ms", now.elapsed().as_millis());
         // ADT file is map_x_y.adt. I think x are rows and ys are columns.
+        std::process::exit(0); // Profiling
     }
 
-    fn handle_adt_lazy(
-        &self,
-        adt: &ADTAsset,
-        direct_doodad_refs: &mut Vec<DoodadReference>,
-        wmos: &mut Vec<WMOReference>,
-    ) -> Result<Vec<(Vec3, Mesh)>, anyhow::Error> {
+    fn handle_adt_lazy(&self, adt: &ADTAsset) -> Result<ADTNode, anyhow::Error> {
+        let mut direct_doodad_refs = Vec::new();
+        let mut wmos = Vec::new();
+
         for dad_ref in &adt.mddf.doodadDefs {
             let name = &adt.mmdx.filenames[*adt
                 .mmdx
@@ -143,10 +120,10 @@ impl MapManager {
                 continue;
             }
 
-            direct_doodad_refs.push(DoodadReference::new(
+            direct_doodad_refs.push(Arc::new(DoodadReference::new(
                 transform_for_doodad_ref(dad_ref).into(),
                 name,
-            ));
+            )));
         }
 
         for &wmo_ref in adt.modf.mapObjDefs.iter() {
@@ -167,36 +144,68 @@ impl MapManager {
 
         let mut terrain_chunk = vec![];
         for mcnk in &adt.mcnks {
-            terrain_chunk.push(ADTImporter::create_mesh(mcnk, false)?);
+            let mesh = ADTImporter::create_mesh(mcnk, false)?;
+            terrain_chunk.push((mesh.0.into(), RwLock::new(mesh.1.into())));
         }
 
-        // TODO: Resolving would be enqueued as futures on a tokio runtime
         // TODO: Resolving should be a matter of the rendering app, not this code here? But then their code relies on things being preloaded?
-
-        let mut wmo_arcs = Vec::new(); // used to load doodads after all wmos have been resolved
-        for wmo in wmos {
+        let mut set = JoinSet::new();
+        for wmo in &wmos {
             let result = self
                 .wmo_resolver
                 .resolve(wmo.reference.reference_str.clone());
 
             // TODO: should we resolve WMO Groups right here or rather after all WMOs are resolved? Technically groups could even be lazily resolved?
             for sub_group in &result.subgroups {
-                let group_result = self
-                    .wmo_group_resolver
-                    .resolve(sub_group.reference_str.to_string());
+                let resolver = self.wmo_group_resolver.clone();
+                let sub_group_cloned = sub_group.clone();
+                set.spawn_blocking_on(
+                    move || {
+                        let group_result = resolver.resolve(sub_group_cloned.reference_str.to_string());
 
-                let mut write_lock_group = sub_group
-                    .reference
-                    .write()
-                    .expect("Write lock on sub group reference");
+                        let mut write_lock_group = sub_group_cloned
+                            .reference
+                            .write()
+                            .expect("Write lock on sub group reference");
 
-                *write_lock_group.deref_mut() = Some(group_result);
+                        *write_lock_group.deref_mut() = Some(group_result);
+                    },
+                    self.runtime.handle(),
+                );
             }
 
             // TODO: optimize. Since all materials and textures reside on the WMO level, they are loaded, even when the subgroup that needs them isn't.
-            self.resolve_tex_reference(&result.tex_references);
+            Self::resolve_tex_reference(
+                self.runtime.handle(),
+                &mut set,
+                self.tex_resolver.clone(),
+                result.tex_references.clone(),
+            );
 
-            wmo_arcs.push(result.clone());
+            // Contrary to the previous use case description, we kick of wmo doodad loading before
+            // all WMOs have been loaded, because it (may) improve performance by ensuring there's
+            // always enough work to be done. Otherwise we could have two cores resolving the two
+            // wmos and the rest of the application waits until it knows about doodads. Also, that
+            // way we have a little less allocations. Another aspect here is that the resolvers are
+            // a bottleneck that can lock. Thus it's better to distribute load between the resolvers
+            // more than going in very synchronous and force-inserting data masses once per resolver.
+            // To give an impact detail: When loading one northshire adt and still with resolver
+            // having a RwLock<HashMap<_>>,summed thread wait time has gone down from 270s to 205s.
+            // the tex_resolver is the most occupied resolver, which is no wonder since most textures
+            // also stem from common.mpq thus blocking on loading as well.
+            for dad in &result.doodads {
+                let m2_resolver = self.m2_resolver.clone();
+                let tex_resolver = self.tex_resolver.clone();
+
+                Self::spawn_doodad_resolvers(
+                    self.runtime.handle(),
+                    &mut set,
+                    dad.clone(),
+                    m2_resolver,
+                    tex_resolver,
+                );
+            }
+
             let mut write_lock = wmo
                 .reference
                 .reference
@@ -206,41 +215,99 @@ impl MapManager {
             *write_lock.deref_mut() = Some(result);
         }
 
-        let wmo_dads = wmo_arcs.iter().flat_map(|wmo| &wmo.doodads).collect_vec();
+        for dad in &direct_doodad_refs {
+            let m2_resolver = self.m2_resolver.clone();
+            let tex_resolver = self.tex_resolver.clone();
 
-        for dad in direct_doodad_refs.iter().interleave(wmo_dads) {
-            // TODO: PERF: get rid of duplicated references here, make DoodadReference#reference an Arc and cache them at least adt wide.
-            let result = self
-                .m2_resolver
-                .resolve(dad.reference.reference_str.clone());
-
-            // TODO: yet another enqueue for tokio
-            self.resolve_tex_reference(&result.tex_reference);
-
-            let mut write_lock = dad
-                .reference
-                .reference
-                .write()
-                .expect("Write lock on doodad reference");
-
-            *write_lock.deref_mut() = Some(result);
+            Self::spawn_doodad_resolvers(
+                self.runtime.handle(),
+                &mut set,
+                dad.clone(),
+                m2_resolver,
+                tex_resolver,
+            );
         }
 
-        Ok(terrain_chunk)
+        // TODO: truly async when the renderer can do that
+        while let Some(result) = pollster::block_on(set.join_next()) {
+            result.expect("Loading to be successful");
+        }
+
+        Ok(ADTNode {
+            terrain: terrain_chunk,
+            doodads: direct_doodad_refs,
+            wmos,
+        })
     }
 
-    fn resolve_tex_reference(&self, references: &Vec<IRTextureReference>) {
-        for tex_reference in references.iter() {
-            let result_tex = self
-                .tex_resolver
-                .resolve(tex_reference.reference_str.clone());
+    fn spawn_doodad_resolvers(
+        handle: &Handle,
+        set: &mut JoinSet<()>,
+        dad: Arc<DoodadReference>,
+        m2_resolver: Arc<Resolver<M2Generator, M2Node>>,
+        tex_resolver: Arc<Resolver<M2Generator, RwLock<Option<IRTexture>>>>,
+    ) {
+        let handle_clone = handle.clone();
+        set.spawn_on(
+            async move {
+                let reference_str = dad.reference.reference_str.clone();
+                let result = handle_clone
+                    .spawn_blocking(move || {
+                        // TODO: PERF: get rid of duplicated references here, make DoodadReference#reference an Arc and cache them at least adt wide.
+                        m2_resolver.resolve(reference_str)
+                    })
+                    .await
+                    .unwrap();
+                let mut new_set = JoinSet::new();
+                // TODO: currently, we use join sets rarely, especially for those non-failing (error returning) operations, there's no reason to really join.
+                Self::resolve_tex_reference(
+                    &handle_clone,
+                    &mut new_set,
+                    tex_resolver,
+                    result.tex_reference.clone(),
+                );
 
-            let mut ref_wlock = tex_reference
-                .reference
-                .write()
-                .expect("texture reference write lock");
+                handle_clone
+                    .spawn_blocking(move || {
+                        let mut write_lock = dad
+                            .reference
+                            .reference
+                            .write()
+                            .expect("Write lock on doodad reference");
+                        *write_lock.deref_mut() = Some(result);
+                    })
+                    .await
+                    .unwrap();
 
-            *ref_wlock.deref_mut() = Some(result_tex);
+                while let Some(join) = new_set.join_next().await {
+                    join.expect("Texture resolving to complete without panic");
+                }
+            },
+            handle,
+        );
+    }
+
+    fn resolve_tex_reference(
+        handle: &Handle,
+        set: &mut JoinSet<()>,
+        tex_resolver: Arc<Resolver<M2Generator, RwLock<Option<IRTexture>>>>,
+        references: Vec<Arc<IRTextureReference>>,
+    ) {
+        for tex_reference in references {
+            let resolver = tex_resolver.clone();
+            set.spawn_blocking_on(
+                move || {
+                    let result_tex = resolver.resolve(tex_reference.reference_str.clone());
+
+                    let mut ref_wlock = tex_reference
+                        .reference
+                        .write()
+                        .expect("texture reference write lock");
+
+                    *ref_wlock.deref_mut() = Some(result_tex);
+                },
+                handle,
+            );
         }
     }
 }
