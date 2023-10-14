@@ -44,3 +44,5 @@ wow_srp = { git = "https://github.com/gtker/wow_srp", rev = "9c5382a2915850efc69
 wow_login_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync"] }
 # wow_world_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync", "wrath"] }
 wow_world_messages = { path = "../wow_messages/wow_world_messages", features = ["sync", "wrath", "print-testcase"] }
+# replacing RwLock<HashMap<_>>, especially in the resolvers, that had held a global hashmap lock when inserting, massively impacting parallelity
+dashmap = "5.5.3"
