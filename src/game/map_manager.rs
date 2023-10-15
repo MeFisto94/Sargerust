@@ -54,7 +54,12 @@ impl MapManager {
     }
 
     // TODO: I am not sure if the whole preloading shouldn't be the responsibility of the render thread and if we as src\game should at best care about building the graph.
-    pub fn preload_map(&mut self, map: String, position: Vec3, orientation: f32) {
+    pub fn preload_map(
+        &mut self,
+        map: String,
+        position: Vec3,
+        _orientation: f32, /* TODO: use for foveated preloading */
+    ) {
         let now = Instant::now();
         info!("Loading map {} @ {}", map, position);
         let wdt_buf = self

@@ -78,8 +78,8 @@ impl Parseable<MOTXChunk> for MOTXChunk {
     fn parse<R: Read>(rdr: &mut R) -> Result<MOTXChunk, ParserError> {
         let gsl = GenericStringList::parse(rdr)?;
         Ok(MOTXChunk {
-            textureNameList: gsl.stringList,
-            offsets: gsl.offset_to_stringList_offset,
+            textureNameList: gsl.string_list,
+            offsets: gsl.offset_to_string_list_offset,
         })
     }
 }
@@ -150,8 +150,8 @@ impl Parseable<MOGNChunk> for MOGNChunk {
     fn parse<R: Read>(rdr: &mut R) -> Result<MOGNChunk, ParserError> {
         let gsl = GenericStringList::parse(rdr)?;
         Ok(MOGNChunk {
-            groupNameList: gsl.stringList,
-            offset_lookup: gsl.offset_to_stringList_offset,
+            groupNameList: gsl.string_list,
+            offset_lookup: gsl.offset_to_string_list_offset,
         })
     }
 }
@@ -319,8 +319,8 @@ impl Parseable<MODNChunk> for MODNChunk {
     fn parse<R: Read>(rdr: &mut R) -> Result<MODNChunk, ParserError> {
         let gsl = GenericStringList::parse(rdr)?;
         Ok(MODNChunk {
-            doodadNameList: gsl.stringList,
-            doodadNameListLookup: gsl.offset_to_stringList_offset,
+            doodadNameList: gsl.string_list,
+            doodadNameListLookup: gsl.offset_to_string_list_offset,
         })
     }
 }

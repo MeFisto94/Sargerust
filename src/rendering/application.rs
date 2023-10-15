@@ -10,22 +10,19 @@ use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
 use log::trace;
 use rend3::types::{
-    Camera, CameraProjection, Handedness, MaterialHandle, MeshHandle, ObjectHandle, PresentMode, SampleCount, Surface,
-    Texture2DHandle, TextureFormat,
+    Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Surface, Texture2DHandle,
+    TextureFormat,
 };
 use rend3::util::typedefs::FastHashMap;
 use rend3::Renderer;
 use rend3_framework::{DefaultRoutines, Event, Grabber, UserResizeEvent};
 use rend3_routine::base::BaseRenderGraph;
-use tokio::io::AsyncReadExt;
 use winit::event::{ElementState, KeyboardInput, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
 
 use crate::game::application::GameApplication;
-use crate::rendering::asset_graph::nodes::adt_node::{
-    ADTNode, DoodadReference, IRMaterial, IRMesh, IRTexture, IRTextureReference, M2Node,
-};
+use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, IRMaterial, IRTextureReference};
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
 use crate::rendering::rend3_backend::{gpu_loaders, Rend3BackendConverter};
@@ -47,7 +44,6 @@ pub struct RenderingApplication {
 
     // mirroring the state of the MapManager.
     current_map: Option<String>,
-    object_list: Vec<ObjectHandle>, // TODO: Refactor to the DAG
     tile_graph: HashMap<(u8, u8), Arc<ADTNode>>,
     missing_texture_material: Option<MaterialHandle>,
     texture_still_loading_material: Option<MaterialHandle>,
@@ -64,7 +60,6 @@ impl RenderingApplication {
             timestamp_last_frame: Instant::now(),
             grabber: None,
             current_map: None,
-            object_list: vec![],
             tile_graph: HashMap::new(),
             missing_texture_material: None,
             texture_still_loading_material: None,
@@ -155,7 +150,7 @@ impl RenderingApplication {
         ))
     }
 
-    fn update_tile_graph(&self, renderer: &Arc<Renderer>, tile_pos: (u8, u8), graph: &Arc<ADTNode>) {
+    fn update_tile_graph(&self, renderer: &Arc<Renderer>, _tile_pos: (u8, u8), graph: &Arc<ADTNode>) {
         // TODO: All this doesn't have to happen on the render thread. It could even happen inside of
         //  map_manager with interior knowledge of what has changed. One could even chain the
         //  resolver calls to load calls to gpu_load.

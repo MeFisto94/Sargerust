@@ -150,8 +150,8 @@ impl Parseable<u128> for u128 {
 // Helper Type because we have multiple chunks that are merely String Arrays.
 #[derive(Debug, Clone)]
 pub struct GenericStringList {
-    pub stringList: Vec<String>,
-    pub offset_to_stringList_offset: HashMap<u32, usize>,
+    pub string_list: Vec<String>,
+    pub offset_to_string_list_offset: HashMap<u32, usize>,
 }
 
 impl Parseable<GenericStringList> for GenericStringList {
@@ -184,8 +184,8 @@ impl Parseable<GenericStringList> for GenericStringList {
         }
 
         Ok(GenericStringList {
-            stringList: list,
-            offset_to_stringList_offset: map,
+            string_list: list,
+            offset_to_string_list_offset: map,
         })
     }
 }

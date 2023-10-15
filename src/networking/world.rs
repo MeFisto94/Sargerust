@@ -56,8 +56,7 @@ impl WorldServer {
             let mut dec = self.decrypter.lock().unwrap();
             let mut enc = self.encrypter.lock().unwrap();
 
-            let warden =
-                expect_server_message_encryption::<SMSG_WARDEN_DATA, _>(&mut self.stream(), dec.deref_mut()).unwrap();
+            expect_server_message_encryption::<SMSG_WARDEN_DATA, _>(&mut self.stream(), dec.deref_mut()).unwrap();
             let s =
                 expect_server_message_encryption::<SMSG_AUTH_RESPONSE, _>(&mut self.stream(), dec.deref_mut()).unwrap();
 
@@ -133,7 +132,7 @@ impl WorldServer {
                 })
                 .unwrap();
             }
-            opcode => self
+            _opcode => self
                 .packet_handler_sender
                 .send(packet)
                 .expect("Failed to enqueue packet handlers"),

@@ -3,7 +3,7 @@ use std::fs;
 use std::io::Cursor;
 use std::ops::DerefMut;
 use std::path::Path;
-use std::sync::{Mutex, RwLock};
+use std::sync::RwLock;
 
 use itertools::Itertools;
 use log::{trace, warn};
@@ -25,6 +25,8 @@ pub fn read_mpq_file_into_cursor(archive: &mut Archive, file_name: &str) -> Resu
 
 pub struct MPQLoader {
     prioritized_archives: Vec<(String, RwLock<Archive>)>,
+    #[allow(unused)]
+    // Will become used once MPQLoader is concurrent (because then we construct new readers from the data_folder and the archive name)
     data_folder: String,
 }
 
@@ -32,8 +34,8 @@ pub struct MPQLoader {
 enum MPQType {
     Base,
     Patch,
-    TBC,
-    WOTLK,
+    Tbc,
+    Wotlk,
     Common,
     Unknown,
 }
@@ -115,9 +117,9 @@ impl MPQLoader {
         if file_name.starts_with("common") {
             MPQType::Common
         } else if file_name.starts_with("expansion") {
-            MPQType::TBC
+            MPQType::Tbc
         } else if file_name.starts_with("lichking") {
-            MPQType::WOTLK
+            MPQType::Wotlk
         } else if file_name.starts_with("patch") {
             MPQType::Patch
         } else {
@@ -135,7 +137,7 @@ impl MPQLoader {
 }
 
 impl RawAssetLoader for MPQLoader {
-    fn load_raw(&self, path: &str) -> &[u8] {
+    fn load_raw(&self, _path: &str) -> &[u8] {
         //&self.load_raw_owned(path)
         todo!()
     }

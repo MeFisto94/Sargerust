@@ -1,11 +1,9 @@
-use std::ops::Deref;
 use std::sync::Arc;
 
 use glam::{Affine3A, EulerRot, Quat, Vec3};
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
 use image_blp::BlpImage;
-use itertools::Itertools;
 use mpq::Archive;
 use rendering::common::coordinate_systems::TILE_SIZE;
 use sargerust_files::adt::types::SMDoodadDef;
@@ -22,8 +20,8 @@ mod rendering; // Containing the rendering/application for the Asset Viewers.
 
 enum DemoMode {
     M2,
-    WMO,
-    ADT,
+    Wmo,
+    Adt,
     MultipleAdt,
     NoDemo,
 }
@@ -40,8 +38,8 @@ fn main() {
 
     match mode {
         DemoMode::M2 => demos::main_simple_m2(&mpq_loader).unwrap(),
-        DemoMode::WMO => demos::main_simple_wmo(&mpq_loader).unwrap(),
-        DemoMode::ADT => demos::main_simple_adt(&mpq_loader).unwrap(),
+        DemoMode::Wmo => demos::main_simple_wmo(&mpq_loader).unwrap(),
+        DemoMode::Adt => demos::main_simple_adt(&mpq_loader).unwrap(),
         DemoMode::MultipleAdt => demos::main_multiple_adt(&mpq_loader).unwrap(),
         DemoMode::NoDemo => {
             let mut recv = None;

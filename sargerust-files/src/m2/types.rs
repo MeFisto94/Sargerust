@@ -27,6 +27,7 @@ impl Parseable<M2Array> for M2Array {
     }
 }
 
+#[allow(dead_code)] // At some point we will use it, bounding boxes etc.
 #[repr(C, packed)]
 struct M2Range {
     minimum: u32,

@@ -1,13 +1,15 @@
+use std::sync::Arc;
+
+use image_blp::BlpImage;
+
+use sargerust_files::m2::reader::M2Reader;
+
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
-use crate::rendering::asset_graph::nodes::adt_node::{IRTextureReference, M2Node};
+use crate::rendering::asset_graph::nodes::adt_node::IRTextureReference;
 use crate::rendering::common::types::{Material, Mesh};
 use crate::rendering::importer::m2_importer::M2Importer;
 use crate::rendering::loader::blp_loader::BLPLoader;
-use image_blp::BlpImage;
-use itertools::Itertools;
-use sargerust_files::m2::reader::M2Reader;
-use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct LoadedM2 {

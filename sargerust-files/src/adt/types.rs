@@ -78,7 +78,7 @@ pub struct MTEXChunk {
 impl Parseable<MTEXChunk> for MTEXChunk {
     fn parse<R: Read>(rdr: &mut R) -> Result<MTEXChunk, ParserError> {
         Ok(MTEXChunk {
-            filenames: GenericStringList::parse(rdr)?.stringList,
+            filenames: GenericStringList::parse(rdr)?.string_list,
         })
     }
 }
@@ -93,8 +93,8 @@ impl Parseable<MMDXChunk> for MMDXChunk {
     fn parse<R: Read>(rdr: &mut R) -> Result<MMDXChunk, ParserError> {
         let gsl = GenericStringList::parse(rdr)?;
         Ok(MMDXChunk {
-            filenames: gsl.stringList,
-            offsets: gsl.offset_to_stringList_offset,
+            filenames: gsl.string_list,
+            offsets: gsl.offset_to_string_list_offset,
         })
     }
 }
@@ -123,8 +123,8 @@ impl Parseable<MWMOChunk> for MWMOChunk {
     fn parse<R: Read>(rdr: &mut R) -> Result<MWMOChunk, ParserError> {
         let gsl = GenericStringList::parse(rdr)?;
         Ok(MWMOChunk {
-            filenames: gsl.stringList,
-            offsets: gsl.offset_to_stringList_offset,
+            filenames: gsl.string_list,
+            offsets: gsl.offset_to_string_list_offset,
         })
     }
 }

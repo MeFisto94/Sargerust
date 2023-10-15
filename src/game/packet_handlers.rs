@@ -1,8 +1,10 @@
-use crate::game::application::GameApplication;
-use log::{info, trace, warn};
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Weak};
+
+use log::{info, warn};
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
+
+use crate::game::application::GameApplication;
 
 pub struct PacketHandlers {
     app: Weak<GameApplication>,

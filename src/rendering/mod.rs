@@ -5,7 +5,6 @@ use std::sync::Arc;
 use glam::{Affine3A, Vec3, Vec3A};
 use image_blp::convert::blp_to_image;
 use image_blp::BlpImage;
-use itertools::Itertools;
 use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectHandle};
 use rend3::Renderer;
 

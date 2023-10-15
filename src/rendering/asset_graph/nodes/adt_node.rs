@@ -110,9 +110,7 @@ impl<T> NodeReference<T> {
 }
 
 // TODO: the typedefs belong into rend3_backend, as they leak and wrap rend3 types
-type IRMaterialReference = IRObjectReference<IRMaterial>;
 pub type IRMaterial = IRObject<Material, MaterialHandle>;
-type IRMeshReference = IRObjectReference<IRMesh>;
 pub type IRMesh = IRObject<Mesh, MeshHandle>;
 // Textures are failable
 pub type IRTextureReference = IRObjectReference<Option<IRTexture>>;
