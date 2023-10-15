@@ -5,7 +5,6 @@ use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use glam::Vec3;
-use itertools::Itertools;
 use log::{error, info, trace, warn};
 use tokio::runtime::{Builder, Handle, Runtime};
 use tokio::task::JoinSet;
@@ -19,7 +18,7 @@ use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::m2_generator::M2Generator;
 use crate::rendering::asset_graph::nodes::adt_node::{
-    ADTNode, DoodadReference, IRTexture, IRTextureReference, M2Node, WMOGroupNode, WMONode, WMOReference,
+    ADTNode, DoodadReference, IRTexture, IRTextureReference, M2Node, TerrainTile, WMOGroupNode, WMONode, WMOReference,
 };
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
@@ -94,7 +93,6 @@ impl MapManager {
         self.current_map = Some((map, wdt));
         warn!("Loading took {}ms", now.elapsed().as_millis());
         // ADT file is map_x_y.adt. I think x are rows and ys are columns.
-        std::process::exit(0); // Profiling
     }
 
     fn handle_adt_lazy(&self, adt: &ADTAsset) -> Result<ADTNode, anyhow::Error> {
@@ -145,7 +143,12 @@ impl MapManager {
         let mut terrain_chunk = vec![];
         for mcnk in &adt.mcnks {
             let mesh = ADTImporter::create_mesh(mcnk, false)?;
-            terrain_chunk.push((mesh.0.into(), RwLock::new(mesh.1.into())));
+            let tile = TerrainTile {
+                position: mesh.0.into(),
+                mesh: RwLock::new(mesh.1.into()),
+                object_handle: RwLock::new(None),
+            };
+            terrain_chunk.push(tile);
         }
 
         // TODO: Resolving should be a matter of the rendering app, not this code here? But then their code relies on things being preloaded?
@@ -228,10 +231,12 @@ impl MapManager {
             );
         }
 
-        // TODO: truly async when the renderer can do that
-        while let Some(result) = pollster::block_on(set.join_next()) {
-            result.expect("Loading to be successful");
-        }
+        // We need to poll the JoinSet
+        self.runtime.spawn_blocking(move || {
+            while let Some(result) = pollster::block_on(set.join_next()) {
+                result.expect("Loading to be successful");
+            }
+        });
 
         Ok(ADTNode {
             terrain: terrain_chunk,

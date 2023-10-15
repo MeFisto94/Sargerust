@@ -1,16 +1,24 @@
-use crate::rendering::common::types::{Material, Mesh, MeshWithLod};
+use crate::rendering::common::types::{Material, Mesh};
 use glam::{Affine3A, Mat4, Vec3A};
 use image_blp::BlpImage;
-use rend3::types::{MaterialHandle, MeshHandle, Texture2DHandle};
+use rend3::types::{MaterialHandle, MeshHandle, ObjectHandle, Texture2DHandle};
 use sargerust_files::m2::types::M2Texture;
 use sargerust_files::wdt::types::SMMapObjDef;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug)]
 pub struct ADTNode {
     pub doodads: Vec<Arc<DoodadReference>>,
-    pub terrain: Vec<(Vec3A, RwLock<IRMesh>)>,
+    pub terrain: Vec<TerrainTile>,
     pub wmos: Vec<WMOReference>,
+}
+
+#[derive(Debug)]
+pub struct TerrainTile {
+    pub position: Vec3A,
+    pub mesh: RwLock<IRMesh>,
+    pub object_handle: RwLock<Option<ObjectHandle>>,
 }
 
 // TODO: commons.rs in nodes?
@@ -18,6 +26,10 @@ pub struct ADTNode {
 pub struct DoodadReference {
     pub transform: Mat4,
     pub reference: NodeReference<M2Node>,
+    // TODO: maybe we should have separate structs, graph/mapmanager and renderer side?
+    pub renderer_object_handle: tokio::sync::RwLock<Option<ObjectHandle>>,
+    pub renderer_has_texture: AtomicBool,
+    pub renderer_is_complete: AtomicBool, // This is redundant with renderer_object_handle.is_some, but lock-free
 }
 
 impl DoodadReference {
@@ -25,6 +37,9 @@ impl DoodadReference {
         Self {
             transform,
             reference: NodeReference::new(reference),
+            renderer_is_complete: AtomicBool::new(false),
+            renderer_has_texture: AtomicBool::new(false),
+            renderer_object_handle: tokio::sync::RwLock::new(None),
         }
     }
 }
@@ -34,7 +49,9 @@ pub struct M2Node {
     // the vec is immutable after creation, just the tex_reference#reference needs RwLocking
     pub tex_reference: Vec<Arc<IRTextureReference>>,
     pub mesh: RwLock<IRMesh>,
-    pub material: RwLock<IRMaterial>, // TODO: RWLock inside IRMaterial#handle instead? As no-one should modify the material contents and whenever a node has resolved it's reference, it has to be existant/loaded?
+    pub material: RwLock<IRMaterial>,
+    // TODO: RWLock inside IRMaterial#handle instead? As no-one should modify the material contents
+    //  and whenever a node has resolved it's reference, it has to be existent/loaded?
 }
 
 #[derive(Debug)]
@@ -42,6 +59,8 @@ pub struct WMOReference {
     pub map_obj_def: SMMapObjDef,
     pub transform: Affine3A,
     pub reference: NodeReference<WMONode>,
+    // TODO: This type is a clear sign that we should decouple the asset graph from tracking what has been loaded.
+    pub obj_handles: RwLock<Vec<RwLock<Vec<ObjectHandle>>>>,
 }
 
 impl WMOReference {
@@ -50,6 +69,7 @@ impl WMOReference {
             map_obj_def,
             transform,
             reference: NodeReference::new(reference),
+            obj_handles: RwLock::new(Vec::new()),
         }
     }
 }
@@ -72,7 +92,7 @@ pub struct WMOGroupNode {
     pub material_ids: Vec<u8>,
 }
 
-/// DO NOT DERIVCE CLONE FOR NODE REFERENCES, it breaks the renderer. As the renderer polls the lock
+/// DO NOT DERIVE CLONE FOR NODE REFERENCES, it breaks the renderer. As the renderer polls the lock
 /// to see if it has been loaded async in the meantime.
 #[derive(Debug)]
 pub struct NodeReference<T> {
@@ -89,6 +109,7 @@ impl<T> NodeReference<T> {
     }
 }
 
+// TODO: the typedefs belong into rend3_backend, as they leak and wrap rend3 types
 type IRMaterialReference = IRObjectReference<IRMaterial>;
 pub type IRMaterial = IRObject<Material, MaterialHandle>;
 type IRMeshReference = IRObjectReference<IRMesh>;

@@ -1,25 +1,3 @@
-use crate::game::application::GameApplication;
-use crate::rendering::asset_graph::nodes::adt_node::{
-    ADTNode, DoodadReference, IRMaterial, IRMesh, IRTexture, IRTextureReference, M2Node,
-};
-use crate::rendering::common::coordinate_systems;
-use crate::rendering::common::highlevel_types::PlacedDoodad;
-use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, TransparencyType};
-use crate::rendering::rend3_backend::Rend3BackendConverter;
-use crate::rendering::{add_placed_doodads, add_terrain_chunks, add_wmo_groups};
-use glam::{Affine3A, Mat4, UVec2, Vec3, Vec3A, Vec4};
-use image_blp::BlpImage;
-use itertools::Itertools;
-use log::trace;
-use rend3::types::{
-    Camera, CameraProjection, Handedness, MaterialHandle, MaterialTag, MeshHandle, ObjectHandle, PresentMode,
-    ResourceHandle, SampleCount, Surface, Texture2DHandle, TextureFormat,
-};
-use rend3::util::typedefs::FastHashMap;
-use rend3::Renderer;
-use rend3_framework::{DefaultRoutines, Event, Grabber, UserResizeEvent};
-use rend3_routine::base::BaseRenderGraph;
-use sargerust_files::adt::types::ADTAsset;
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::hash::BuildHasher;
@@ -27,9 +5,30 @@ use std::ops::DerefMut;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, RwLock, Weak};
 use std::time::Instant;
+
+use glam::{Mat4, UVec2, Vec3A, Vec4};
+use itertools::Itertools;
+use log::trace;
+use rend3::types::{
+    Camera, CameraProjection, Handedness, MaterialHandle, MeshHandle, ObjectHandle, PresentMode, SampleCount, Surface,
+    Texture2DHandle, TextureFormat,
+};
+use rend3::util::typedefs::FastHashMap;
+use rend3::Renderer;
+use rend3_framework::{DefaultRoutines, Event, Grabber, UserResizeEvent};
+use rend3_routine::base::BaseRenderGraph;
+use tokio::io::AsyncReadExt;
 use winit::event::{ElementState, KeyboardInput, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
+
+use crate::game::application::GameApplication;
+use crate::rendering::asset_graph::nodes::adt_node::{
+    ADTNode, DoodadReference, IRMaterial, IRMesh, IRTexture, IRTextureReference, M2Node,
+};
+use crate::rendering::common::coordinate_systems;
+use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
+use crate::rendering::rend3_backend::{gpu_loaders, Rend3BackendConverter};
 
 // pub trait RendererCommand {
 //     fn run(&self);
@@ -48,19 +47,10 @@ pub struct RenderingApplication {
 
     // mirroring the state of the MapManager.
     current_map: Option<String>,
-    loaded_tiles: HashMap<
-        (u8, u8),
-        (
-            Arc<ADTAsset>,
-            /* Terrain */ Vec<(Vec3, Mesh)>,
-            Vec<PlacedDoodad>,
-            /* WMO */ Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>,
-            HashMap<String, BlpImage>,
-        ),
-    >,
     object_list: Vec<ObjectHandle>, // TODO: Refactor to the DAG
     tile_graph: HashMap<(u8, u8), Arc<ADTNode>>,
     missing_texture_material: Option<MaterialHandle>,
+    texture_still_loading_material: Option<MaterialHandle>,
 }
 
 impl RenderingApplication {
@@ -74,10 +64,10 @@ impl RenderingApplication {
             timestamp_last_frame: Instant::now(),
             grabber: None,
             current_map: None,
-            loaded_tiles: HashMap::new(),
             object_list: vec![],
             tile_graph: HashMap::new(),
             missing_texture_material: None,
+            texture_still_loading_material: None,
         }
     }
 
@@ -98,7 +88,7 @@ impl RenderingApplication {
             (mm.current_map.is_some() && &mm.current_map.as_ref().unwrap().0 != self.current_map.as_ref().unwrap())
         {
             trace!("Map has changed, discarding everything");
-            self.loaded_tiles.clear();
+            self.tile_graph.clear();
             self.current_map = Some(mm.current_map.as_ref().unwrap().0.clone());
 
             // TODO: This needs to be more sophisticated, in general it sucks that we just can't call from the packet handler into RenderApplication
@@ -117,160 +107,213 @@ impl RenderingApplication {
         }
 
         let added_tiles = mm
-            //.loaded_tiles
             .tile_graph
             .iter()
-            //.filter(|ki| !self.loaded_tiles.contains_key(ki.0))
             .filter(|ki| !self.tile_graph.contains_key(ki.0))
             .collect_vec();
         let removed_tiles = self
-            //.loaded_tiles
             .tile_graph
             .keys()
-            //.filter(|ki| !mm.loaded_tiles.contains_key(ki))
             .filter(|ki| !mm.tile_graph.contains_key(ki))
             .copied()
             .collect_vec();
 
         for tile in removed_tiles {
-            //self.loaded_tiles.remove(&tile);
             self.tile_graph.remove(&tile);
         }
 
         for (key, value) in added_tiles {
             let val = value.clone();
-            //self.add_tile(renderer, *key, &val);
             self.add_tile_graph(renderer, *key, &val);
-            //self.loaded_tiles.insert(*key, val);
             self.tile_graph.insert(*key, val);
+        }
+
+        for (key, value) in &self.tile_graph {
+            // currently, we only update doodads
+            self.update_tile_graph(renderer, *key, value);
         }
     }
 
     fn init_missing_texture_material(&mut self, renderer: &Arc<Renderer>) {
         let mat = Material {
             is_unlit: true,
-            albedo: AlbedoType::Value(Vec4::new(1.0, 0.0, 0.5, 1.0)), // screaming pink
+            albedo: AlbedoType::Value(Vec4::new(0.22, 1.0, 0.0, 1.0)), // neon/lime green
             transparency: TransparencyType::Opaque,
         };
 
         let render_mat = Rend3BackendConverter::create_material_from_ir(&mat, None);
         self.missing_texture_material = Some(renderer.add_material(render_mat));
+
+        let mat_loading = Material {
+            is_unlit: true,
+            albedo: AlbedoType::Value(Vec4::new(0.4, 0.4, 0.4, 1.0)),
+            transparency: TransparencyType::Opaque,
+        };
+
+        self.texture_still_loading_material = Some(renderer.add_material(
+            Rend3BackendConverter::create_material_from_ir(&mat_loading, None),
+        ))
     }
 
-    fn add_tile(
-        &mut self,
-        renderer: &Arc<Renderer>,
-        tile_pos: (u8, u8),
-        tile: &(
-            Arc<ADTAsset>,
-            Vec<(Vec3, Mesh)>,
-            Vec<PlacedDoodad>,
-            Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>,
-            HashMap<String, BlpImage>,
-        ),
-    ) {
-        let (adt, terrain_chunk, placed_doodads, wmos, textures) = tile;
-        add_placed_doodads(placed_doodads, renderer, &mut self.object_list);
-        add_wmo_groups(
-            wmos.iter().map(|w| (&w.0, &w.1)),
-            textures,
-            renderer,
-            &mut self.object_list,
-        );
-        add_terrain_chunks(terrain_chunk, renderer, &mut self.object_list);
+    fn update_tile_graph(&self, renderer: &Arc<Renderer>, tile_pos: (u8, u8), graph: &Arc<ADTNode>) {
+        // TODO: All this doesn't have to happen on the render thread. It could even happen inside of
+        //  map_manager with interior knowledge of what has changed. One could even chain the
+        //  resolver calls to load calls to gpu_load.
+        self.load_terrain_chunks(renderer, graph);
+        self.load_doodads(renderer, &graph.doodads, None);
+        self.load_wmos(renderer, graph);
     }
 
     fn add_tile_graph(&mut self, renderer: &Arc<Renderer>, tile_pos: (u8, u8), graph: &Arc<ADTNode>) {
         trace!("add_tile_graph: {}, {}", tile_pos.0, tile_pos.1);
-        {
-            // TODO: Currently one hardcoded material per adt
-            let _material = Material {
-                is_unlit: true,
-                albedo: AlbedoType::Vertex { srgb: true },
-                transparency: TransparencyType::Opaque,
-            };
-            let material = Rend3BackendConverter::create_material_from_ir(&_material, None);
-            let material_handle = renderer.add_material(material);
+        self.update_tile_graph(renderer, tile_pos, graph);
+    }
 
-            for (position, mesh) in &graph.terrain {
-                let mesh_handle = Self::gpu_load_mesh(renderer, mesh);
-
-                let object = rend3::types::Object {
-                    mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
-                    material: material_handle.clone(),
-                    transform: coordinate_systems::adt_to_blender_transform(Vec3A::new(
-                        position.x, position.y, position.z,
-                    )),
-                };
-
-                // TODO: the object handle has to reside in the graph for auto freeing.
-                let _object_handle = renderer.add_object(object);
-                self.object_list.push(_object_handle);
-            }
-        }
-
-        self.load_doodads(renderer, &graph.doodads, None);
-
+    fn load_wmos(&self, renderer: &Arc<Renderer>, graph: &Arc<ADTNode>) {
         for wmo_ref in &graph.wmos {
-            if let Some(wmo) = wmo_ref
-                .reference
-                .reference
-                .read()
-                .expect("WMO Read Lock")
-                .as_ref()
-            {
-                self.load_doodads(renderer, &wmo.doodads, Some(wmo_ref.transform.into()));
-                for material in &wmo.materials {
-                    self.load_material(renderer, material, &wmo.tex_references);
+            let wmo = {
+                let wmo_rlock = wmo_ref.reference.reference.read().expect("WMO Read Lock");
+                if wmo_rlock.is_none() {
+                    continue; // WMO is not loaded yet.
                 }
 
-                for subgroup_ref in wmo.subgroups.iter() {
-                    if let Some(subgroup) = subgroup_ref
-                        .reference
+                wmo_rlock
+                    .as_ref()
+                    .expect("WMO has to be loaded (see lines above)")
+                    .clone()
+            };
+
+            self.load_doodads(renderer, &wmo.doodads, Some(wmo_ref.transform.into()));
+            let all_tex_loaded = Self::are_all_textures_loaded(&wmo.tex_references);
+
+            if !all_tex_loaded {
+                continue; // TODO: implement delay loading of textures
+            }
+
+            for material in &wmo.materials {
+                self.load_material(renderer, material, &wmo.tex_references);
+            }
+
+            if wmo_ref.obj_handles.read().expect("Obj Handles").is_empty() {
+                // First load, we'll be so kind and preallocate
+                {
+                    let mut handles = Vec::new();
+                    for _ in &wmo.subgroups {
+                        handles.push(RwLock::new(Vec::new()));
+                    }
+
+                    let mut obj_handles_wlock = wmo_ref.obj_handles.write().expect("Obj Handles");
+                    *obj_handles_wlock.deref_mut() = handles;
+                }
+            }
+
+            for (subgroup_id, subgroup_ref) in wmo.subgroups.iter().enumerate() {
+                {
+                    let handles_lock = wmo_ref.obj_handles.read().expect("Obj Handles");
+                    let wmoref_rlock = handles_lock[subgroup_id]
                         .read()
-                        .expect("Subgroup Read Lock")
-                        .as_ref()
-                    {
-                        for (idx, batch) in subgroup.mesh_batches.iter().enumerate() {
-                            let mat_id = subgroup.material_ids[idx];
+                        .expect("Subgroup Obj Handle Write Lock");
 
-                            let material_handle = if mat_id != 0xFF {
-                                let mat_rw = wmo.materials[mat_id as usize]
-                                    .read()
-                                    .expect("Material read lock");
-                                mat_rw
-                                    .handle
-                                    .as_ref()
-                                    .expect("Material to be loaded (right above)")
-                                    .clone()
-                            } else {
-                                // TODO: this is not exactly correct, we should probably have a "no mat" material.
-                                //  and especially for WMO Groups, they probably have a default material anyway
-                                self.missing_texture_material
-                                    .as_ref()
-                                    .expect("Missing Texture Material to be initialized")
-                                    .clone()
-                            };
-
-                            let mesh_handle = Self::gpu_load_mesh(renderer, batch);
-                            let object = rend3::types::Object {
-                                mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
-                                material: material_handle.clone(),
-                                transform: wmo_ref.transform.into(),
-                            };
-
-                            // TODO: the object handle has to reside in the graph for auto freeing.
-                            let _object_handle = renderer.add_object(object);
-                            self.object_list.push(_object_handle);
-                        }
+                    if !wmoref_rlock.is_empty() {
+                        continue; // This is our "sign", that this subgroup has been rendered already.
+                                  // TODO: Allow for textures to be delay loaded, similar to doodads.
                     }
                 }
-            } // else: not loaded yet?
+
+                let subgroup = {
+                    let subgroup_rlock = subgroup_ref.reference.read().expect("Subgroup Read Lock");
+
+                    if subgroup_rlock.is_none() {
+                        // not loaded yet
+                        continue;
+                    }
+
+                    subgroup_rlock
+                        .as_ref()
+                        .expect("Subgroup has to be loaded (see lines above)")
+                        .clone()
+                };
+
+                let mut object_handles = Vec::with_capacity(subgroup.mesh_batches.len());
+
+                // TODO: probably we should merge all batches into one object
+                for (idx, batch) in subgroup.mesh_batches.iter().enumerate() {
+                    let mat_id = subgroup.material_ids[idx];
+
+                    // TODO: This may still fail async, we haven't ensured that all required materials (and especially their textures) are resolved.
+                    let material_handle = if mat_id != 0xFF {
+                        let mat_rw = wmo.materials[mat_id as usize]
+                            .read()
+                            .expect("Material read lock");
+
+                        mat_rw
+                            .handle
+                            .as_ref()
+                            .expect("Material to be loaded (right above)")
+                            .clone()
+                    } else {
+                        // TODO: this is not exactly correct, we should probably have a "no mat" material.
+                        //  and especially for WMO Groups, they probably have a default material anyway
+                        self.texture_still_loading_material
+                            .as_ref()
+                            .expect("Texture Still Loading Material to be initialized")
+                            .clone()
+                    };
+
+                    let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, batch);
+                    let object = rend3::types::Object {
+                        mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
+                        material: material_handle.clone(),
+                        transform: wmo_ref.transform.into(),
+                    };
+
+                    object_handles.push(renderer.add_object(object));
+                }
+
+                {
+                    let handles_lock = wmo_ref.obj_handles.read().expect("Obj Handles");
+                    let mut wmoref_wlock = handles_lock[subgroup_id]
+                        .write()
+                        .expect("Subgroup Obj Handle Write Lock");
+                    *wmoref_wlock.deref_mut() = object_handles;
+                }
+            }
+        }
+    }
+
+    fn load_terrain_chunks(&self, renderer: &Arc<Renderer>, graph: &Arc<ADTNode>) {
+        // TODO: Currently one hardcoded material per adt
+        let _material = Material {
+            is_unlit: true,
+            albedo: AlbedoType::Vertex { srgb: true },
+            transparency: TransparencyType::Opaque,
+        };
+        let material = Rend3BackendConverter::create_material_from_ir(&_material, None);
+        let material_handle = renderer.add_material(material);
+
+        for tile in &graph.terrain {
+            let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, &tile.mesh);
+
+            let object = rend3::types::Object {
+                mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
+                material: material_handle.clone(),
+                transform: coordinate_systems::adt_to_blender_transform(Vec3A::new(
+                    tile.position.x,
+                    tile.position.y,
+                    tile.position.z,
+                )),
+            };
+
+            let mut wlock = tile
+                .object_handle
+                .write()
+                .expect("Object Handle Write Lock");
+            *wlock.deref_mut() = Some(renderer.add_object(object));
         }
     }
 
     fn load_doodads(
-        &mut self,
+        &self,
         renderer: &Arc<Renderer>,
         doodads: &Vec<Arc<DoodadReference>>,
         parent_transform: Option<Mat4>,
@@ -278,37 +321,67 @@ impl RenderingApplication {
         for doodad in doodads {
             // TODO: we need a better logic to express the desire to actually render something, because then we can explicitly load to the gpu
 
-            if let Some(m2) = doodad
-                .reference
-                .reference
-                .read()
-                .expect("M2 Read Lock")
-                .as_ref()
-            {
-                let mesh_handle = Self::gpu_load_mesh(renderer, &m2.mesh);
+            if doodad.renderer_is_complete.load(Ordering::Acquire) {
+                continue;
+            }
 
-                let material_handle = self.load_material(renderer, &m2.material, &m2.tex_reference);
+            // TODO: technically we have a race condition here, while we load the stuff on the GPU, it may have changed loader side. In general we have no concept of updating yet.
+            let m2 = {
+                // TODO: Async aware RwLock
+                let m2_rlock = doodad.reference.reference.read().expect("M2 Read Lock");
+                if m2_rlock.is_none() {
+                    continue;
+                }
 
-                let object = rend3::types::Object {
-                    mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
-                    material: material_handle.clone(),
-                    transform: (parent_transform.unwrap_or(Mat4::IDENTITY) * doodad.transform),
-                };
+                m2_rlock.as_ref().expect("previous is_none check.").clone()
+            };
 
-                // TODO: the object handle has to reside in the graph for auto freeing.
-                let _object_handle = renderer.add_object(object);
-                self.object_list.push(_object_handle);
+            let all_tex_loaded = Self::are_all_textures_loaded(&m2.tex_reference);
+            let has_object_handle = { doodad.renderer_object_handle.blocking_read().is_some() };
+
+            if has_object_handle && !all_tex_loaded {
+                // We're waiting on textures and that hasn't changed yet.
+                continue;
+            }
+
+            let material_handle = if all_tex_loaded {
+                self.load_material(renderer, &m2.material, &m2.tex_reference)
             } else {
-                log::warn!(
-                    "Doodad couldn't be rendered because it wasn't resolved yet. Solve when going async. {}",
-                    &doodad.reference.reference_str
-                );
+                self.texture_still_loading_material
+                    .as_ref()
+                    .expect("Material already initialized")
+                    .clone()
+            };
+
+            // TODO: handle the absence of the tex_reference. Currently this will render the missing texture style, but I guess when we _know_ the texture is not ready yet, we should load an albedo grey material.
+
+            let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, &m2.mesh);
+            let object = rend3::types::Object {
+                mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
+                material: material_handle.clone(),
+                transform: (parent_transform.unwrap_or(Mat4::IDENTITY) * doodad.transform),
+            };
+
+            let mut handle_writer = doodad.renderer_object_handle.blocking_write();
+            *handle_writer.deref_mut() = Some(renderer.add_object(object));
+
+            if all_tex_loaded {
+                doodad.renderer_is_complete.store(true, Ordering::SeqCst);
             }
         }
     }
 
+    fn are_all_textures_loaded(tex_reference: &Vec<Arc<IRTextureReference>>) -> bool {
+        !tex_reference.iter().any(|tex| {
+            tex.reference
+                .read()
+                .expect("tex reference read lock")
+                .is_none()
+        })
+    }
+
     fn load_material(
-        &mut self,
+        &self,
         renderer: &Arc<Renderer>,
         material: &RwLock<IRMaterial>,
         tex_references: &Vec<Arc<IRTextureReference>>,
@@ -327,7 +400,7 @@ impl RenderingApplication {
             Some(tex_name) => tex_references
                 .iter()
                 .find(|tex_ref| tex_name.eq(&tex_ref.reference_str))
-                .and_then(|tex_ref| Self::gpu_load_texture(renderer, &tex_ref.reference)),
+                .and_then(|tex_ref| gpu_loaders::gpu_load_texture(renderer, &tex_ref.reference)),
             _ => None,
         };
 
@@ -341,81 +414,9 @@ impl RenderingApplication {
                 .expect("Missing Texture Material to be initialized already")
                 .clone()
         } else {
-            Self::gpu_load_material(renderer, material, texture_handle_opt)
+            gpu_loaders::gpu_load_material(renderer, material, texture_handle_opt)
         };
         material_handle
-    }
-
-    fn gpu_load_mesh(renderer: &Arc<Renderer>, mesh: &RwLock<IRMesh>) -> MeshHandle {
-        {
-            if let Some(handle) = mesh.read().expect("Mesh Read Lock").handle.as_ref() {
-                return handle.clone();
-            }
-        }
-
-        let mut mesh_lock = mesh.write().expect("Mesh Write Lock");
-        let render_mesh =
-            Rend3BackendConverter::create_mesh_from_ir(&mesh_lock.data).expect("Mesh building successful");
-        let mesh_handle = renderer.add_mesh(render_mesh);
-        mesh_lock.deref_mut().handle = Some(mesh_handle.clone());
-        mesh_handle
-    }
-
-    fn gpu_load_material(
-        renderer: &Arc<Renderer>,
-        material: &RwLock<IRMaterial>,
-        texture_handle: Option<Texture2DHandle>,
-    ) -> MaterialHandle {
-        {
-            if let Some(handle) = material.read().expect("Material Read Lock").handle.as_ref() {
-                return handle.clone();
-            }
-        }
-        let mut material_lock = material.write().expect("Material Write Lock");
-        let render_mat = Rend3BackendConverter::create_material_from_ir(&material_lock.data, texture_handle);
-        let material_handle = renderer.add_material(render_mat);
-        material_lock.deref_mut().handle = Some(material_handle.clone());
-        material_handle
-    }
-
-    fn gpu_load_texture(
-        renderer: &Arc<Renderer>,
-        texture_reference: &RwLock<Option<Arc<RwLock<Option<IRTexture>>>>>,
-    ) -> Option<Texture2DHandle> {
-        {
-            let tex_arc = texture_reference.read().expect("Texture Read Lock");
-            if let Some(opt_handle) = tex_arc.as_ref() {
-                {
-                    let tex_lock = opt_handle.read().expect("Texture Read Lock 2");
-                    if let Some(tex_handle) = tex_lock.as_ref() {
-                        if let Some(handle) = tex_handle.handle.as_ref() {
-                            return Some(handle.clone());
-                        } // else: texture not added to the GPU yet - continue with the write lock
-                    } else {
-                        // texture loading error?
-                        return None;
-                    }
-                }
-            } else {
-                // else: texture (reference?) not loaded yet.
-                // TODO: the caller should prevent calling in that case and unwrap the lock? The caller should at least distinguish between texture not loaded (grey diffuse color) and texture loading error (pink!)
-                return None;
-            }
-        }
-
-        let tex_wlock = texture_reference.write().expect("Texture Write Lock");
-        let mut tex_iwlock = tex_wlock
-            .as_ref()
-            .expect("unreachable!")
-            .as_ref()
-            .write()
-            .expect("Texture internal write lock");
-
-        let tex = tex_iwlock.as_mut().expect("unreachable!");
-        let texture = Rend3BackendConverter::create_texture_from_ir(&tex.data, 0);
-        let texture_handle = renderer.add_texture_2d(texture);
-        tex.handle = Some(texture_handle.clone());
-        Some(texture_handle)
     }
 }
 
@@ -440,11 +441,11 @@ impl rend3_framework::App for RenderingApplication {
 
     fn setup(
         &mut self,
-        event_loop: &EventLoop<UserResizeEvent<()>>,
+        _event_loop: &EventLoop<UserResizeEvent<()>>,
         window: &Window,
         renderer: &Arc<Renderer>,
-        routines: &Arc<DefaultRoutines>,
-        surface_format: TextureFormat,
+        _routines: &Arc<DefaultRoutines>,
+        _surface_format: TextureFormat,
     ) {
         // Push the Renderer into the GameApplication to preload handles.
         if self

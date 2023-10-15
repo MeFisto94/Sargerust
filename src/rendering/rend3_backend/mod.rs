@@ -7,6 +7,7 @@ use crate::rendering::common::types::TransparencyType::{Blend, Cutout, Opaque};
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, VertexBuffers};
 use crate::rendering::create_texture_rgba8;
 
+pub mod gpu_loaders;
 pub struct Rend3BackendConverter {}
 
 impl Rend3BackendConverter {
