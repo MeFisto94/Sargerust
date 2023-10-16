@@ -11,7 +11,7 @@ use std::sync::{Arc, RwLock};
 pub struct ADTNode {
     pub doodads: Vec<Arc<DoodadReference>>,
     pub terrain: Vec<TerrainTile>,
-    pub wmos: Vec<WMOReference>,
+    pub wmos: Vec<Arc<WMOReference>>,
 }
 
 #[derive(Debug)]

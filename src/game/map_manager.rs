@@ -12,7 +12,7 @@ use tokio::task::JoinSet;
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::ADTAsset;
 use sargerust_files::wdt::reader::WDTReader;
-use sargerust_files::wdt::types::WDTAsset;
+use sargerust_files::wdt::types::{SMMapObjDef, WDTAsset};
 
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
@@ -46,7 +46,7 @@ impl MapManager {
             m2_resolver: Arc::new(Resolver::new(M2Generator::new(mpq_loader.clone()))),
             tex_resolver: Arc::new(Resolver::new(M2Generator::new(mpq_loader.clone()))),
             wmo_resolver: Arc::new(Resolver::new(M2Generator::new(mpq_loader.clone()))),
-            wmo_group_resolver: Arc::new(Resolver::new(M2Generator::new(mpq_loader))),
+            wmo_group_resolver: Arc::new(Resolver::new(M2Generator::new(mpq_loader.clone()))),
             runtime: Builder::new_multi_thread()
                 .build()
                 .expect("Tokio Runtime to be built"),
@@ -135,14 +135,24 @@ impl MapManager {
                 .offsets
                 .get(&adt.mwid.mwmo_offsets[wmo_ref.nameId as usize])
                 .unwrap()];
-            trace!("WMO {} has been referenced from ADT", name);
+            //trace!("WMO {} has been referenced from ADT", name);
 
             if name.ends_with("STORMWIND.WMO") {
                 continue; // TODO: Temporary performance optimization
             }
 
-            let transform = transform_for_wmo_ref(&wmo_ref);
-            wmos.push(WMOReference::new(wmo_ref, transform, name.to_owned()));
+            if let Some(wmo_reference) = self.try_find_wmo_ref(&wmo_ref, name) {
+                wmos.push(wmo_reference);
+            } else {
+                // TODO: There's a race condition from this line until this method terminates. And
+                //  it even fails to find WMORefs already present in wmos, which is kinda a file fault anyway.
+                let transform = transform_for_wmo_ref(&wmo_ref);
+                wmos.push(Arc::new(WMOReference::new(
+                    wmo_ref,
+                    transform,
+                    name.to_owned(),
+                )));
+            }
         }
 
         let mut terrain_chunk = vec![];
@@ -159,6 +169,18 @@ impl MapManager {
         // TODO: Resolving should be a matter of the rendering app, not this code here? But then their code relies on things being preloaded?
         let mut set = JoinSet::new();
         for wmo in &wmos {
+            if wmo
+                .reference
+                .reference
+                .read()
+                .expect("Reference ReadLock")
+                .as_ref()
+                .is_some()
+            {
+                // Apparently our reference was cloned and thus is pre-loaded.
+                continue;
+            }
+
             let result = self
                 .wmo_resolver
                 .resolve(wmo.reference.reference_str.clone());
@@ -248,6 +270,17 @@ impl MapManager {
             doodads: direct_doodad_refs,
             wmos,
         })
+    }
+
+    fn try_find_wmo_ref(&self, needle: &SMMapObjDef, needle_str: &str) -> Option<Arc<WMOReference>> {
+        self.tile_graph
+            .values()
+            .find_map(|graph| {
+                graph.wmos.iter().find(|wmo| {
+                    wmo.map_obj_def.uniqueId == needle.uniqueId && wmo.reference.reference_str.eq(needle_str)
+                })
+            })
+            .map(|arc| arc.clone())
     }
 
     fn spawn_doodad_resolvers(
