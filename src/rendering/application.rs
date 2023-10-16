@@ -497,26 +497,26 @@ impl rend3_framework::App for RenderingApplication {
                 // TODO: https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/platform.rs. Make platform independent and also add more, or search other crate, rather.
                 if button_pressed(&self.scancode_status, 17u32) {
                     // W
-                    self.camera_location += forward * 15.0 * delta_time.as_secs_f32();
+                    self.camera_location += forward * 30.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 31u32) {
                     // S
-                    self.camera_location -= forward * 10.0 * delta_time.as_secs_f32();
+                    self.camera_location -= forward * 20.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 30u32) {
                     // A
-                    self.camera_location -= right * 10.0 * delta_time.as_secs_f32();
+                    self.camera_location -= right * 20.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 32u32) {
                     // D
-                    self.camera_location += right * 10.0 * delta_time.as_secs_f32();
+                    self.camera_location += right * 20.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 42u32) {
                     // LSHIFT
-                    self.camera_location += up * 5.0 * delta_time.as_secs_f32();
+                    self.camera_location += up * 10.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 29u32) {
-                    self.camera_location -= up * 5.0 * delta_time.as_secs_f32();
+                    self.camera_location -= up * 10.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 57421u32) {
                     // arrow right
