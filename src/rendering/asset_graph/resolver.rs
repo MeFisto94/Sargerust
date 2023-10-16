@@ -1,9 +1,10 @@
+use std::sync::{Arc, Weak};
+
+use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
-use std::ops::DerefMut;
-use std::sync::{Arc, RwLock, RwLockWriteGuard, Weak};
 
 pub struct Resolver<G: GraphNodeGenerator<T>, T> {
-    ref_cache: DashMap<String, RwLock<Weak<T>>>,
+    ref_cache: DashMap<String, Weak<T>>,
     generator: G,
 }
 
@@ -14,6 +15,8 @@ pub trait GraphNodeGenerator<T> {
 impl<G: GraphNodeGenerator<T>, T> Resolver<G, T> {
     pub fn new(generator: G) -> Self {
         Self {
+            // One could also increase the shard amount, but nbThreads * 4 is the default, so ~32 on
+            // a Quad Core. That pairs well with probably < 100 entries
             ref_cache: DashMap::with_capacity(100),
             generator,
         }
@@ -23,48 +26,38 @@ impl<G: GraphNodeGenerator<T>, T> Resolver<G, T> {
     //  also canonicalize paths: uppercase and forward slashes as in MPQ?
     //  -> Those two requirements do conflict, though.
     pub fn resolve(&self, name: String) -> Arc<T> {
-        // TODO: This is one of the hottest paths when loading assets, due to the locking on the hashmap
-        //  consider experimenting with alternatives (chashmap, dashmap, leapfrog). However,
-        //  according to the benchmark from the dashmap author (https://github.com/xacrimon/conc-map-bench)
-        //  dashmap should be very competetive and outperform chashmap.
-        // Easy path: The cache contains a weak reference
-        if let Some(weak_lock) = self.ref_cache.get(&name) {
-            // TODO: with dashmap, could we also just get_mut instead of having RwLocks inside the entries?
-            {
-                let weak = weak_lock.read().expect("Get the read lock on the entry");
-                if let Some(arc) = weak.upgrade() {
-                    return arc;
+        // optimistic path
+        // can be removed without impacting correctness
+        if let Some(existing) = self.ref_cache.get(&name).and_then(|x| x.upgrade()) {
+            return existing;
+        }
+
+        // TODO: this may or may not be a performance culprit in the future. Move generate in or out
+        //  and fine tune the shard size.
+        // assume that nobody else is trying to initialize this entry
+        // benefit: we can call `generate` outside of the critical section
+        // drawback: if we're wrong, `generate` gets called more than once
+        // let new = self.generator.generate(&name);
+
+        // clone can be removed, when generating outside the critical section
+        match self.ref_cache.entry(name.clone()) {
+            Entry::Occupied(mut o) => {
+                if let Some(existing) = o.get().upgrade() {
+                    // the optimistic path failed earlier,
+                    // but someone slipped an entry in since then
+                    existing
+                } else {
+                    // there was already an entry, but it died
+                    let new = self.generator.generate(&name);
+                    o.insert(Arc::downgrade(&new));
+                    new
                 }
             }
-            {
-                let mut weak = weak_lock.write().expect("Get the write lock on the entry");
-                return Self::generate(self, &name, &mut weak);
-            }
-        }
-
-        // Heavier path: We need to lock the entire cache to insert a new weak reference, however
-        // we try to do this as short as possible by _not_ waiting for the generator.
-        // Note: the above comment is kind-of outdated with DashMap but was true for RwLock<HashMap<_>>
-        // the reasoning still remains, though, as we just lock on smaller buckets but still do lock.
-        {
-            self.ref_cache
-                .insert(name.clone(), RwLock::new(Weak::new()));
-        }
-
-        {
-            let entry = self.ref_cache.get(&name).unwrap();
-            let mut weak = entry.write().expect("Get the write lock on the entry");
-            Self::generate(self, &name, &mut weak)
-        }
-    }
-
-    fn generate(&self, name: &str, weak: &mut RwLockWriteGuard<Weak<T>>) -> Arc<T> {
-        match weak.upgrade() {
-            Some(arc) => arc, // maybe we have been raced
-            None => {
-                let arc = self.generator.generate(name);
-                *weak.deref_mut() = Arc::downgrade(&arc.clone());
-                arc
+            Entry::Vacant(v) => {
+                // there was no entry
+                let new = self.generator.generate(&name);
+                v.insert(Arc::downgrade(&new));
+                new
             }
         }
     }
