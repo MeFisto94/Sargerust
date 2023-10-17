@@ -4,7 +4,7 @@ use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use glam::Vec3;
+use glam::{Vec3, Vec3A};
 use log::{error, info, trace, warn};
 use tokio::runtime::{Builder, Handle, Runtime};
 use tokio::task::JoinSet;
@@ -53,6 +53,20 @@ impl MapManager {
         }
     }
 
+    pub fn update_camera(&mut self, position: Vec3A) {
+        if self.current_map.is_none() {
+            return;
+        }
+
+        let coords = coordinate_systems::adt_world_to_tiles(position.into());
+        if self.tile_graph.contains_key(&coords) {
+            return;
+        }
+
+        // TODO: unloading and proper range based checks once the API around here stabilizesd
+        self.try_load_chunk(&coords);
+    }
+
     // TODO: I am not sure if the whole preloading shouldn't be the responsibility of the render thread and if we as src\game should at best care about building the graph.
     pub fn preload_map(
         &mut self,
@@ -80,15 +94,7 @@ impl MapManager {
                 );
 
                 if wdt.has_chunk(chunk_coords.1, chunk_coords.0) {
-                    let adt_buf = self.mpq_loader.as_ref().load_raw_owned(&format!(
-                        "world\\maps\\{}\\{}_{}_{}.adt",
-                        map, map, chunk_coords.1, chunk_coords.0
-                    ));
-                    let adt = ADTReader::parse_asset(&mut Cursor::new(adt_buf.expect("Cannot load map adt")))
-                        .expect("Error parsing ADT");
-                    trace!("Loaded tile {}_{}_{}", map, chunk_coords.1, chunk_coords.0);
-                    let graph = self.handle_adt_lazy(&adt).unwrap();
-                    self.tile_graph.insert(chunk_coords, Arc::new(graph));
+                    self.load_chunk(&map, &chunk_coords);
                 } else {
                     error!("We load into the world on unmapped terrain?!");
                 }
@@ -98,6 +104,28 @@ impl MapManager {
         self.current_map = Some((map, wdt));
         warn!("Loading took {}ms", now.elapsed().as_millis());
         // ADT file is map_x_y.adt. I think x are rows and ys are columns.
+    }
+
+    fn try_load_chunk(&mut self, coords: &(u8, u8)) -> bool {
+        if let Some((map, wdt)) = self.current_map.as_ref() {
+            if wdt.has_chunk(coords.1, coords.0) {
+                self.load_chunk(&map.clone(), coords);
+                return true;
+            }
+        }
+
+        false
+    }
+    fn load_chunk(&mut self, map: &String, chunk_coords: &(u8, u8)) {
+        let adt_buf = self.mpq_loader.as_ref().load_raw_owned(&format!(
+            "world\\maps\\{}\\{}_{}_{}.adt",
+            map, map, chunk_coords.1, chunk_coords.0
+        ));
+        let adt =
+            ADTReader::parse_asset(&mut Cursor::new(adt_buf.expect("Cannot load map adt"))).expect("Error parsing ADT");
+        trace!("Loaded tile {}_{}_{}", map, chunk_coords.1, chunk_coords.0);
+        let graph = self.handle_adt_lazy(&adt).unwrap();
+        self.tile_graph.insert(*chunk_coords, Arc::new(graph));
     }
 
     fn handle_adt_lazy(&self, adt: &ADTAsset) -> Result<ADTNode, anyhow::Error> {
@@ -280,7 +308,7 @@ impl MapManager {
                     wmo.map_obj_def.uniqueId == needle.uniqueId && wmo.reference.reference_str.eq(needle_str)
                 })
             })
-            .map(|arc| arc.clone())
+            .cloned()
     }
 
     fn spawn_doodad_resolvers(

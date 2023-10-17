@@ -77,6 +77,13 @@ impl RenderingApplication {
 
         let app = self.app();
         let mm_lock = app.game_state.clone().map_manager.clone();
+        {
+            mm_lock
+                .write()
+                .expect("Write lock on map manager")
+                .update_camera(coordinate_systems::blender_to_adt(self.camera_location));
+        }
+
         let mm = mm_lock.read().expect("Read Lock on Map Manager");
 
         if mm.current_map.is_some() != self.current_map.is_some() /* initial load or unload */ ||

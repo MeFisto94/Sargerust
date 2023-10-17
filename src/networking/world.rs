@@ -124,7 +124,6 @@ impl WorldServer {
         match packet.as_ref() {
             ServerOpcodeMessage::SMSG_TIME_SYNC_REQ(req) => {
                 let time_sync = req.time_sync;
-                trace!("SYNC TIME: {}", &time_sync);
                 let client_ticks = self.connect_time.elapsed().unwrap().as_millis() as u32;
                 self.send_encrypted(CMSG_TIME_SYNC_RESP {
                     time_sync,

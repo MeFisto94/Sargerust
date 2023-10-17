@@ -10,6 +10,11 @@ pub fn adt_to_blender(source: Vec3A) -> Vec3A {
 }
 
 #[inline]
+pub fn blender_to_adt(source: Vec3A) -> Vec3A {
+    Vec3A::new(-source.y, source.x, source.z)
+}
+
+#[inline]
 pub fn adt_to_blender_rot() -> Mat4 {
     // flip 90 degrees negative around the Z axis
     Mat4::from_euler(EulerRot::XYZ, 0.0 * PI, 0.0 * PI, -0.5 * PI)
