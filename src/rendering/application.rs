@@ -78,14 +78,11 @@ impl RenderingApplication {
         let app = self.app();
         let mm_lock = app.game_state.clone().map_manager.clone();
         {
-            mm_lock
                 .write()
-                .expect("Write lock on map manager")
-                .update_camera(coordinate_systems::blender_to_adt(self.camera_location));
         }
 
+        {
         let mm = mm_lock.read().expect("Read Lock on Map Manager");
-
         if mm.current_map.is_some() != self.current_map.is_some() /* initial load or unload */ ||
             (mm.current_map.is_some() && &mm.current_map.as_ref().unwrap().0 != self.current_map.as_ref().unwrap())
         {
@@ -134,6 +131,13 @@ impl RenderingApplication {
             // currently, we only update doodads
             self.update_tile_graph(renderer, *key, value);
         }
+    }
+
+        // a) We need to drop mm first and b) this should happen after the camera_location has been initially set
+        mm_lock
+            .write()
+            .expect("Write lock on map manager")
+            .update_camera(coordinate_systems::blender_to_adt(self.camera_location));
     }
 
     fn init_missing_texture_material(&mut self, renderer: &Arc<Renderer>) {

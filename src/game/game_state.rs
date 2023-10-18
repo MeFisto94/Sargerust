@@ -32,14 +32,9 @@ impl GameState {
     /// Called when first entering the world and whenever the map changes (teleport, portal)
     pub fn change_map(&self, map: Map, position: Vector3d, orientation: f32) {
         trace!("Switching to map {}", map);
-        // TODO: temporary mapping from Eastern Kingdom to Azeroth.
-        if map == Map::EasternKingdoms {
-            self.map_manager.write().unwrap().preload_map(
-                "Azeroth".into(),
-                Vec3::new(position.x, position.y, position.z),
-                orientation,
-            );
-        }
+
+        // It's important to set the player location before loading the map for the first time,
+        // because otherwise it could happen that we load the (32, 32) chunk (i.e. 0, 0, 0)
         let mut player_location = self
             .player_location
             .write()
@@ -51,5 +46,14 @@ impl GameState {
             .player_orientation
             .write()
             .expect("Player Orientation write lock") = orientation;
+
+        // TODO: temporary mapping from Eastern Kingdom to Azeroth.
+        if map == Map::EasternKingdoms {
+            self.map_manager.write().unwrap().preload_map(
+                "Azeroth".into(),
+                Vec3::new(position.x, position.y, position.z),
+                orientation,
+            );
+        }
     }
 }
