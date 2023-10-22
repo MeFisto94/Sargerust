@@ -1,3 +1,5 @@
+#![feature(iter_array_chunks)]
+
 use std::sync::Arc;
 
 use glam::{Affine3A, EulerRot, Quat, Vec3};
@@ -16,6 +18,7 @@ mod demos;
 mod game;
 mod io;
 pub mod networking;
+pub mod physics;
 mod rendering; // Containing the rendering/application for the Asset Viewers.
 
 enum DemoMode {

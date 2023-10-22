@@ -1,6 +1,7 @@
 use crate::game::application::GameApplication;
 use crate::game::map_manager::MapManager;
 use crate::io::mpq::loader::MPQLoader;
+use crate::physics::physics_state::PhysicsState;
 use glam::{Vec3, Vec3A};
 use log::trace;
 use std::sync::{Arc, RwLock, Weak};
@@ -11,17 +12,20 @@ use wow_world_messages::wrath::{Map, Vector3d};
 pub struct GameState {
     pub app: Weak<GameApplication>,
     pub map_manager: Arc<RwLock<MapManager>>,
+    // TODO: this is apparently in ADT space, this _has_ to be changed to blender space?
     pub player_location: RwLock<Vec3A>,
     pub player_orientation: RwLock<f32>,
+    pub physics_state: Arc<RwLock<PhysicsState>>,
 }
 
 impl GameState {
     pub fn new(app: Weak<GameApplication>, mpq_loader: Arc<MPQLoader>) -> Self {
         Self {
-            app,
             map_manager: Arc::new(RwLock::new(MapManager::new(mpq_loader))),
             player_location: RwLock::new(Vec3A::new(0.0, 0.0, 0.0)),
             player_orientation: RwLock::new(0.0),
+            physics_state: Arc::new(RwLock::new(PhysicsState::new(app.clone()))),
+            app,
         }
     }
 
@@ -39,6 +43,7 @@ impl GameState {
             .player_location
             .write()
             .expect("Player Location write lock");
+        // TODO: adt_to_blender?
         player_location.x = position.x;
         player_location.y = position.y;
         player_location.z = position.z;

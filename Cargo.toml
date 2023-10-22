@@ -10,15 +10,22 @@ members = [
     "mpq-rust"
 ]
 
+# Force release builds for rapier
+[profile.dev.package.rapier3d]
+opt-level = 3
+
 [dependencies]
-log = "0.4.20"
 # Logging, but getting rid of the regex feature/dependency for regex filters.
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
-# mpq = "0.8"
-mpq = { path = "mpq-rust" }
+log = "0.4.20"
+
+# Error handling
+anyhow = "1.0.75"
+
+# asset parsing
+mpq = { path = "mpq-rust" } # mpq = "0.8"
 image-blp = "1"
 sargerust-files = { path = "sargerust-files", features = ["wotlk"] }
-anyhow = "1.0.75"
 
 # For the Rendering/Game Engine
 # Linear algebra library
@@ -50,3 +57,7 @@ tokio = { version = "1.33.0", features = ["full"] }
 
 # replacing RwLock<HashMap<_>>, especially in the resolvers, that had held a global hashmap lock when inserting, massively impacting parallelity
 dashmap = "5.5.3"
+
+# Physics Engine
+rapier3d = { version = "0.17.2", features = ["simd-nightly"] }
+nalgebra = { features = ["convert-glam024"] } # TODO: match version with rapier3d.

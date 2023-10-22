@@ -19,8 +19,10 @@ a lot of `// TODO:` comments everywhere I have an idea while coding).
 
 ### Roadmap
 Things that still need to be implemented (loosely sorted by priority):
-- Physics (especially a character controller)
+- Physics
+  - WMO streaming
   - Packets to send moving to the server
+- Third Person Camera Controller
 - Rendering of the terrain material (create a dedicated shader)
 - Entity Component System (hecs?) to keep track of all the gameobjects (moving geometry), especially NPCs
 - Reading of DBC files, especially in preparation for:

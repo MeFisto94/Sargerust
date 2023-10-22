@@ -27,10 +27,6 @@ use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
 use crate::rendering::rend3_backend::{gpu_loaders, Rend3BackendConverter};
 
-// pub trait RendererCommand {
-//     fn run(&self);
-// }
-
 // #[derive(Debug)] // TODO: Ensure Grabber implements Display
 pub struct RenderingApplication {
     scancode_status: FastHashMap<u32, bool>,
@@ -47,6 +43,7 @@ pub struct RenderingApplication {
     tile_graph: HashMap<(u8, u8), Arc<ADTNode>>,
     missing_texture_material: Option<MaterialHandle>,
     texture_still_loading_material: Option<MaterialHandle>,
+    fly_cam: bool,
 }
 
 impl RenderingApplication {
@@ -63,6 +60,7 @@ impl RenderingApplication {
             tile_graph: HashMap::new(),
             missing_texture_material: None,
             texture_still_loading_material: None,
+            fly_cam: false,
         }
     }
 
@@ -70,7 +68,7 @@ impl RenderingApplication {
         self.app.upgrade().expect("Weak Pointer expired")
     }
 
-    fn run_updates(&mut self, renderer: &Arc<Renderer>) {
+    fn run_updates(&mut self, renderer: &Arc<Renderer>, delta_time: f32, delta_movement: Vec3A) {
         if self.missing_texture_material.is_none() {
             self.init_missing_texture_material(renderer);
         }
@@ -78,60 +76,80 @@ impl RenderingApplication {
         let app = self.app();
         let mm_lock = app.game_state.clone().map_manager.clone();
         {
+            // TODO: Either this gets a proper delta time calculation (i.e. running [0, n] times,
+            //  according to how many slices of the delta time have been passed), _or_ it gets it's
+            //  own executor and runs unrelated to the rendering, then thread safe and with all
+            //  consequences on interfaces (e.g. updating a new player movement may be enqueued and
+            //  the result is ready in a later frame and then needs to traverse the network)
+
+            app.game_state
+                .clone()
+                .physics_state
+                .clone()
                 .write()
+                .expect("Write lock on physics state")
+                .update_fixed(coordinate_systems::blender_to_adt(delta_movement).into());
+
+            if !self.fly_cam {
+                // TODO: Third Person controls.
+                // TODO: if this is required, this is a sign that we're missing adt_to_blender calls on the inputs to the physics simulation,
+                //  at least for the player start transform, but potentially also for the terrain meshes
+                self.camera_location =
+                    coordinate_systems::adt_to_blender(*app.game_state.player_location.read().expect(""));
+            }
         }
 
         {
-        let mm = mm_lock.read().expect("Read Lock on Map Manager");
-        if mm.current_map.is_some() != self.current_map.is_some() /* initial load or unload */ ||
-            (mm.current_map.is_some() && &mm.current_map.as_ref().unwrap().0 != self.current_map.as_ref().unwrap())
-        {
-            trace!("Map has changed, discarding everything");
-            self.tile_graph.clear();
-            self.current_map = Some(mm.current_map.as_ref().unwrap().0.clone());
+            let mm = mm_lock.read().expect("Read Lock on Map Manager");
+            if mm.current_map.is_some() != self.current_map.is_some() /* initial load or unload */ ||
+                (mm.current_map.is_some() && &mm.current_map.as_ref().unwrap().0 != self.current_map.as_ref().unwrap())
+            {
+                trace!("Map has changed, discarding everything");
+                self.tile_graph.clear();
+                self.current_map = Some(mm.current_map.as_ref().unwrap().0.clone());
 
-            // TODO: This needs to be more sophisticated, in general it sucks that we just can't call from the packet handler into RenderApplication
-            self.camera_location = coordinate_systems::adt_to_blender(
-                *app.game_state
-                    .player_location
+                // TODO: This needs to be more sophisticated, in general it sucks that we just can't call from the packet handler into RenderApplication
+                self.camera_location = coordinate_systems::adt_to_blender(
+                    *app.game_state
+                        .player_location
+                        .read()
+                        .expect("Read Lock on Player Location"),
+                );
+                self.camera_yaw = *app
+                    .game_state
+                    .player_orientation
                     .read()
-                    .expect("Read Lock on Player Location"),
-            );
-            self.camera_yaw = *app
-                .game_state
-                .player_orientation
-                .read()
-                .expect("Read Lock on Player Orientation")
-                - PI * 0.5;
-        }
+                    .expect("Read Lock on Player Orientation")
+                    - PI * 0.5;
+            }
 
-        let added_tiles = mm
-            .tile_graph
-            .iter()
-            .filter(|ki| !self.tile_graph.contains_key(ki.0))
-            .collect_vec();
-        let removed_tiles = self
-            .tile_graph
-            .keys()
-            .filter(|ki| !mm.tile_graph.contains_key(ki))
-            .copied()
-            .collect_vec();
+            let added_tiles = mm
+                .tile_graph
+                .iter()
+                .filter(|ki| !self.tile_graph.contains_key(ki.0))
+                .collect_vec();
+            let removed_tiles = self
+                .tile_graph
+                .keys()
+                .filter(|ki| !mm.tile_graph.contains_key(ki))
+                .copied()
+                .collect_vec();
 
-        for tile in removed_tiles {
-            self.tile_graph.remove(&tile);
-        }
+            for tile in removed_tiles {
+                self.tile_graph.remove(&tile);
+            }
 
-        for (key, value) in added_tiles {
-            let val = value.clone();
-            self.add_tile_graph(renderer, *key, &val);
-            self.tile_graph.insert(*key, val);
-        }
+            for (key, value) in added_tiles {
+                let val = value.clone();
+                self.add_tile_graph(renderer, *key, &val);
+                self.tile_graph.insert(*key, val);
+            }
 
-        for (key, value) in &self.tile_graph {
-            // currently, we only update doodads
-            self.update_tile_graph(renderer, *key, value);
+            for (key, value) in &self.tile_graph {
+                // currently, we only update doodads
+                self.update_tile_graph(renderer, *key, value);
+            }
         }
-    }
 
         // a) We need to drop mm first and b) this should happen after the camera_location has been initially set
         mm_lock
@@ -505,29 +523,34 @@ impl rend3_framework::App for RenderingApplication {
                 let right: Vec3A = rotation.x_axis;
                 let up: Vec3A = rotation.z_axis;
 
+                let mut delta: Vec3A = Vec3A::new(0.0, 0.0, 0.0);
+
                 // TODO: https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/platform.rs. Make platform independent and also add more, or search other crate, rather.
                 if button_pressed(&self.scancode_status, 17u32) {
                     // W
-                    self.camera_location += forward * 30.0 * delta_time.as_secs_f32();
+                    delta += forward * 30.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 31u32) {
                     // S
-                    self.camera_location -= forward * 20.0 * delta_time.as_secs_f32();
+                    delta -= forward * 20.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 30u32) {
                     // A
-                    self.camera_location -= right * 20.0 * delta_time.as_secs_f32();
+                    delta -= right * 20.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 32u32) {
                     // D
-                    self.camera_location += right * 20.0 * delta_time.as_secs_f32();
+                    delta += right * 20.0 * delta_time.as_secs_f32();
+                }
+                if button_pressed(&self.scancode_status, 33u32) {
+                    self.fly_cam = !self.fly_cam;
                 }
                 if button_pressed(&self.scancode_status, 42u32) {
                     // LSHIFT
-                    self.camera_location += up * 10.0 * delta_time.as_secs_f32();
+                    delta += up * 10.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 29u32) {
-                    self.camera_location -= up * 10.0 * delta_time.as_secs_f32();
+                    delta -= up * 10.0 * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 57421u32) {
                     // arrow right
@@ -544,7 +567,15 @@ impl rend3_framework::App for RenderingApplication {
                     self.camera_pitch -= 0.25 * delta_time.as_secs_f32();
                 }
 
-                self.run_updates(renderer);
+                if self.fly_cam {
+                    self.camera_location += delta;
+                } // else: we will consider the delta for the physics movement and then mirror that to the cam
+
+                self.run_updates(
+                    renderer,
+                    delta_time.as_secs_f32(),
+                    if self.fly_cam { Vec3A::ZERO } else { delta },
+                );
 
                 window.request_redraw();
             }
