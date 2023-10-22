@@ -48,7 +48,7 @@ fn main() {
             let mut recv = None;
             let app = Arc::new_cyclic(|weak| {
                 let mut app = GameApplication::new(weak, mpq_loader);
-                recv = Some(app.realm_logon("127.0.0.1:3724"));
+                recv = Some(app.realm_logon("127.0.0.1:3724", "user", "user"));
                 app
             });
 

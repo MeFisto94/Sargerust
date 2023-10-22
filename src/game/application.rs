@@ -43,9 +43,9 @@ impl GameApplication {
         }
     }
 
-    pub fn realm_logon(&mut self, address: &str) -> Receiver<Box<ServerOpcodeMessage>> {
+    pub fn realm_logon(&mut self, address: &str, username: &str, password: &str) -> Receiver<Box<ServerOpcodeMessage>> {
         let (sender, receiver) = channel();
-        self.prepare_network(sender, address);
+        self.prepare_network(sender, address, username, password);
         receiver
     }
 
@@ -75,11 +75,17 @@ impl GameApplication {
             .expect("Logic Thread to terminate normally");
     }
 
-    fn prepare_network(&mut self, packet_handler_sender: Sender<Box<ServerOpcodeMessage>>, address: &str) {
+    fn prepare_network(
+        &mut self,
+        packet_handler_sender: Sender<Box<ServerOpcodeMessage>>,
+        address: &str,
+        username: &str,
+        password: &str,
+    ) {
         let (session_key, world_server_stream, server_id) = {
             let mut auth_server = TcpStream::connect(address).expect("Connecting to the Server succeeds");
-            let (session_key, realms) = auth::auth(&mut auth_server, "user", "user");
-            dbg!(&realms.realms[0].name);
+            let (session_key, realms) = auth::auth(&mut auth_server, username, password);
+            log::trace!("Choosing realm {}", &realms.realms[0].name);
             (
                 session_key,
                 TcpStream::connect(&realms.realms[0].address).unwrap(),
@@ -93,7 +99,7 @@ impl GameApplication {
         let seed = ProofSeed::new();
         let seed_value = seed.seed();
         let (client_proof, crypto) = seed.into_client_header_crypto(
-            &NormalizedString::new("user").unwrap(),
+            &NormalizedString::new(username).unwrap(),
             session_key,
             s.server_seed,
         );
@@ -112,7 +118,7 @@ impl GameApplication {
             client_build: 12340,
             login_server_id: server_id as u32,
             // The trick is that we need to uppercase the account name
-            username: NormalizedString::new("user").unwrap().to_string(),
+            username: NormalizedString::new(username).unwrap().to_string(),
             client_seed: seed_value,
             client_proof,
             addon_info: vec![],
