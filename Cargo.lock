@@ -3668,12 +3668,12 @@ dependencies = [
 [[package]]
 name = "wow_login_messages"
 version = "0.3.0"
-source = "git+https://github.com/gtker/wow_messages#98a774583d08bb4d28e169e0df84ae48ed6f874a"
+source = "git+https://github.com/gtker/wow_messages#95a217aa07f5a9bf03fd083144be24c92d9cc7ea"
 
 [[package]]
 name = "wow_srp"
 version = "0.6.0"
-source = "git+https://github.com/gtker/wow_srp?rev=9c5382a2915850efc69f05d7985ab06b3ec13163#9c5382a2915850efc69f05d7985ab06b3ec13163"
+source = "git+https://github.com/gtker/wow_srp?rev=7b019d589bdd11e7b206d250c4b85b968d3945ee#7b019d589bdd11e7b206d250c4b85b968d3945ee"
 dependencies = [
  "hmac",
  "num-bigint",
@@ -3684,10 +3684,12 @@ dependencies = [
 [[package]]
 name = "wow_world_base"
 version = "0.1.1"
+source = "git+https://github.com/gtker/wow_messages#95a217aa07f5a9bf03fd083144be24c92d9cc7ea"
 
 [[package]]
 name = "wow_world_messages"
 version = "0.1.0"
+source = "git+https://github.com/gtker/wow_messages#95a217aa07f5a9bf03fd083144be24c92d9cc7ea"
 dependencies = [
  "flate2",
  "wow_srp",

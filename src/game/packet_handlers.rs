@@ -39,7 +39,7 @@ impl PacketHandlers {
                 }
                 ServerOpcodeMessage::SMSG_MONSTER_MOVE(_) => (),
                 ServerOpcodeMessage::SMSG_MOTD(pkt) => {
-                    for motd in &pkt.motd {
+                    for motd in &pkt.motds {
                         info!("MOTD: {}", motd)
                     }
                 }

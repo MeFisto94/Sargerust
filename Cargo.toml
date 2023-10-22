@@ -42,7 +42,7 @@ rend3-routine = { git = "https://github.com/BVE-Reborn/rend3" }
 rend3-framework = { git = "https://github.com/BVE-Reborn/rend3" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.3"
-# windowing
+# windowing. TODO: Upgrade to 0.29 for new keyboard handling
 winit = "0.28"
 
 # collect_vec and other niceities
@@ -51,10 +51,9 @@ quick_cache = "0.4.0"
 
 # Multiplayer/Networking
 # "srp-fast-math" is not supported with the MSVC target. Also rev needs to match the version defined in the messages
-wow_srp = { git = "https://github.com/gtker/wow_srp", rev = "9c5382a2915850efc69f05d7985ab06b3ec13163", default-features = false, features = ["tbc-header", "wrath-header", "srp-default-math"] }
+wow_srp = { git = "https://github.com/gtker/wow_srp", rev = "7b019d589bdd11e7b206d250c4b85b968d3945ee", default-features = false, features = ["tbc-header", "wrath-header", "srp-default-math"] }
 wow_login_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync"] }
-# wow_world_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync", "wrath"] }
-wow_world_messages = { path = "../wow_messages/wow_world_messages", features = ["sync", "wrath", "print-testcase"] }
+wow_world_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync", "wrath", "print-testcase"] }
 
 # async
 tokio = { version = "1.33.0", features = ["full"] }
