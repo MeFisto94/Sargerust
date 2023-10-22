@@ -131,12 +131,16 @@ impl GameApplication {
         .write_unencrypted_client(&mut &world_server_stream)
         .unwrap();
 
-        self.world_server = Some(Arc::new(WorldServer::new(
-            world_server_stream,
-            encrypter,
-            decrypter,
-            packet_handler_sender,
-        )));
+        let ws_arc = Arc::new_cyclic(|weak| {
+            WorldServer::new(
+                weak.clone(),
+                world_server_stream,
+                encrypter,
+                decrypter,
+                packet_handler_sender,
+            )
+        });
+        self.world_server = Some(ws_arc);
     }
 
     pub fn run_packet_handlers(&self, receiver: Receiver<Box<ServerOpcodeMessage>>) -> JoinHandle<()> {

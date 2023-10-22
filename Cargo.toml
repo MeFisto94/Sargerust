@@ -14,6 +14,10 @@ members = [
 [profile.dev.package.rapier3d]
 opt-level = 3
 
+# Force release builds for glam
+[profile.dev.package.glam]
+opt-level = 3
+
 [dependencies]
 # Logging, but getting rid of the regex feature/dependency for regex filters.
 env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
@@ -29,7 +33,7 @@ sargerust-files = { path = "sargerust-files", features = ["wotlk"] }
 
 # For the Rendering/Game Engine
 # Linear algebra library
-glam = "0.24"
+glam = { version = "0.24", features = ["approx"] }
 # Renderer core
 rend3 = { git = "https://github.com/BVE-Reborn/rend3" }
 # Programmable render list that dictates how the scene renders

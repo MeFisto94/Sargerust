@@ -82,7 +82,8 @@ impl RenderingApplication {
             //  consequences on interfaces (e.g. updating a new player movement may be enqueued and
             //  the result is ready in a later frame and then needs to traverse the network)
 
-            app.game_state
+            let player_movement_info = app
+                .game_state
                 .clone()
                 .physics_state
                 .clone()
@@ -90,12 +91,21 @@ impl RenderingApplication {
                 .expect("Write lock on physics state")
                 .update_fixed(coordinate_systems::blender_to_adt(delta_movement).into());
 
+            app.world_server
+                .clone()
+                .expect("World Server to be present")
+                .movement_tracker
+                .write()
+                .expect("Movement Tracker Write Lock tainted")
+                .track_movement(player_movement_info);
+
             if !self.fly_cam {
                 // TODO: Third Person controls.
                 // TODO: if this is required, this is a sign that we're missing adt_to_blender calls on the inputs to the physics simulation,
                 //  at least for the player start transform, but potentially also for the terrain meshes
-                self.camera_location =
-                    coordinate_systems::adt_to_blender(*app.game_state.player_location.read().expect(""));
+                let mut player_loc = *app.game_state.player_location.read().expect("");
+                player_loc += Vec3A::new(0.0, 0.0, 3.0); // character height half.
+                self.camera_location = coordinate_systems::adt_to_blender(player_loc);
             }
         }
 
@@ -517,30 +527,35 @@ impl rend3_framework::App for RenderingApplication {
                     glam::EulerRot::XYZ,
                     -self.camera_pitch * PI,
                     0.0 /* roll */ * PI,
-                    -self.camera_yaw * PI,
+                    -self.camera_yaw,
                 );
                 let forward: Vec3A = rotation.y_axis;
                 let right: Vec3A = rotation.x_axis;
                 let up: Vec3A = rotation.z_axis;
 
+                let fwd_speed = if self.fly_cam { 30.0 } else { 7.0 };
+                let strafe_speed = if self.fly_cam { 20.0 } else { 7.0 };
+                let back_speed = if self.fly_cam { 20.0 } else { 4.5 };
+
                 let mut delta: Vec3A = Vec3A::new(0.0, 0.0, 0.0);
+                let mut yaw = 0.0;
 
                 // TODO: https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/platform.rs. Make platform independent and also add more, or search other crate, rather.
                 if button_pressed(&self.scancode_status, 17u32) {
                     // W
-                    delta += forward * 30.0 * delta_time.as_secs_f32();
+                    delta += forward * fwd_speed * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 31u32) {
                     // S
-                    delta -= forward * 20.0 * delta_time.as_secs_f32();
+                    delta -= forward * back_speed * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 30u32) {
                     // A
-                    delta -= right * 20.0 * delta_time.as_secs_f32();
+                    delta -= right * strafe_speed * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 32u32) {
                     // D
-                    delta += right * 20.0 * delta_time.as_secs_f32();
+                    delta += right * strafe_speed * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 33u32) {
                     self.fly_cam = !self.fly_cam;
@@ -554,11 +569,11 @@ impl rend3_framework::App for RenderingApplication {
                 }
                 if button_pressed(&self.scancode_status, 57421u32) {
                     // arrow right
-                    self.camera_yaw += 0.5 * delta_time.as_secs_f32();
+                    yaw += PI * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 57419u32) {
                     // arrow left
-                    self.camera_yaw -= 0.5 * delta_time.as_secs_f32();
+                    yaw -= PI * delta_time.as_secs_f32();
                 }
                 if button_pressed(&self.scancode_status, 57416u32) {
                     self.camera_pitch += 0.25 * delta_time.as_secs_f32();
@@ -569,7 +584,29 @@ impl rend3_framework::App for RenderingApplication {
 
                 if self.fly_cam {
                     self.camera_location += delta;
-                } // else: we will consider the delta for the physics movement and then mirror that to the cam
+                    self.camera_yaw += yaw;
+                } else {
+                    self.camera_yaw += yaw;
+
+                    // location: we will consider the delta for the physics movement and then mirror that to the cam
+                    let gs = self.app().game_state.clone();
+                    let mut player_wlock = gs
+                        .player_orientation
+                        .write()
+                        .expect("Player orientation tainted");
+
+                    let orientation = player_wlock.deref_mut();
+                    *orientation -= yaw;
+
+                    // fancy clamping from -PI to +PI.
+                    while *orientation < -PI {
+                        *orientation += 2.0 * PI;
+                    }
+
+                    while *orientation > PI {
+                        *orientation -= 2.0 * PI;
+                    }
+                }
 
                 self.run_updates(
                     renderer,
@@ -590,7 +627,7 @@ impl rend3_framework::App for RenderingApplication {
                     glam::EulerRot::XYZ,
                     (-0.5 - self.camera_pitch) * PI,
                     0.0 /* roll */ * PI,
-                    self.camera_yaw * PI,
+                    self.camera_yaw,
                 );
                 let view = view * Mat4::from_translation((-self.camera_location).into());
 
@@ -633,8 +670,8 @@ impl rend3_framework::App for RenderingApplication {
                     frame_handle,
                     resolution,
                     self.sample_count(),
-                    glam::Vec4::ZERO,
-                    glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+                    Vec4::ZERO,
+                    Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
                 );
 
                 // Dispatch a render using the built up rendergraph!

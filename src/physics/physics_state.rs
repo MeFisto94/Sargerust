@@ -1,19 +1,21 @@
 use crate::game::application::GameApplication;
+use crate::physics::character_movement_information::CharacterMovementInformation;
 use crate::physics::physics_simulator::PhysicsSimulator;
+use crate::physics::terrain_tile_colliders::TerrainTileColliders;
 use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, TerrainTile};
 use glam::{Vec3, Vec3A};
 use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
 use std::ops::DerefMut;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 
 pub struct PhysicsState {
     app: Weak<GameApplication>,
     physics_simulator: PhysicsSimulator,
-    rigid_body_handle: Option<RigidBodyHandle>,
+    rigid_body_handle: OnceLock<RigidBodyHandle>,
     character_controller: KinematicCharacterController,
     character_controller_collider: Option<ColliderHandle>,
-    adt_nodes: Vec<(Weak<ADTNode>, Vec<ColliderHandle>)>,
+    adt_nodes: Vec<(Weak<ADTNode>, TerrainTileColliders)>,
 }
 
 impl PhysicsState {
@@ -22,7 +24,7 @@ impl PhysicsState {
             app,
             physics_simulator: PhysicsSimulator::default(),
             adt_nodes: vec![],
-            rigid_body_handle: None,
+            rigid_body_handle: OnceLock::new(),
             character_controller: KinematicCharacterController {
                 up: Vector::z_axis(),
                 ..KinematicCharacterController::default()
@@ -35,35 +37,19 @@ impl PhysicsState {
         self.app.upgrade().expect("Weak Pointer expired")
     }
 
-    pub fn update_fixed(&mut self, movement_relative: Vec3) {
+    pub fn update_fixed(&mut self, movement_relative: Vec3) -> CharacterMovementInformation {
         if self.character_controller_collider.is_none() {
-            let mut pos_vec3: Vec3 = {
-                (*self
-                    .app()
-                    .game_state
-                    .player_location
-                    .read()
-                    .expect("player read lock"))
-                .into()
-            };
-
-            pos_vec3.z += 5.0;
-            let coll = ColliderBuilder::capsule_z(3.0, 0.5)
-                .position(pos_vec3.into())
-                .build();
-            self.character_controller_collider = Some(self.physics_simulator.insert_collider(coll));
+            self.character_controller_collider = Some(self.create_character_collider());
         }
 
-        if self.rigid_body_handle.is_none() {
-            self.rigid_body_handle = Some(
-                self.physics_simulator
-                    .insert_rigid_body(RigidBodyBuilder::fixed().build()),
-            )
-        }
+        let collider = self
+            .character_controller_collider
+            .expect("has to be constructed already");
 
         self.delta_map();
-        self.update_character(movement_relative, false);
+        let char = self.update_character(collider, movement_relative, false);
         self.physics_simulator.step();
+        char
     }
 
     // TODO: Collider with heightfield at low res or rather meshes? Mesh would have the benefit of
@@ -78,24 +64,54 @@ impl PhysicsState {
             let weak = Arc::downgrade(adt);
             if !self.adt_nodes.iter().any(|entry| entry.0.ptr_eq(&weak)) {
                 let colliders = adt.terrain.iter().map(|terrain| terrain.into()).collect();
-                let handle = self.rigid_body_handle.expect("Terrain Rigid Body present");
-                let collider_handles = self.physics_simulator.insert_colliders(colliders, handle);
-                self.adt_nodes.push((weak, collider_handles));
+                let handle = self.rigid_body_handle.get_or_init(|| {
+                    self.physics_simulator
+                        .insert_rigid_body(RigidBodyBuilder::fixed().build())
+                });
+                let collider_handles = self.physics_simulator.insert_colliders(colliders, *handle);
+                self.adt_nodes
+                    .push((weak, TerrainTileColliders::new(collider_handles)));
+
+                // TODO: add wmo colliders
             }
         }
 
-        for (weak, colliders) in &self.adt_nodes {
+        for (weak, tile_colliders) in &self.adt_nodes {
             if weak.upgrade().is_none() {
-                for &collider in colliders {
+                for &collider in &tile_colliders.terrain_colliders {
                     self.physics_simulator.drop_collider(collider, false);
                 }
 
-                // TODO: Remove.
+                // TODO: Remove entry
+                // TODO: drop wmo colliders
             }
         }
     }
 
-    pub fn update_character(&mut self, movement_relative: Vec3, flying: bool) {
+    fn create_character_collider(&mut self) -> ColliderHandle {
+        let mut pos_vec3: Vec3 = {
+            (*self
+                .app()
+                .game_state
+                .player_location
+                .read()
+                .expect("player read lock"))
+            .into()
+        };
+        pos_vec3.z += 3.0; // compare this in update_character for the reasoning.
+
+        let coll = ColliderBuilder::capsule_z(3.0, 0.5)
+            .position(pos_vec3.into())
+            .build();
+        self.physics_simulator.insert_collider(coll)
+    }
+
+    pub fn update_character(
+        &mut self,
+        collider: ColliderHandle,
+        movement_relative: Vec3,
+        flying: bool,
+    ) -> CharacterMovementInformation {
         // I think rapier does not care about the collider at all, all that is important is that it's a shape with a position
         let mut pos: Vec3 = {
             (*self
@@ -109,10 +125,10 @@ impl PhysicsState {
 
         // I think this is because of the capsule shape and considering the physics position to be the center?
         pos.z += 3.0;
+        pos.z += 0.2 * 3.0; // offset
 
         // Update the collider first
-        self.physics_simulator
-            .teleport_collider(self.character_controller_collider.expect(""), pos);
+        self.physics_simulator.teleport_collider(collider, pos);
 
         // TODO: when not flying, we could also null z-axis forces in movement_relative.
 
@@ -124,20 +140,40 @@ impl PhysicsState {
 
         let movement = self.physics_simulator.move_character(
             &self.character_controller,
-            self.character_controller_collider.expect(""),
+            collider,
             50.0,
             movement_relative + gravity,
         );
 
-        {
+        // TODO: actually, the absolute position is a bit too high, causing flying. Is this the capsule offset?
+
+        let transl: Vec3A = movement.translation.into();
+        let absolute_position = {
             let app = self.app();
             let mut wlock = app
                 .game_state
                 .player_location
                 .write()
                 .expect("player write lock");
-            let transl: Vec3A = movement.translation.into();
             *wlock.deref_mut() += transl;
+            *wlock
+        };
+
+        let orientation = {
+            *self
+                .app()
+                .game_state
+                .player_orientation
+                .read()
+                .expect("player orientation read lock")
+        };
+
+        let pos = absolute_position.into();
+
+        CharacterMovementInformation {
+            absolute_position: pos,
+            orientation,
+            delta_movement: transl.into(),
         }
     }
 }

@@ -21,7 +21,6 @@ a lot of `// TODO:` comments everywhere I have an idea while coding).
 Things that still need to be implemented (loosely sorted by priority):
 - Physics
   - WMO streaming
-  - Packets to send moving to the server
 - Third Person Camera Controller
 - Rendering of the terrain material (create a dedicated shader)
 - Entity Component System (hecs?) to keep track of all the gameobjects (moving geometry), especially NPCs
