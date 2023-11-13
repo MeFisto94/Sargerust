@@ -64,3 +64,6 @@ dashmap = "5.5.3"
 # Physics Engine
 rapier3d = { version = "0.17.2", features = ["simd-nightly"] }
 nalgebra = { features = ["convert-glam024"] } # TODO: match version with rapier3d.
+
+[patch.crates-io]
+simba = { git = "https://github.com/dimforge/simba" } # https://github.com/dimforge/simba/issues/50 and after that, nalgebra and rapier3d need to be updated
