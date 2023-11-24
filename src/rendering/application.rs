@@ -8,7 +8,7 @@ use std::time::Instant;
 
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
-use log::trace;
+use log::{error, trace};
 use rend3::types::{
     Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Surface, Texture2DHandle,
     TextureFormat,
@@ -125,12 +125,13 @@ impl RenderingApplication {
                         .read()
                         .expect("Read Lock on Player Location"),
                 );
-                self.camera_yaw = *app
-                    .game_state
-                    .player_orientation
-                    .read()
-                    .expect("Read Lock on Player Orientation")
-                    - PI * 0.5;
+
+                self.camera_yaw = PI
+                    - *app
+                        .game_state
+                        .player_orientation
+                        .read()
+                        .expect("Read Lock on Player Orientation");
             }
 
             let added_tiles = mm
@@ -540,7 +541,8 @@ impl rend3_framework::App for RenderingApplication {
                 let mut delta: Vec3A = Vec3A::new(0.0, 0.0, 0.0);
                 let mut yaw = 0.0;
 
-                // TODO: https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/platform.rs. Make platform independent and also add more, or search other crate, rather.
+                // TODO: https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/platform.rs.
+                //  Make platform independent and also add more, or search other crate, rather.
                 if button_pressed(&self.scancode_status, 17u32) {
                     // W
                     delta += forward * fwd_speed * delta_time.as_secs_f32();

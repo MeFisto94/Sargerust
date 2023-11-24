@@ -159,6 +159,8 @@ impl PhysicsState {
             *wlock
         };
 
+        // TODO: Does this really belong inside the _physics_ state? I think it's here because
+        //  technically we should honor the orientation at some point and constrain angular movement etc
         let orientation = {
             *self
                 .app()
@@ -168,10 +170,8 @@ impl PhysicsState {
                 .expect("player orientation read lock")
         };
 
-        let pos = absolute_position.into();
-
         CharacterMovementInformation {
-            absolute_position: pos,
+            absolute_position: absolute_position.into(),
             orientation,
             delta_movement: transl.into(),
         }

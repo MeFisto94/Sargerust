@@ -1,5 +1,6 @@
 use crate::networking::world::WorldServer;
 use crate::physics::character_movement_information::CharacterMovementInformation;
+use crate::rendering::common::coordinate_systems;
 use glam::{Quat, Vec3};
 use std::f32::consts::PI;
 use std::sync::Weak;
@@ -30,11 +31,12 @@ impl MovementTracker {
     }
 
     pub fn track_movement(&mut self, movement_info: CharacterMovementInformation) {
-        let counter_rotation = Quat::from_rotation_z(-movement_info.orientation);
-        let delta_unrotated = counter_rotation * movement_info.delta_movement;
+        let counter_rotation = Quat::from_rotation_z(PI - movement_info.orientation);
+        let delta_unrotated =
+            counter_rotation * coordinate_systems::adt_to_blender(movement_info.delta_movement.into());
 
         self._track_movement(
-            delta_unrotated,
+            delta_unrotated.into(),
             movement_info.absolute_position,
             movement_info.orientation,
         );
@@ -49,15 +51,7 @@ impl MovementTracker {
         let player_guid = world.player_guid.get().expect("Player Guid is already set");
         let timestamp = world.get_timestamp();
 
-        let info = Self::build_movement_info(
-            delta_unrotated,
-            absolute_position,
-            // TODO: this orientation swap only works for the start/stop command, not for the heartbeat apparently? tapping "W" has the right facing, continuous walking doesn't
-            //  this may be related to the heartbeat and/or us not emitting START_TURN_XX messages as of now.
-            // TODO: apparently this correct factor is dependant on the initial facing? So we need a different solution!
-            orientation - 0.75 * PI, /* TODO: do we need the same correction factor for other units? */
-            timestamp,
-        );
+        let info = Self::build_movement_info(delta_unrotated, absolute_position, orientation, timestamp);
         let info_clone = info.clone();
 
         // TODO: integrate into the following if-else branch. It has been commented out for the time being.
@@ -125,7 +119,7 @@ impl MovementTracker {
                     .expect("Sending message to be successful");
             }
         } else {
-            // TODO: this currently fires a ByteBufferExcepton sometimes when parsing apparently.
+            // TODO: this currently fires a ByteBufferException sometimes when parsing apparently.
             if self.last_heartbeat.elapsed().as_millis() >= 500 {
                 world
                     .send_encrypted(MSG_MOVE_HEARTBEAT {
@@ -191,8 +185,8 @@ impl MovementTracker {
             }
         }
 
-        if delta_unrotated.z.abs() > EPSILON {
-            if delta_unrotated.z.is_sign_negative() {
+        if delta_unrotated.y.abs() > EPSILON {
+            if delta_unrotated.y.is_sign_negative() {
                 flags.set_backward();
             } else {
                 flags.set_forward();

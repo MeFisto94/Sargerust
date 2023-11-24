@@ -22,7 +22,7 @@ Things that still need to be implemented (loosely sorted by priority):
 - Physics
   - WMO streaming
   - Doodads
-- Third Person Camera Controller
+- Third Person Camera Controller (and sending `MOVE_FACING` packets)
 - Rendering of the terrain material (create a dedicated shader)
 - Entity Component System (hecs?) to keep track of all the gameobjects (moving geometry), especially NPCs
 - Reading of DBC files, especially in preparation for:
