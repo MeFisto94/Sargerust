@@ -21,13 +21,14 @@ a lot of `// TODO:` comments everywhere I have an idea while coding).
 Things that still need to be implemented (loosely sorted by priority):
 - Physics
   - WMO streaming
-  - Doodads
 - Third Person Camera Controller (and sending `MOVE_FACING` packets)
 - Rendering of the terrain material (create a dedicated shader)
 - Entity Component System (hecs?) to keep track of all the gameobjects (moving geometry), especially NPCs
+  - Rendering thereof
 - Reading of DBC files, especially in preparation for:
 - Game Logic. Casting spells and showing stats (mana, health) mainly.
 - Portals, Water, and other less important render objects
+- Audio System, potentially leveraging HRTF and precise reflection and absorption (e.g. SteamAudio)
 - UI/Addon System: This will most likely be using mlua and if possible port
 the entirety of "`FrameXML`", so that the original UI code can be run, but for that
 a lot of API surface and especially the related event handling and layout management

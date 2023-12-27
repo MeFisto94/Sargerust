@@ -2,11 +2,13 @@ use crate::game::application::GameApplication;
 use crate::physics::character_movement_information::CharacterMovementInformation;
 use crate::physics::physics_simulator::PhysicsSimulator;
 use crate::physics::terrain_tile_colliders::TerrainTileColliders;
-use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, TerrainTile};
+use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, M2Node, TerrainTile, WMONode};
+use crate::rendering::common::coordinate_systems;
 use glam::{Vec3, Vec3A};
+use itertools::Itertools;
 use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, OnceLock, Weak};
 
 pub struct PhysicsState {
@@ -52,6 +54,8 @@ impl PhysicsState {
         char
     }
 
+    // TODO: Implement notifications via https://docs.rs/tokio/latest/tokio/sync/broadcast/index.html
+
     // TODO: Collider with heightfield at low res or rather meshes? Mesh would have the benefit of
     //  already being in adt/whatever space. In the end, it should be a heightfield for performance reasons, though.
     pub fn delta_map(&mut self) {
@@ -59,21 +63,23 @@ impl PhysicsState {
         let app = self.app();
         let mm_lock = app.game_state.clone().map_manager.clone();
         let mm = mm_lock.read().expect("Read Lock on Map Manager");
+        let handle = self.terrain_rb();
 
         for (coords, adt) in &mm.tile_graph {
             let weak = Arc::downgrade(adt);
             if !self.adt_nodes.iter().any(|entry| entry.0.ptr_eq(&weak)) {
                 let colliders = adt.terrain.iter().map(|terrain| terrain.into()).collect();
-                let handle = self.rigid_body_handle.get_or_init(|| {
-                    self.physics_simulator
-                        .insert_rigid_body(RigidBodyBuilder::fixed().build())
-                });
-                let collider_handles = self.physics_simulator.insert_colliders(colliders, *handle);
+                let collider_handles = self.physics_simulator.insert_colliders(colliders, handle);
                 self.adt_nodes
-                    .push((weak, TerrainTileColliders::new(collider_handles)));
+                    .push((weak.clone(), TerrainTileColliders::new(collider_handles)));
 
+                // TODO: add wmo doodad colliders
                 // TODO: add wmo colliders
             }
+
+            // At this point, there has to be a value within adt_nodes that has the terrain colliders
+            // TODO: maybe some rust magic (e.g. interior mutability?) would allow us to pull out "nodes"
+            self.process_direct_doodads(handle, adt, &weak);
         }
 
         for (weak, tile_colliders) in &self.adt_nodes {
@@ -86,6 +92,54 @@ impl PhysicsState {
                 // TODO: drop wmo colliders
             }
         }
+    }
+
+    fn process_direct_doodads(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>, weak: &Weak<ADTNode>) {
+        let nodes = self
+            .adt_nodes
+            .iter_mut()
+            .find(|entry| entry.0.ptr_eq(weak))
+            .expect("Logical error");
+
+        for doodad in &adt.doodads {
+            let resolved_doodad = doodad.reference.reference.read().expect("poisoned lock");
+            if let Some(dad) = resolved_doodad.deref() {
+                let weak_dad = Arc::downgrade(dad);
+                if !nodes
+                    .1
+                    .doodad_colliders
+                    .iter()
+                    .any(|dac| dac.0.ptr_eq(&weak_dad))
+                {
+                    // doodad has been resolved and hasn't been added to the physics scene yet
+
+                    // We need to counter convert because physics seem to have a different coordinate system.
+                    let doodad_position: Vec3 =
+                        coordinate_systems::blender_to_adt(doodad.transform.to_scale_rotation_translation().2.into())
+                            .into();
+
+                    let mut doodad_collider: Collider = dad.deref().into();
+                    doodad_collider.set_position(doodad_position.into());
+
+                    // TODO: This is questionable. Should all doodads be their own, but fixed, rigid body or part
+                    //  of the terrain body. The latter sounds more reasonable for most cases, provided the physics
+                    //  engine can handle that.
+                    let doodad_handle: ColliderHandle = *self
+                        .physics_simulator
+                        .insert_colliders(vec![doodad_collider], handle)
+                        .first()
+                        .unwrap();
+                    nodes.1.doodad_colliders.push((weak_dad, doodad_handle));
+                }
+            }
+        }
+    }
+
+    fn terrain_rb(&mut self) -> RigidBodyHandle {
+        *self.rigid_body_handle.get_or_init(|| {
+            self.physics_simulator
+                .insert_rigid_body(RigidBodyBuilder::fixed().build())
+        })
     }
 
     fn create_character_collider(&mut self) -> ColliderHandle {
@@ -200,5 +254,29 @@ impl From<&TerrainTile> for Collider {
         ColliderBuilder::trimesh(vertices, indices)
             .position(Into::<Vec3>::into(value.position).into())
             .build()
+    }
+}
+
+// TODO: We have differing implementations of From<T> for Collider. Some set the position, some don't
+impl From<&M2Node> for Collider {
+    fn from(value: &M2Node) -> Self {
+        let meshlock = value.mesh.read().expect("Mesh RLock");
+        let vertices = meshlock
+            .data
+            .vertex_buffers
+            .position_buffer
+            .iter()
+            .map(|&vert| vert.into())
+            .collect();
+
+        let indices = meshlock
+            .data
+            .index_buffer
+            .clone()
+            .into_iter()
+            .array_chunks()
+            .collect();
+
+        ColliderBuilder::trimesh(vertices, indices).build()
     }
 }
