@@ -1,15 +1,17 @@
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
+
+use glam::{Vec3, Vec3A};
+use itertools::Itertools;
+use rapier3d::control::KinematicCharacterController;
+use rapier3d::prelude::*;
+
 use crate::game::application::GameApplication;
 use crate::physics::character_movement_information::CharacterMovementInformation;
 use crate::physics::physics_simulator::PhysicsSimulator;
 use crate::physics::terrain_tile_colliders::TerrainTileColliders;
 use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, M2Node, TerrainTile, WMONode};
 use crate::rendering::common::coordinate_systems;
-use glam::{Vec3, Vec3A};
-use itertools::Itertools;
-use rapier3d::control::KinematicCharacterController;
-use rapier3d::prelude::*;
-use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, OnceLock, Weak};
 
 pub struct PhysicsState {
     app: Weak<GameApplication>,
@@ -18,6 +20,10 @@ pub struct PhysicsState {
     character_controller: KinematicCharacterController,
     character_controller_collider: Option<ColliderHandle>,
     adt_nodes: Vec<(Weak<ADTNode>, TerrainTileColliders)>,
+    wmo_doodads: Vec<(
+        Weak<WMONode>,
+        Arc<Mutex<Vec<(Weak<M2Node>, ColliderHandle)>>>,
+    )>,
 }
 
 impl PhysicsState {
@@ -32,6 +38,7 @@ impl PhysicsState {
                 ..KinematicCharacterController::default()
             },
             character_controller_collider: None,
+            wmo_doodads: vec![],
         }
     }
 
@@ -79,10 +86,20 @@ impl PhysicsState {
 
             // At this point, there has to be a value within adt_nodes that has the terrain colliders
             // TODO: maybe some rust magic (e.g. interior mutability?) would allow us to pull out "nodes"
-            self.process_direct_doodads(handle, adt, &weak);
+            let colliders = self
+                .adt_nodes
+                .iter_mut()
+                .find(|entry| entry.0.ptr_eq(&weak))
+                .expect("Logical error")
+                .1
+                .doodad_colliders
+                .clone();
+
+            self.process_direct_doodads(handle, &adt.doodads, colliders);
+            self.process_wmo_doodads(handle, adt);
         }
 
-        for (weak, tile_colliders) in &self.adt_nodes {
+        for (weak, tile_colliders) in self.adt_nodes.deref() {
             if weak.upgrade().is_none() {
                 for &collider in &tile_colliders.terrain_colliders {
                     self.physics_simulator.drop_collider(collider, false);
@@ -94,23 +111,54 @@ impl PhysicsState {
         }
     }
 
-    fn process_direct_doodads(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>, weak: &Weak<ADTNode>) {
-        let nodes = self
-            .adt_nodes
-            .iter_mut()
-            .find(|entry| entry.0.ptr_eq(weak))
-            .expect("Logical error");
 
-        for doodad in &adt.doodads {
+    fn process_wmo_doodads(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>) {
+        for wmo_ref in &adt.wmos {
+            let resolved_wmo = wmo_ref.reference.reference.read().expect("poisoned lock");
+            if let Some(wmo) = resolved_wmo.deref() {
+                let weak_wmo = Arc::downgrade(wmo);
+
+                if !self
+                    .wmo_doodads
+                    .iter_mut()
+                    .any(|entry| entry.0.ptr_eq(&weak_wmo))
+                {
+                    // No collider for that wmo yet, but we have resolved the reference, so we can submit collision handles.
+                    self.wmo_doodads
+                        .push((weak_wmo.clone(), Default::default()));
+                }
+
+                let colliders = self
+                    .wmo_doodads
+                    .iter_mut()
+                    .find(|entry| entry.0.ptr_eq(&weak_wmo))
+                    .expect("Logical error")
+                    .1
+                    .clone();
+
+                self.process_direct_doodads(handle, &wmo.doodads, colliders);
+            }
+        }
+    }
+
+    fn process_direct_doodads(
+        &mut self,
+        handle: RigidBodyHandle,
+        doodads: &Vec<Arc<DoodadReference>>,
+        doodad_colliders: Arc<Mutex<Vec<(Weak<M2Node>, ColliderHandle)>>>,
+    ) {
+        for doodad in doodads {
             let resolved_doodad = doodad.reference.reference.read().expect("poisoned lock");
             if let Some(dad) = resolved_doodad.deref() {
                 let weak_dad = Arc::downgrade(dad);
-                if !nodes
-                    .1
-                    .doodad_colliders
+
+                let has_collider_for_key = doodad_colliders
+                    .lock()
+                    .expect("poisoned lock")
                     .iter()
-                    .any(|dac| dac.0.ptr_eq(&weak_dad))
-                {
+                    .any(|dac| dac.0.ptr_eq(&weak_dad));
+
+                if !has_collider_for_key {
                     // doodad has been resolved and hasn't been added to the physics scene yet
 
                     // We need to counter convert because physics seem to have a different coordinate system.
@@ -129,7 +177,16 @@ impl PhysicsState {
                         .insert_colliders(vec![doodad_collider], handle)
                         .first()
                         .unwrap();
-                    nodes.1.doodad_colliders.push((weak_dad, doodad_handle));
+
+                    doodad_colliders
+                        .lock()
+                        .expect("poisoned lock")
+                        .push((weak_dad, doodad_handle));
+
+                    log::trace!(
+                        "Adding Doodad collider for {}",
+                        doodad.reference.reference_str
+                    );
                 }
             }
         }
