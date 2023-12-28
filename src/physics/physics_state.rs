@@ -10,7 +10,9 @@ use crate::game::application::GameApplication;
 use crate::physics::character_movement_information::CharacterMovementInformation;
 use crate::physics::physics_simulator::PhysicsSimulator;
 use crate::physics::terrain_tile_colliders::TerrainTileColliders;
-use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, M2Node, TerrainTile, WMONode};
+use crate::rendering::asset_graph::nodes::adt_node::{
+    ADTNode, DoodadReference, IRMesh, M2Node, NodeReference, TerrainTile, WMOGroupNode, WMONode,
+};
 use crate::rendering::common::coordinate_systems;
 
 pub struct PhysicsState {
@@ -23,6 +25,10 @@ pub struct PhysicsState {
     wmo_doodads: Vec<(
         Weak<WMONode>,
         Arc<Mutex<Vec<(Weak<M2Node>, ColliderHandle)>>>,
+    )>,
+    wmo_colliders: Vec<(
+        Weak<WMONode>,
+        Arc<Mutex<Vec<(Weak<WMOGroupNode>, ColliderHandle)>>>,
     )>,
 }
 
@@ -39,6 +45,7 @@ impl PhysicsState {
             },
             character_controller_collider: None,
             wmo_doodads: vec![],
+            wmo_colliders: vec![],
         }
     }
 
@@ -79,13 +86,9 @@ impl PhysicsState {
                 let collider_handles = self.physics_simulator.insert_colliders(colliders, handle);
                 self.adt_nodes
                     .push((weak.clone(), TerrainTileColliders::new(collider_handles)));
-
-                // TODO: add wmo doodad colliders
-                // TODO: add wmo colliders
             }
 
             // At this point, there has to be a value within adt_nodes that has the terrain colliders
-            // TODO: maybe some rust magic (e.g. interior mutability?) would allow us to pull out "nodes"
             let colliders = self
                 .adt_nodes
                 .iter_mut()
@@ -97,6 +100,7 @@ impl PhysicsState {
 
             self.process_direct_doodads(handle, &adt.doodads, colliders);
             self.process_wmo_doodads(handle, adt);
+            self.process_wmos(handle, adt);
         }
 
         for (weak, tile_colliders) in self.adt_nodes.deref() {
@@ -105,12 +109,93 @@ impl PhysicsState {
                     self.physics_simulator.drop_collider(collider, false);
                 }
 
-                // TODO: Remove entry
-                // TODO: drop wmo colliders
+                // TODO: Drop all other colliders and remove entries.
             }
         }
     }
 
+    fn process_wmos(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>) {
+        for wmo_ref in &adt.wmos {
+            let resolved_wmo = wmo_ref.reference.reference.read().expect("poisoned lock");
+            if let Some(wmo) = resolved_wmo.deref() {
+                let weak_wmo = Arc::downgrade(wmo);
+
+                if !self
+                    .wmo_colliders
+                    .iter_mut()
+                    .any(|entry| entry.0.ptr_eq(&weak_wmo))
+                {
+                    self.wmo_colliders
+                        .push((weak_wmo.clone(), Default::default()));
+                }
+
+                let colliders = self
+                    .wmo_colliders
+                    .iter_mut()
+                    .find(|entry| entry.0.ptr_eq(&weak_wmo))
+                    .expect("Logical error")
+                    .1
+                    .clone();
+
+                let wmo_root_translation: Vec3A = wmo_ref.transform.translation;
+                self.process_wmo_groups(handle, wmo_root_translation, &wmo.subgroups, colliders);
+            }
+        }
+    }
+
+    // TODO: maybe make this method generic.
+    fn process_wmo_groups(
+        &mut self,
+        handle: RigidBodyHandle,
+        wmo_root_translation: Vec3A,
+        groups: &Vec<Arc<NodeReference<WMOGroupNode>>>,
+        colliders: Arc<Mutex<Vec<(Weak<WMOGroupNode>, ColliderHandle)>>>,
+    ) {
+        for group_reference in groups {
+            let resolved_group = group_reference.reference.read().expect("poisoned lock");
+            if let Some(group) = resolved_group.deref() {
+                let weak_grp = Arc::downgrade(group);
+
+                let has_collider_for_key = colliders
+                    .lock()
+                    .expect("poisoned lock")
+                    .iter()
+                    .any(|dac| dac.0.ptr_eq(&weak_grp));
+
+                if !has_collider_for_key {
+                    // Technically, these aren't multiple batches, just multiple LoD levels.
+                    let mesh_lock = group.mesh_batches.first().expect("at least one LoD level");
+                    let mesh = mesh_lock.read().expect("poisoned lock");
+
+                    // TODO: maybe this also needs to be done for the actual rotation?
+                    // We need to counter convert because physics seem to have a different coordinate system.
+                    let doodad_position: Vec3 = coordinate_systems::blender_to_adt(wmo_root_translation).into();
+
+                    let mut doodad_collider: Collider = mesh.deref().into();
+                    doodad_collider.set_position(doodad_position.into());
+
+                    // TODO: This is questionable. Should all doodads be their own, but fixed, rigid body or part
+                    //  of the terrain body. The latter sounds more reasonable for most cases, provided the physics
+                    //  engine can handle that.
+                    let doodad_handle: ColliderHandle = *self
+                        .physics_simulator
+                        .insert_colliders(vec![doodad_collider], handle)
+                        .first()
+                        .unwrap();
+
+                    colliders
+                        .lock()
+                        .expect("poisoned lock")
+                        .push((weak_grp, doodad_handle));
+
+                    log::trace!(
+                        "Adding collider for WMO Group {}",
+                        group_reference.reference_str
+                    );
+                }
+            }
+        }
+    }
 
     fn process_wmo_doodads(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>) {
         for wmo_ref in &adt.wmos {
@@ -160,8 +245,8 @@ impl PhysicsState {
 
                 if !has_collider_for_key {
                     // doodad has been resolved and hasn't been added to the physics scene yet
-
                     // We need to counter convert because physics seem to have a different coordinate system.
+                    // TODO: rotation too?
                     let doodad_position: Vec3 =
                         coordinate_systems::blender_to_adt(doodad.transform.to_scale_rotation_translation().2.into())
                             .into();
@@ -289,36 +374,24 @@ impl PhysicsState {
     }
 }
 
+// TODO: We have differing implementations of From<T> for Collider. Some set the position, some don't
 impl From<&TerrainTile> for Collider {
     fn from(value: &TerrainTile) -> Self {
-        let meshlock = value.mesh.read().expect("Mesh RLock");
-        let vertices = meshlock
-            .data
-            .vertex_buffers
-            .position_buffer
-            .iter()
-            .map(|&vert| vert.into())
-            .collect();
-
-        let indices = meshlock
-            .data
-            .index_buffer
-            .clone()
-            .into_iter()
-            .array_chunks()
-            .collect();
-
-        ColliderBuilder::trimesh(vertices, indices)
-            .position(Into::<Vec3>::into(value.position).into())
-            .build()
+        let mut collider: Collider = value.mesh.read().expect("Mesh RLock").deref().into();
+        collider.set_position(Into::<Vec3>::into(value.position).into());
+        collider
     }
 }
 
-// TODO: We have differing implementations of From<T> for Collider. Some set the position, some don't
 impl From<&M2Node> for Collider {
     fn from(value: &M2Node) -> Self {
-        let meshlock = value.mesh.read().expect("Mesh RLock");
-        let vertices = meshlock
+        value.mesh.read().expect("Mesh RLock").deref().into()
+    }
+}
+
+impl From<&IRMesh> for Collider {
+    fn from(value: &IRMesh) -> Self {
+        let vertices = value
             .data
             .vertex_buffers
             .position_buffer
@@ -326,7 +399,7 @@ impl From<&M2Node> for Collider {
             .map(|&vert| vert.into())
             .collect();
 
-        let indices = meshlock
+        let indices = value
             .data
             .index_buffer
             .clone()

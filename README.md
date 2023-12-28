@@ -19,10 +19,10 @@ a lot of `// TODO:` comments everywhere I have an idea while coding).
 
 ### Roadmap
 Things that still need to be implemented (loosely sorted by priority):
-- Physics
-  - WMO streaming
-- Third Person Camera Controller (and sending `MOVE_FACING` packets)
 - Rendering of the terrain material (create a dedicated shader)
+- Physics: Cleaning up, debug rendering (because I think the shapes are mis-rotated or placed),
+  debugging crashes once the above is accomplished.
+- Third Person Camera Controller (and sending `MOVE_FACING` packets)
 - Entity Component System (hecs?) to keep track of all the gameobjects (moving geometry), especially NPCs
   - Rendering thereof
 - Reading of DBC files, especially in preparation for:
