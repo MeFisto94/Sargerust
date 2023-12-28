@@ -1,4 +1,4 @@
-use crate::rendering::asset_graph::nodes::adt_node::{M2Node, WMONode};
+use crate::rendering::asset_graph::nodes::adt_node::M2Node;
 use rapier3d::prelude::ColliderHandle;
 use std::sync::{Arc, Mutex, Weak};
 

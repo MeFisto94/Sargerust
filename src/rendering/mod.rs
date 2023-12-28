@@ -51,7 +51,9 @@ pub fn add_terrain_chunks(
     for (position, _mesh) in terrain_chunk {
         let mesh = Rend3BackendConverter::create_mesh_from_ir(_mesh).unwrap();
 
-        let mesh_handle = renderer.add_mesh(mesh);
+        let mesh_handle = renderer
+            .add_mesh(mesh)
+            .expect("Creating the mesh is successful");
 
         // TODO: here, the renderer defines the material for the terrain, but why? It should be stored outside of terrain_chunk maybe because it applies for every ADT tile at least? Perspectively...
         let _material = Material {
@@ -96,7 +98,9 @@ pub fn add_wmo_groups<'a, W>(
             // One "lod" has it's own material here, but technically it's a wmo group batch.
             for (i, material) in materials.iter().enumerate() {
                 let mesh = Rend3BackendConverter::create_mesh_from_ir_lod(lod_mesh, i).unwrap();
-                let mesh_handle = renderer.add_mesh(mesh);
+                let mesh_handle = renderer
+                    .add_mesh(mesh)
+                    .expect("Creating the mesh is successful");
 
                 // TODO: concept work for textures
                 let blp_opt = match &material.albedo {
@@ -104,9 +108,11 @@ pub fn add_wmo_groups<'a, W>(
                     _ => None,
                 };
 
-                let mapped_tex = blp_opt
-                    .as_ref()
-                    .map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
+                let mapped_tex = blp_opt.as_ref().map(|tex| {
+                    renderer
+                        .add_texture_2d(create_texture_rgba8(tex, 0))
+                        .expect("Creating the texture is successful")
+                });
                 let material = Rend3BackendConverter::create_material_from_ir(material, mapped_tex);
                 let material_handle = renderer.add_material(material);
 
@@ -128,13 +134,14 @@ pub fn add_placed_doodads(
         let m2 = dad.m2.deref();
         // Create mesh and calculate smooth normals based on vertices
         let mesh = Rend3BackendConverter::create_mesh_from_ir(&m2.mesh).unwrap();
-        let mesh_handle = renderer.add_mesh(mesh);
+        let mesh_handle = renderer.add_mesh(mesh).expect("Mesh creation successful");
 
         // TODO: concept work for textures
-        let mapped_tex = m2
-            .blp_opt
-            .as_ref()
-            .map(|tex| renderer.add_texture_2d(create_texture_rgba8(tex, 0)));
+        let mapped_tex = m2.blp_opt.as_ref().map(|tex| {
+            renderer
+                .add_texture_2d(create_texture_rgba8(tex, 0))
+                .expect("Texture creation successful")
+        });
         let material = Rend3BackendConverter::create_material_from_ir(&m2.material, mapped_tex);
         let material_handle = renderer.add_material(material);
 

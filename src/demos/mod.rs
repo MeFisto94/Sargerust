@@ -13,7 +13,9 @@ use glam::{Affine3A, DVec2, Mat4, Vec3, Vec3A};
 use image_blp::BlpImage;
 use itertools::Itertools;
 use log::{trace, warn};
+use rend3::types::SampleCount;
 use rend3::util::typedefs::FastHashMap;
+use rend3_routine::base::{BaseRenderGraphRoutines, OutputRenderTarget};
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::ADTAsset;
 use sargerust_files::m2::reader::M2Reader;
@@ -104,6 +106,7 @@ pub fn render<'a, W>(
         &mut data_core,
         &spp,
         &base_rendergraph.interfaces,
+        &base_rendergraph.gpu_culler.culling_buffer_map_handle,
     );
     drop(data_core);
     let tonemapping_routine = rend3_routine::tonemapping::TonemappingRoutine::new(
@@ -253,20 +256,29 @@ pub fn render<'a, W>(
             let frame_handle = graph.add_imported_render_target(
                 &frame,
                 0..1,
+                0..1,
                 rend3::graph::ViewportRect::from_size(resolution),
             );
             // Add the default rendergraph without a skybox
             base_rendergraph.add_to_graph(
                 &mut graph,
-                &eval_output,
-                &pbr_routine,
-                None,
-                &tonemapping_routine,
-                frame_handle,
-                resolution,
-                rend3::types::SampleCount::One,
-                glam::Vec4::ZERO,
-                glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+                rend3_routine::base::BaseRenderGraphInputs {
+                    eval_output: &eval_output,
+                    routines: BaseRenderGraphRoutines {
+                        pbr: &pbr_routine,
+                        skybox: None,
+                        tonemapping: &tonemapping_routine,
+                    },
+                    target: OutputRenderTarget {
+                        handle: frame_handle,
+                        resolution,
+                        samples: SampleCount::One,
+                    },
+                },
+                rend3_routine::base::BaseRenderGraphSettings {
+                    ambient_color: glam::Vec4::ZERO,
+                    clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+                },
             );
 
             // Dispatch a render using the built up rendergraph!

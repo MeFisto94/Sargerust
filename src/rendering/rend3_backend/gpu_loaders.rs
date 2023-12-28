@@ -14,7 +14,9 @@ pub fn gpu_load_mesh(renderer: &Arc<Renderer>, mesh: &RwLock<IRMesh>) -> MeshHan
 
     let mut mesh_lock = mesh.write().expect("Mesh Write Lock");
     let render_mesh = Rend3BackendConverter::create_mesh_from_ir(&mesh_lock.data).expect("Mesh building successful");
-    let mesh_handle = renderer.add_mesh(render_mesh);
+    let mesh_handle = renderer
+        .add_mesh(render_mesh)
+        .expect("Mesh creation successful");
     mesh_lock.deref_mut().handle = Some(mesh_handle.clone());
     mesh_handle
 }
@@ -71,7 +73,9 @@ pub fn gpu_load_texture(
 
     let tex = tex_iwlock.as_mut().expect("unreachable!");
     let texture = Rend3BackendConverter::create_texture_from_ir(&tex.data, 0);
-    let texture_handle = renderer.add_texture_2d(texture);
+    let texture_handle = renderer
+        .add_texture_2d(texture)
+        .expect("Texture creation successful");
     tex.handle = Some(texture_handle.clone());
     Some(texture_handle)
 }

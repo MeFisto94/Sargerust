@@ -660,20 +660,28 @@ impl rend3_framework::App for RenderingApplication {
                 let frame_handle = graph.add_imported_render_target(
                     &frame,
                     0..1,
+                    0..1,
                     rend3::graph::ViewportRect::from_size(resolution),
                 );
-                // Add the default rendergraph without a skybox
                 base_rendergraph.add_to_graph(
                     &mut graph,
-                    &eval_output,
-                    &pbr_routine,
-                    None,
-                    &tonemapping_routine,
-                    frame_handle,
-                    resolution,
-                    self.sample_count(),
-                    Vec4::ZERO,
-                    Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+                    rend3_routine::base::BaseRenderGraphInputs {
+                        eval_output: &eval_output,
+                        routines: BaseRenderGraphRoutines {
+                            pbr: &pbr_routine,
+                            skybox: None,
+                            tonemapping: &tonemapping_routine,
+                        },
+                        target: OutputRenderTarget {
+                            handle: frame_handle,
+                            resolution,
+                            samples: SampleCount::One,
+                        },
+                    },
+                    rend3_routine::base::BaseRenderGraphSettings {
+                        ambient_color: glam::Vec4::ZERO,
+                        clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+                    },
                 );
 
                 // Dispatch a render using the built up rendergraph!
