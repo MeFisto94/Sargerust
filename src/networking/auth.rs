@@ -8,7 +8,7 @@ use wow_login_messages::version_8::{
 use wow_login_messages::version_8::{
     CMD_AUTH_LOGON_PROOF_Server, CMD_AUTH_LOGON_PROOF_Server_LoginResult, CMD_REALM_LIST_Client, CMD_REALM_LIST_Server,
 };
-use wow_login_messages::ClientMessage;
+use wow_login_messages::{ClientMessage, Message};
 use wow_srp::client::SrpClientChallenge;
 use wow_srp::normalized_string::NormalizedString;
 use wow_srp::{PublicKey, SESSION_KEY_LENGTH};

@@ -3825,13 +3825,14 @@ dependencies = [
 
 [[package]]
 name = "wow_login_messages"
-version = "0.3.0"
-source = "git+https://github.com/gtker/wow_messages#404ade384d8cc00f58e882f4637804af13071094"
+version = "0.4.0"
+source = "git+https://github.com/gtker/wow_messages#fa87331ca369e7cfe557e6e1c25c7a758669da84"
 
 [[package]]
 name = "wow_srp"
-version = "0.6.0"
-source = "git+https://github.com/gtker/wow_srp?rev=7b019d589bdd11e7b206d250c4b85b968d3945ee#7b019d589bdd11e7b206d250c4b85b968d3945ee"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc239609a34604bf1c3fc5c00ce4c9534acea0413f98af3a19d66184b0a3787d"
 dependencies = [
  "hmac",
  "num-bigint",
@@ -3841,13 +3842,13 @@ dependencies = [
 
 [[package]]
 name = "wow_world_base"
-version = "0.1.1"
-source = "git+https://github.com/gtker/wow_messages#404ade384d8cc00f58e882f4637804af13071094"
+version = "0.2.0"
+source = "git+https://github.com/gtker/wow_messages#fa87331ca369e7cfe557e6e1c25c7a758669da84"
 
 [[package]]
 name = "wow_world_messages"
-version = "0.1.0"
-source = "git+https://github.com/gtker/wow_messages#404ade384d8cc00f58e882f4637804af13071094"
+version = "0.2.0"
+source = "git+https://github.com/gtker/wow_messages#fa87331ca369e7cfe557e6e1c25c7a758669da84"
 dependencies = [
  "flate2",
  "wow_srp",

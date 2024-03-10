@@ -53,7 +53,6 @@ impl GameApplication {
         let ws = self.world_server.as_ref().unwrap().clone();
         let net_thread = std::thread::Builder::new()
             .name("Network".into())
-            .stack_size(8000000)
             .spawn(move || {
                 ws.run();
             })
