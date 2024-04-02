@@ -2,7 +2,6 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use glam::{Vec3, Vec3A};
-use itertools::Itertools;
 use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
 

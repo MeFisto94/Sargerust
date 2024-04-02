@@ -21,11 +21,11 @@ opt-level = 3
 
 [dependencies]
 # Logging, but getting rid of the regex feature/dependency for regex filters.
-env_logger = { version = "0.10", default-features = false, features = ["auto-color", "humantime"] }
-log = "0.4.20"
+env_logger = { version = "0.11.3", default-features = false, features = ["auto-color", "humantime"] }
+log = "0.4.21"
 
 # Error handling
-anyhow = "1.0.75"
+anyhow = "1.0.81"
 
 # asset parsing
 mpq = { path = "mpq-rust" } # mpq = "0.8"
@@ -34,7 +34,7 @@ sargerust-files = { path = "sargerust-files", features = ["wotlk"] }
 
 # For the Rendering/Game Engine
 # Linear algebra library
-glam = { version = "0.24", features = ["approx"] }
+glam = { version = "0.24.2", features = ["approx"] }
 # Renderer core
 rend3 = { git = "https://github.com/BVE-Reborn/rend3" }
 # Programmable render list that dictates how the scene renders
@@ -47,8 +47,8 @@ pollster = "0.3"
 winit = "0.28"
 
 # collect_vec and other niceities
-itertools = "0.11.0"
-quick_cache = "0.4.0"
+itertools = "0.12.1"
+quick_cache = "0.4.2"
 
 # Multiplayer/Networking
 # "srp-fast-math" is not supported with the MSVC target. Also the version needs to match the version defined in the messages
@@ -63,7 +63,7 @@ tokio = { version = "1.33.0", features = ["full"] }
 dashmap = "5.5.3"
 
 # Physics Engine
-rapier3d = { version = "0.17.2", features = ["simd-nightly"] }
+rapier3d = { version = "0.18.0", features = ["simd-nightly"] }
 nalgebra = { features = ["convert-glam024"] } # TODO: match version with rapier3d.
 
 [patch.crates-io]

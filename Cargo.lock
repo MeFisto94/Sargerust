@@ -92,10 +92,58 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.77"
+name = "anstream"
+version = "0.6.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9d19de80eff169429ac1e9f48fffb163916b448a44e8e046186232046d9e1f9"
+checksum = "d96bd03f33fe50a863e394ee9718a706f988b9079b20c3784fb726e7678b62fb"
+dependencies = [
+ "anstyle",
+ "anstyle-parse",
+ "anstyle-query",
+ "anstyle-wincon",
+ "colorchoice",
+ "utf8parse",
+]
+
+[[package]]
+name = "anstyle"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8901269c6307e8d93993578286ac0edf7f195079ffff5ebdeea6a59ffb7e36bc"
+
+[[package]]
+name = "anstyle-parse"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c75ac65da39e5fe5ab759307499ddad880d724eed2f6ce5b5e8a26f4f387928c"
+dependencies = [
+ "utf8parse",
+]
+
+[[package]]
+name = "anstyle-query"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e28923312444cdd728e4738b3f9c9cac739500909bb3d3c94b43551b16517648"
+dependencies = [
+ "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "anstyle-wincon"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cd54b81ec8d6180e24654d0b371ad22fc3dd083b6ff8ba325b72e00c87660a7"
+dependencies = [
+ "anstyle",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "anyhow"
+version = "1.0.81"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0952808a6c2afd1aa8947271f3a60f1a6763c7b912d210184c5149b5cf147247"
 
 [[package]]
 name = "approx"
@@ -312,6 +360,12 @@ name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
+
+[[package]]
+name = "colorchoice"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
 name = "com-rs"
@@ -644,6 +698,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a009aa4810eb158359dda09d0c87378e4bbb89b5a801f016885a4707ba24f7ea"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -653,6 +716,19 @@ dependencies = [
  "is-terminal",
  "log",
  "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38b35839ba51819680ba087cd351788c9a3c476841207e0b8cee0b04722343b9"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "env_filter",
+ "humantime",
+ "log",
 ]
 
 [[package]]
@@ -1235,9 +1311,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.11.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
@@ -1399,9 +1475,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.20"
+version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
+checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
 
 [[package]]
 name = "malloc_buf"
@@ -1703,13 +1779,13 @@ dependencies = [
 
 [[package]]
 name = "num-derive"
-version = "0.3.3"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "876a53fff98e03a936a674b29568b0e605f06b29372c2489ff4de23f1949743d"
+checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.43",
 ]
 
 [[package]]
@@ -1988,9 +2064,9 @@ dependencies = [
 
 [[package]]
 name = "parry3d"
-version = "0.13.5"
+version = "0.13.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b55dc0e6db79bddbc5fd583569f7356cdcc63e1e9b2b93a9ab70dd8e717160e0"
+checksum = "6ccba18a65dba56c08dadfa936e0c9efbc883b3a26dc77d2685f78be10f7667c"
 dependencies = [
  "approx",
  "arrayvec",
@@ -2169,9 +2245,9 @@ dependencies = [
 
 [[package]]
 name = "quick_cache"
-version = "0.4.0"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f69f8d22fa3f34f3083d9a4375c038732c7a7e964de1beb81c544da92dfc40b8"
+checksum = "b1380629287ed1247c1e0fcc6d43efdcec508b65382c9ab775cc8f3df7ca07b0"
 dependencies = [
  "ahash",
  "equivalent",
@@ -2226,9 +2302,9 @@ checksum = "9c8a99fddc9f0ba0a85884b8d14e3592853e787d581ca1816c91349b10e4eeab"
 
 [[package]]
 name = "rapier3d"
-version = "0.17.2"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62a8a0bd9d3135f7b4eb45d0796540e7bab47b6b7c974f90567ccc5a0454f42b"
+checksum = "92d07a833e0aa3bc57010caaa50bf75fa78afc03a74207607db740da4e4579a1"
 dependencies = [
  "approx",
  "arrayvec",
@@ -2349,7 +2425,7 @@ dependencies = [
  "cfg-if",
  "console_error_panic_hook",
  "console_log",
- "env_logger",
+ "env_logger 0.10.1",
  "glam",
  "js-sys",
  "log",
@@ -2553,7 +2629,7 @@ dependencies = [
  "encase",
  "encase_derive",
  "encase_derive_impl",
- "env_logger",
+ "env_logger 0.11.3",
  "glam",
  "image-blp",
  "itertools",
@@ -3194,6 +3270,12 @@ dependencies = [
  "idna",
  "percent-encoding",
 ]
+
+[[package]]
+name = "utf8parse"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "vcpkg"
