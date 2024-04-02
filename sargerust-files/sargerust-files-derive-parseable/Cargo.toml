@@ -1,7 +1,8 @@
 [package]
 name = "sargerust-files-derive-parseable"
-version = "0.1.0"
 edition = "2021"
+publish = false
+version = "0.1.0"
 
 [lib]
 proc-macro = true
@@ -9,7 +10,7 @@ proc-macro = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-syn = { version = "1", features = ["derive", "parsing" ]}
+syn = { version = "1", features = ["derive", "parsing"] }
 quote = "1"
 proc-macro2 = "1"
 proc-macro-crate = "1.3"
