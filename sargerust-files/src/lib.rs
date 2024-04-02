@@ -31,7 +31,6 @@ pub enum ParserError {
 
 pub mod adt;
 pub mod common;
-pub mod highlevel;
 pub mod m2;
 pub mod wdt;
 pub mod wmo;
