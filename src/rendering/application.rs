@@ -16,7 +16,7 @@ use rend3::types::{
 use rend3::util::typedefs::FastHashMap;
 use rend3::Renderer;
 use rend3_framework::{DefaultRoutines, Event, Grabber, UserResizeEvent};
-use rend3_routine::base::BaseRenderGraph;
+use rend3_routine::base::{BaseRenderGraph, BaseRenderGraphRoutines, OutputRenderTarget};
 use winit::event::{ElementState, KeyboardInput, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
