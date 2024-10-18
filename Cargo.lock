@@ -865,15 +865,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "framexml-parser"
-version = "0.1.0"
-dependencies = [
- "quick-xml",
- "serde",
- "serde_derive",
-]
-
-[[package]]
 name = "futures-channel"
 version = "0.3.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1586,9 +1577,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.10"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3d0b296e374a4e6f3c7b0a1f5a51d748a0d34c85e7dc48fc3fa9a87657fe09"
+checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
 dependencies = [
  "libc",
  "log",
@@ -2253,16 +2244,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "quick-xml"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eff6510e86862b57b210fd8cbe8ed3f0d7d600b9c2863cd4549a2e033c66e956"
-dependencies = [
- "memchr",
- "serde",
-]
-
-[[package]]
 name = "quick_cache"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2665,9 +2646,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dashmap",
- "encase",
- "encase_derive",
- "encase_derive_impl",
  "env_logger 0.11.3",
  "glam",
  "image-blp",
