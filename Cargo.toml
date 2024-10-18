@@ -47,8 +47,8 @@ pollster = "0.3"
 winit = "0.28"
 
 # collect_vec and other niceities
-itertools = "0.12.1"
-quick_cache = "0.4.2"
+itertools = "0.13.0"
+quick_cache = "0.6.9"
 
 # Multiplayer/Networking
 # "srp-fast-math" is not supported with the MSVC target. Also the version needs to match the version defined in the messages
@@ -60,7 +60,7 @@ wow_world_messages = { git = "https://github.com/gtker/wow_messages", features =
 tokio = { version = "1.33.0", features = ["full"] }
 
 # replacing RwLock<HashMap<_>>, especially in the resolvers, that had held a global hashmap lock when inserting, massively impacting parallelity
-dashmap = "5.5.3"
+dashmap = "6.1.0"
 
 # Physics Engine
 rapier3d = { version = "0.22.0", features = ["simd-nightly"] }
