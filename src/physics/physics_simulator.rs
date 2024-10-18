@@ -8,7 +8,7 @@ pub struct PhysicsSimulator {
     physics_pipeline: PhysicsPipeline,
     island_manager: IslandManager,
     ccd_solver: CCDSolver,
-    broad_phase: BroadPhase,
+    broad_phase: BroadPhaseMultiSap,
     narrow_phase: NarrowPhase,
     gravity: Vector<Real>,
     rigid_body_set: RigidBodySet,
@@ -26,7 +26,7 @@ impl Default for PhysicsSimulator {
             integration_parameters: IntegrationParameters::default(),
             physics_pipeline: PhysicsPipeline::new(),
             island_manager: IslandManager::new(),
-            broad_phase: BroadPhase::new(),
+            broad_phase: BroadPhaseMultiSap::new(),
             narrow_phase: NarrowPhase::new(),
             // impulse and multibody joint set.
             ccd_solver: CCDSolver::new(),
@@ -134,18 +134,16 @@ impl PhysicsSimulator {
         );
 
         // kick away other objects.
-        for collision in collisions.iter() {
-            controller.solve_character_collision_impulses(
-                self.integration_parameters.dt,
-                &mut self.rigid_body_set,
-                &self.collider_set,
-                &self.queries,
-                collider.shape(),
-                mass,
-                collision,
-                QueryFilter::default().exclude_collider(collider_handle),
-            );
-        }
+        controller.solve_character_collision_impulses(
+            self.integration_parameters.dt,
+            &mut self.rigid_body_set,
+            &self.collider_set,
+            &self.queries,
+            collider.shape(),
+            mass,
+            &collisions,
+            QueryFilter::default().exclude_collider(collider_handle),
+        );
 
         movement
     }

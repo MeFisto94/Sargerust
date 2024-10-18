@@ -25,7 +25,7 @@ env_logger = { version = "0.11.3", default-features = false, features = ["auto-c
 log = "0.4.21"
 
 # Error handling
-anyhow = "1.0.81"
+anyhow = "1.0.86"
 
 # asset parsing
 mpq = { path = "mpq-rust" } # mpq = "0.8"
@@ -63,8 +63,5 @@ tokio = { version = "1.33.0", features = ["full"] }
 dashmap = "5.5.3"
 
 # Physics Engine
-rapier3d = { version = "0.18.0", features = ["simd-nightly"] }
-nalgebra = { features = ["convert-glam024"] } # TODO: match version with rapier3d.
-
-[patch.crates-io]
-simba = { git = "https://github.com/dimforge/simba" } # https://github.com/dimforge/simba/issues/50 and after that, nalgebra and rapier3d need to be updated
+rapier3d = { version = "0.22.0", features = ["simd-nightly"] }
+nalgebra = { version = "0.33.1", features = ["convert-glam024"] } # Match version with rapier3d.
