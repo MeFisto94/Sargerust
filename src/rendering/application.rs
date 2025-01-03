@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use std::hash::BuildHasher;
 use std::ops::DerefMut;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, RwLock, Weak};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock, Weak};
 use std::time::Instant;
 use winit::event::Event;
 
@@ -11,6 +11,8 @@ use crate::game::application::GameApplication;
 use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, IRMaterial, IRTextureReference};
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
+use crate::rendering::rend3_backend::material::terrain::terrain_material::TerrainMaterial;
+use crate::rendering::rend3_backend::material::terrain::terrain_routine::TerrainRoutine;
 use crate::rendering::rend3_backend::{Rend3BackendConverter, gpu_loaders};
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
@@ -21,9 +23,15 @@ use rend3::types::{
     TextureFormat,
 };
 use rend3::util::typedefs::FastHashMap;
-use rend3::Renderer;
-use rend3_framework::{DefaultRoutines, Event, Grabber, UserResizeEvent};
-use rend3_routine::base::{BaseRenderGraph, BaseRenderGraphRoutines, OutputRenderTarget};
+use rend3::{Renderer, ShaderPreProcessor};
+use rend3_framework::{DefaultRoutines, EventContext, Grabber, RedrawContext, SetupContext};
+use rend3_routine::base::{
+    BaseRenderGraph, BaseRenderGraphInputs, BaseRenderGraphIntermediateState, BaseRenderGraphRoutines,
+    BaseRenderGraphSettings, OutputRenderTarget,
+};
+use rend3_routine::common::CameraSpecifier;
+use rend3_routine::forward::ForwardRoutineArgs;
+use rend3_routine::{clear, forward};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::platform::scancode::PhysicalKeyExtScancode;
@@ -46,6 +54,8 @@ pub struct RenderingApplication {
     missing_texture_material: Option<MaterialHandle>,
     texture_still_loading_material: Option<MaterialHandle>,
     fly_cam: bool,
+
+    terrain_routine: Option<Mutex<TerrainRoutine>>,
 }
 
 impl RenderingApplication {
@@ -63,6 +73,7 @@ impl RenderingApplication {
             missing_texture_material: None,
             texture_still_loading_material: None,
             fly_cam: false,
+            terrain_routine: None,
         }
     }
 
@@ -253,7 +264,7 @@ impl RenderingApplication {
 
                     if !wmoref_rlock.is_empty() {
                         continue; // This is our "sign", that this subgroup has been rendered already.
-                                  // TODO: Allow for textures to be delay loaded, similar to doodads.
+                        // TODO: Allow for textures to be delay loaded, similar to doodads.
                     }
                 }
 
@@ -325,7 +336,11 @@ impl RenderingApplication {
             albedo: AlbedoType::Vertex { srgb: true },
             transparency: TransparencyType::Opaque,
         };
-        let material = Rend3BackendConverter::create_material_from_ir(&_material, None);
+
+        // TODO: Fix for the new custom shaders
+        //let material = Rend3BackendConverter::create_material_from_ir(&_material, None);
+        let material = TerrainMaterial {};
+
         let material_handle = renderer.add_material(material);
 
         for tile in &graph.terrain {
@@ -466,6 +481,21 @@ impl rend3_framework::App for RenderingApplication {
 
     fn register_logger(&mut self) {
         // intentionally no-opped.
+    }
+
+    fn create_base_rendergraph(&mut self, renderer: &Arc<Renderer>, spp: &mut ShaderPreProcessor) -> BaseRenderGraph {
+        let mut data_core = renderer.data_core.lock();
+        let render_graph = BaseRenderGraph::new(renderer, spp);
+        self.terrain_routine = Some(Mutex::new(TerrainRoutine::new(
+            renderer,
+            &mut data_core,
+            spp,
+            &render_graph.interfaces,
+        )));
+
+        drop(data_core);
+
+        render_graph
     }
 
     fn sample_count(&self) -> SampleCount {
@@ -670,6 +700,12 @@ impl rend3_framework::App for RenderingApplication {
         // Lock the routines
         let pbr_routine = rend3_framework::lock(&context.routines.pbr);
         let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
+        let terrain_routine = self
+            .terrain_routine
+            .as_ref()
+            .expect("terrain to be setup")
+            .lock()
+            .expect("Terrain Routine Lock");
 
         // Build a rendergraph
         let mut graph = rend3::graph::RenderGraph::new();
@@ -702,6 +738,7 @@ impl rend3_framework::App for RenderingApplication {
                 ambient_color: glam::Vec4::ZERO,
                 clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
             },
+            &terrain_routine,
         );
 
         // Dispatch a render using the built up rendergraph!
@@ -715,6 +752,7 @@ fn base_rendergraph_add_to_graph<'node>(
     graph: &mut RenderGraph<'node>,
     inputs: BaseRenderGraphInputs<'_, 'node>,
     settings: BaseRenderGraphSettings,
+    terrain_routine: &'node TerrainRoutine,
 ) {
     // Create the data and handles for the graph.
     let mut state = BaseRenderGraphIntermediateState::new(graph, inputs, settings);
@@ -731,6 +769,21 @@ fn base_rendergraph_add_to_graph<'node>(
 
     // Render all the shadows to the shadow map.
     state.pbr_shadow_rendering();
+
+    terrain_routine
+        .opaque_routine
+        .add_forward_to_graph(ForwardRoutineArgs {
+            graph: state.graph,
+            label: "Terrain Forward Pass",
+            camera: CameraSpecifier::Viewport,
+            binding_data: forward::ForwardRoutineBindingData {
+                whole_frame_uniform_bg: state.forward_uniform_bg,
+                per_material_bgl: &terrain_routine.per_material,
+                extra_bgs: None,
+            },
+            samples: state.inputs.target.samples,
+            renderpass: state.primary_renderpass.clone(),
+        });
 
     // Do the first pass, rendering the predicted triangles from last frame.
     state.pbr_render();

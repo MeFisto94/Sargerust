@@ -8,6 +8,8 @@ use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, V
 use crate::rendering::create_texture_rgba8;
 
 pub mod gpu_loaders;
+pub mod material;
+
 pub struct Rend3BackendConverter {}
 
 impl Rend3BackendConverter {
