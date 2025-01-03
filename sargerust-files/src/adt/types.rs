@@ -261,59 +261,83 @@ pub struct MCNKChunkHeader {
 #[derive(Debug)]
 pub struct MCNKChunk {
     pub header: MCNKChunkHeader,
-    pub(crate) sub_chunks: Vec<IffChunk>,
+    pub(crate) sub_chunks: Vec<u8>,
 }
 
 impl Parseable<MCNKChunk> for MCNKChunk {
     fn parse<R: Read>(rdr: &mut R) -> Result<MCNKChunk, ParserError> {
         let header = MCNKChunkHeader::parse(rdr)?;
 
-        let mut chunk_list = Vec::<IffChunk>::new();
-        let mut chunk_res = IffChunk::read_next_chunk(rdr);
-        while chunk_res.is_ok() {
-            chunk_list.push(chunk_res.unwrap());
-            chunk_res = IffChunk::read_next_chunk(rdr);
-        }
+        // Sadly, the sub-chunks are not laid out consecutively, so we have to read them as one and
+        // reinterpret them using the offsets of the header on demand.
 
-        // weird error handling because when EoF, we get that inside a parser error.
-        match chunk_res {
-            Err(ParserError::IOError(internal)) if internal.kind() == ErrorKind::UnexpectedEof => (),
-            err => return Err(err.unwrap_err()),
-        };
+        let mut sub_chunks = Vec::<u8>::new();
+        rdr.read_to_end(&mut sub_chunks)?;
 
-        Ok(MCNKChunk {
-            header,
-            sub_chunks: chunk_list,
-        })
+        Ok(MCNKChunk { header, sub_chunks })
     }
 }
 
 impl MCNKChunk {
     pub fn get_mcvt(&self) -> Result<Option<MCVTSubChunk>, ParserError> {
-        self.sub_chunks
-            .iter()
-            .filter(|&cnk| cnk.magic_str().eq("MCVT"))
-            .map(|cnk| read_chunk_array(&mut Cursor::new(&cnk.data)))
-            .next()
-            .transpose()
+        if self.header.ofsHeight == 0 {
+            return Ok(None);
+        }
+
+        let mut rdr = Cursor::new(&self.sub_chunks[(self.header.ofsHeight - 136) as usize..]);
+        let iff = IffChunk::read_next_chunk(&mut rdr)?;
+
+        if !iff.is_magic("MCVT") {
+            return Err(ParserError::InvalidMagicValue { magic: iff.magic });
+        }
+
+        Ok(Some(read_chunk_array(&mut Cursor::new(&iff.data))?))
     }
 
     pub fn get_mccv(&self) -> Result<Option<MCCVSubChunk>, ParserError> {
-        self.sub_chunks
-            .iter()
-            .filter(|&cnk| cnk.magic_str().eq("MCCV"))
-            .map(|cnk| read_chunk_array(&mut Cursor::new(&cnk.data)))
-            .next()
-            .transpose()
+        if self.header.ofsMCCV == 0 {
+            // TODO: check for flags has_mccv.
+            return Ok(None);
+        }
+
+        let mut rdr = Cursor::new(&self.sub_chunks[(self.header.ofsMCCV - 136) as usize..]);
+        let iff = IffChunk::read_next_chunk(&mut rdr)?;
+
+        if !iff.is_magic("MCCV") {
+            return Err(ParserError::InvalidMagicValue { magic: iff.magic });
+        }
+
+        Ok(Some(read_chunk_array(&mut Cursor::new(&iff.data))?))
     }
 
     pub fn get_mcnr(&self) -> Result<Option<MCNRSubChunk>, ParserError> {
-        self.sub_chunks
-            .iter()
-            .filter(|&cnk| cnk.magic_str().eq("MCNR"))
-            .map(|cnk| read_chunk_array(&mut Cursor::new(&cnk.data)))
-            .next()
-            .transpose()
+        if self.header.ofsNormal == 0 {
+            return Ok(None);
+        }
+
+        let mut rdr = Cursor::new(&self.sub_chunks[(self.header.ofsNormal - 136) as usize..]);
+        let iff = IffChunk::read_next_chunk(&mut rdr)?;
+
+        if !iff.is_magic("MCNR") {
+            return Err(ParserError::InvalidMagicValue { magic: iff.magic });
+        }
+
+        Ok(Some(read_chunk_array(&mut Cursor::new(&iff.data))?))
+    }
+
+    pub fn get_mcly(&self) -> Result<Option<MCLYSubChunk>, ParserError> {
+        if self.header.ofsLayer == 0 {
+            return Ok(None);
+        }
+
+        let mut rdr = Cursor::new(&self.sub_chunks[(self.header.ofsLayer - 136) as usize..]);
+        let iff = IffChunk::read_next_chunk(&mut rdr)?;
+
+        if !iff.is_magic("MCLY") {
+            return Err(ParserError::InvalidMagicValue { magic: iff.magic });
+        }
+
+        Ok(Some(read_chunk_array(&mut Cursor::new(&iff.data))?))
     }
 
     pub fn get_index_low(row: u8, column: u8) -> u8 {

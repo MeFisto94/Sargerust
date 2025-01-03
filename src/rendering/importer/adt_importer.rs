@@ -25,12 +25,13 @@ impl ADTImporter {
         let mut position_buffer = Vec::new();
         let mut vertex_color_0 = Vec::new();
         let mut normals_buffer = Vec::new();
+
         let mcvt = mcnk.get_mcvt()?.unwrap();
         let mcnr = mcnk.get_mcnr()?;
+        let mcly = mcnk.get_mcly()?;
 
         let use_vertex_color: bool = true; // In theory with this flag we can turn it off for debug purposes.
-        // let mccv = mcnk.get_mccv()?.filter(|_| use_vertex_color); // smchunk flag has_mccv.
-        let mccv: Option<MCCVSubChunk> = None; // TODO: For some reason, get_mccv encounters chunks with invalid utf-8??
+        let mccv = mcnk.get_mccv()?.filter(|_| use_vertex_color); // smchunk flag has_mccv.
 
         // Here we're in ADT Terrain space, that is +x -> north, +y -> west. Thus rows grow in -x, columns go to -y.
         // index of 9x9: 17 * row + column

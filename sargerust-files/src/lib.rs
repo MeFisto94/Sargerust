@@ -3,7 +3,7 @@ use thiserror::Error;
 // TODO: At some point, get rid of all the highlevel impl Parseables and use #[derive(Parseable)] or maybe #[derive(Deserializable)]
 #[derive(Error, Debug)]
 pub enum ParserError {
-    #[error("The file's magic value does not match the expectation {magic}")]
+    #[error("The file/chunk's magic value does not match the expectation {magic}")]
     InvalidMagicValue { magic: u32 },
 
     #[error("The file is violating the expected format, because: {reason}")]

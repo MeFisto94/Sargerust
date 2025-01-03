@@ -60,7 +60,7 @@ pub(crate) struct IffChunk {
 impl IffChunk {
     pub fn magic_str(&self) -> String {
         std::str::from_utf8(&self.magic.to_be_bytes()[..])
-            .expect("Chunk Magic invalid utf8")
+            .unwrap_or_else(|_| panic!("Chunk Magic invalid utf8: {:X}", self.magic))
             .to_owned()
     }
 
@@ -75,6 +75,13 @@ impl IffChunk {
         rdr.read_exact(&mut data)?;
 
         Ok(IffChunk { magic, size, data })
+    }
+
+    pub fn is_magic(&self, magic: &str) -> bool {
+        // The reason of doing it this way is that we've discovered some chunks that had an invalid
+        // magic (not valid utf-8). This is probably rather a parser issue, but also that way we
+        // do u32 comparisons instead of converting everything to strings and comparing those.
+        self.magic == u32::from_be_bytes(magic.as_bytes().try_into().unwrap())
     }
 }
 
