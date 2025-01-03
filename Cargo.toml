@@ -36,11 +36,19 @@ sargerust-files = { path = "sargerust-files", features = ["wotlk"] }
 # Linear algebra library
 glam = { version = "0.25.0", features = ["approx"] }
 # Renderer core
-rend3 = { git = "https://github.com/BVE-Reborn/rend3" }
+rend3 = { git = "https://github.com/MeFisto94/rend3-hp/", branch = "feature/custom-materials" }
 # Programmable render list that dictates how the scene renders
-rend3-routine = { git = "https://github.com/BVE-Reborn/rend3" }
+rend3-routine = { git = "https://github.com/MeFisto94/rend3-hp/", branch = "feature/custom-materials" }
+# For the custom materials
+encase = "0.7.0"
+encase_derive = "0.7.0"
+encase_derive_impl = "0.7.0"
+serde = { version = "1.0.193", features = ["derive"] }
+wgpu = "0.19" # Needs to be in sync with rend3, used for custom materials.
+rust-embed = "8.1.0"
+
 # Framework that deals with the event loop, setting up the renderer, and platform differences.
-rend3-framework = { git = "https://github.com/BVE-Reborn/rend3" }
+rend3-framework = { git = "https://github.com/MeFisto94/rend3-hp/", branch = "feature/custom-materials" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.3"
 # windowing. TODO: Upgrade to 0.29 for new keyboard handling

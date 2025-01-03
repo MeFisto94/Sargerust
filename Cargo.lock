@@ -2273,7 +2273,6 @@ dependencies = [
 [[package]]
 name = "rend3"
 version = "0.3.0"
-source = "git+https://github.com/BVE-Reborn/rend3#de9a8ac83eb1b783d59eb0c66798ad76d55bec19"
 dependencies = [
  "arrayvec",
  "bimap",
@@ -2294,7 +2293,41 @@ dependencies = [
  "pollster",
  "profiling",
  "range-alloc",
- "rend3-types",
+ "rend3-types 0.3.0",
+ "rust-embed",
+ "rustc-hash 1.1.0",
+ "serde",
+ "smallvec",
+ "smartstring",
+ "thiserror",
+ "wgpu",
+ "wgpu-profiler",
+]
+
+[[package]]
+name = "rend3"
+version = "0.3.0"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#f9a42a79e6faa9d58331a8b183b3d8981a8d6aa7"
+dependencies = [
+ "arrayvec",
+ "bimap",
+ "bitflags 2.4.1",
+ "bumpalo",
+ "bytemuck",
+ "encase",
+ "flume",
+ "glam",
+ "handlebars",
+ "indexmap",
+ "list-any",
+ "log",
+ "noop-waker",
+ "num-traits",
+ "once_cell",
+ "parking_lot",
+ "profiling",
+ "range-alloc",
+ "rend3-types 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
  "rust-embed",
  "rustc-hash 1.1.0",
  "serde",
@@ -2308,7 +2341,6 @@ dependencies = [
 [[package]]
 name = "rend3-framework"
 version = "0.3.0"
-source = "git+https://github.com/BVE-Reborn/rend3#de9a8ac83eb1b783d59eb0c66798ad76d55bec19"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -2324,8 +2356,38 @@ dependencies = [
  "parking_lot",
  "pollster",
  "profiling",
- "rend3",
- "rend3-routine",
+ "rend3 0.3.0",
+ "rend3-routine 0.3.0",
+ "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "web-time 1.1.0",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
+name = "rend3-framework"
+version = "0.3.0"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#f9a42a79e6faa9d58331a8b183b3d8981a8d6aa7"
+dependencies = [
+ "anyhow",
+ "cfg-if",
+ "console_error_panic_hook",
+ "console_log",
+ "env_logger",
+ "glam",
+ "gloo-net",
+ "js-sys",
+ "log",
+ "ndk-glue",
+ "once_cell",
+ "parking_lot",
+ "pollster",
+ "profiling",
+ "rend3 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3-routine 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -2338,7 +2400,6 @@ dependencies = [
 [[package]]
 name = "rend3-routine"
 version = "0.3.0"
-source = "git+https://github.com/BVE-Reborn/rend3#de9a8ac83eb1b783d59eb0c66798ad76d55bec19"
 dependencies = [
  "arrayvec",
  "bitflags 2.4.1",
@@ -2352,7 +2413,32 @@ dependencies = [
  "ordered-float",
  "parking_lot",
  "profiling",
- "rend3",
+ "rend3 0.3.0",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "wgpu",
+ "wgpu-profiler",
+]
+
+[[package]]
+name = "rend3-routine"
+version = "0.3.0"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#f9a42a79e6faa9d58331a8b183b3d8981a8d6aa7"
+dependencies = [
+ "arrayvec",
+ "bitflags 2.4.1",
+ "bytemuck",
+ "codespan-reporting",
+ "encase",
+ "flume",
+ "glam",
+ "log",
+ "naga",
+ "ordered-float",
+ "parking_lot",
+ "profiling",
+ "rend3 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
  "rust-embed",
  "serde",
  "serde_json",
@@ -2363,7 +2449,22 @@ dependencies = [
 [[package]]
 name = "rend3-types"
 version = "0.3.0"
-source = "git+https://github.com/BVE-Reborn/rend3#de9a8ac83eb1b783d59eb0c66798ad76d55bec19"
+dependencies = [
+ "bitflags 2.4.1",
+ "bytemuck",
+ "cfg-if",
+ "encase",
+ "glam",
+ "list-any",
+ "once_cell",
+ "thiserror",
+ "wgpu-types",
+]
+
+[[package]]
+name = "rend3-types"
+version = "0.3.0"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#f9a42a79e6faa9d58331a8b183b3d8981a8d6aa7"
 dependencies = [
  "bitflags 2.4.1",
  "bytemuck",
@@ -2508,9 +2609,9 @@ dependencies = [
  "pollster",
  "quick_cache",
  "rapier3d",
- "rend3",
- "rend3-framework",
- "rend3-routine",
+ "rend3 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3-framework 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3-routine 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
  "rust-embed",
  "sargerust-files",
  "serde",
