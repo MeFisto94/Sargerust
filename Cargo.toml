@@ -34,7 +34,7 @@ sargerust-files = { path = "sargerust-files", features = ["wotlk"] }
 
 # For the Rendering/Game Engine
 # Linear algebra library
-glam = { version = "0.24.2", features = ["approx"] }
+glam = { version = "0.25.0", features = ["approx"] }
 # Renderer core
 rend3 = { git = "https://github.com/BVE-Reborn/rend3" }
 # Programmable render list that dictates how the scene renders
@@ -44,7 +44,8 @@ rend3-framework = { git = "https://github.com/BVE-Reborn/rend3" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.3"
 # windowing. TODO: Upgrade to 0.29 for new keyboard handling
-winit = "0.28"
+# https://github.com/BVE-Reborn/rend3/commit/d7869b838ff6b6283141203ec6b8bddffb3b8eea and following seem to fix examples for that.
+winit = "0.29"
 
 # collect_vec and other niceities
 itertools = "0.13.0"
@@ -64,4 +65,5 @@ dashmap = "6.1.0"
 
 # Physics Engine
 rapier3d = { version = "0.22.0", features = ["simd-nightly"] }
-nalgebra = { version = "0.33.1", features = ["convert-glam024"] } # Match version with rapier3d.
+# Caution: The convert-glam feature needs to match the glam version, otherwise it will cause duplicate dependencies in the tree
+nalgebra = { version = "0.33.1", features = ["convert-glam025"] } # Match version with rapier3d.
