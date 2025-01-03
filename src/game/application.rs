@@ -1,7 +1,7 @@
 use rend3::Renderer;
 use std::net::TcpStream;
 use std::sync::atomic::AtomicBool;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, OnceLock, Weak};
 use std::thread::JoinHandle;
 
@@ -9,7 +9,7 @@ use winit::dpi::LogicalSize;
 use wow_srp::normalized_string::NormalizedString;
 use wow_srp::wrath_header::ProofSeed;
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
-use wow_world_messages::wrath::{expect_server_message, ClientMessage, CMSG_AUTH_SESSION, SMSG_AUTH_CHALLENGE};
+use wow_world_messages::wrath::{CMSG_AUTH_SESSION, ClientMessage, SMSG_AUTH_CHALLENGE, expect_server_message};
 
 use crate::game::game_state::GameState;
 use crate::game::packet_handlers::PacketHandlers;
@@ -51,10 +51,11 @@ impl GameApplication {
 
     pub fn run(&self, receiver: Receiver<Box<ServerOpcodeMessage>>) {
         let ws = self.world_server.as_ref().unwrap().clone();
+        let cloned_self = self.weak_self.clone();
         let net_thread = std::thread::Builder::new()
             .name("Network".into())
             .spawn(move || {
-                ws.run();
+                ws.run(cloned_self);
             })
             .unwrap();
 

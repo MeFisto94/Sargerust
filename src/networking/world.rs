@@ -4,22 +4,22 @@ use std::sync::mpsc::Sender;
 use std::sync::{Mutex, OnceLock, RwLock, Weak};
 use std::time::Instant;
 
+use crate::game::application::GameApplication;
 use crate::networking::movement_tracker::MovementTracker;
+use crate::networking::skip_encrypted;
 use itertools::Itertools;
 use log::{info, warn};
 use wow_srp::wrath_header::{ClientDecrypterHalf, ClientEncrypterHalf};
+use wow_world_messages::Guid;
 use wow_world_messages::errors::ExpectedOpcodeError;
 use wow_world_messages::wrath::expect_server_message_encryption;
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
 use wow_world_messages::wrath::{
-    ClientMessage, CMSG_TIME_SYNC_RESP, SMSG_CLIENTCACHE_VERSION, SMSG_TUTORIAL_FLAGS, SMSG_WARDEN_DATA,
+    CMSG_CHAR_ENUM, CMSG_PLAYER_LOGIN, SMSG_AUTH_RESPONSE, SMSG_AUTH_RESPONSE_WorldResult, SMSG_CHAR_ENUM,
 };
 use wow_world_messages::wrath::{
-    SMSG_AUTH_RESPONSE_WorldResult, CMSG_CHAR_ENUM, CMSG_PLAYER_LOGIN, SMSG_AUTH_RESPONSE, SMSG_CHAR_ENUM,
+    CMSG_TIME_SYNC_RESP, ClientMessage, SMSG_CLIENTCACHE_VERSION, SMSG_TUTORIAL_FLAGS, SMSG_WARDEN_DATA,
 };
-use wow_world_messages::Guid;
-
-use crate::networking::skip_encrypted;
 
 pub struct WorldServer {
     stream: TcpStream,
@@ -58,7 +58,7 @@ impl WorldServer {
         &self.stream
     }
 
-    pub fn run(&self) {
+    pub fn run(&self, weak: Weak<GameApplication>) {
         {
             let mut dec = self.decrypter.lock().unwrap();
             let mut enc = self.encrypter.lock().unwrap();
@@ -104,6 +104,16 @@ impl WorldServer {
         }
 
         loop {
+            if let Some(app) = weak.upgrade() {
+                if app
+                    .close_requested
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    info!("App closing requested, shutting down");
+                    return;
+                }
+            }
+
             let opcode_opt =
                 ServerOpcodeMessage::read_encrypted(self.stream(), self.decrypter.lock().unwrap().deref_mut())
                     .map(Box::new);

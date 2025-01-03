@@ -23,6 +23,8 @@ use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::sync::Arc;
 use std::time::Instant;
+use winit::event::WindowEvent;
+use winit::platform::scancode::PhysicalKeyExtScancode;
 
 #[derive(Default)]
 struct DemoApplication {
@@ -52,7 +54,7 @@ pub fn render<'a, W>(
     let mut app = DemoApplication::default();
 
     // Create event loop and window
-    let event_loop = winit::event_loop::EventLoop::new();
+    let event_loop = winit::event_loop::EventLoop::new().expect("Creating event loop");
     let window = {
         let mut builder = winit::window::WindowBuilder::new();
         builder = builder.with_title("Sargerust: Wrath of the Rust King");
@@ -106,7 +108,6 @@ pub fn render<'a, W>(
         &mut data_core,
         &spp,
         &base_rendergraph.interfaces,
-        &base_rendergraph.gpu_culler.culling_buffer_map_handle,
     );
     drop(data_core);
     let tonemapping_routine = rend3_routine::tonemapping::TonemappingRoutine::new(
@@ -150,175 +151,177 @@ pub fn render<'a, W>(
 
     let mut resolution = glam::UVec2::new(window_size.width, window_size.height);
 
-    event_loop.run(move |event, _, control| match event {
-        // Close button was clicked, we should close.
-        winit::event::Event::WindowEvent {
-            event: winit::event::WindowEvent::CloseRequested,
-            ..
-        } => {
-            *control = winit::event_loop::ControlFlow::Exit;
-        }
-        // Window was resized, need to resize renderer.
-        winit::event::Event::WindowEvent {
-            event: winit::event::WindowEvent::Resized(physical_size),
-            ..
-        } => {
-            resolution = glam::UVec2::new(physical_size.width, physical_size.height);
-            // Reconfigure the surface for the new size.
-            rend3::configure_surface(
-                &surface,
-                &renderer.device,
-                preferred_format,
-                glam::UVec2::new(resolution.x, resolution.y),
-                rend3::types::PresentMode::Fifo,
-            );
-            // Tell the renderer about the new aspect ratio.
-            renderer.set_aspect_ratio(resolution.x as f32 / resolution.y as f32);
-        }
-        // Render!
-        winit::event::Event::MainEventsCleared => {
-            // Don't ask me why the rotation is so different here, _but_ the camera by default looks down,
-            // so it is rotated differently than the carthesian that moves it.
-            let rotation = glam::Mat3A::from_euler(
-                glam::EulerRot::XYZ,
-                -app.camera_pitch * PI,
-                0.0 /* roll */ * PI,
-                -app.camera_yaw * PI,
-            );
-            let forward: Vec3A = rotation.y_axis;
-            let right: Vec3A = rotation.x_axis;
-            let up: Vec3A = rotation.z_axis;
+    event_loop
+        .run(move |event, _| match event {
+            // Window was resized, need to resize renderer.
+            winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::Resized(physical_size),
+                ..
+            } => {
+                resolution = glam::UVec2::new(physical_size.width, physical_size.height);
+                // Reconfigure the surface for the new size.
+                rend3::configure_surface(
+                    &surface,
+                    &renderer.device,
+                    preferred_format,
+                    glam::UVec2::new(resolution.x, resolution.y),
+                    rend3::types::PresentMode::Fifo,
+                );
+                // Tell the renderer about the new aspect ratio.
+                renderer.set_aspect_ratio(resolution.x as f32 / resolution.y as f32);
+            }
+            // Render!
+            winit::event::Event::WindowEvent {
+                window_id: _,
+                event: WindowEvent::RedrawRequested,
+            } => {
+                // TODO: Look at the lifecycles again, compare e.g. https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/lib.rs#L572
 
-            if *app.scancode_status.get(&17u32).unwrap_or(&false) {
-                // W
-                app.camera_location += forward * 30.0 / 60.0 * 5.0; // fake delta time
-            }
-            if *app.scancode_status.get(&31u32).unwrap_or(&false) {
-                // S
-                app.camera_location -= forward * 30.0 / 60.0; // fake delta time
-            }
-            if *app.scancode_status.get(&30u32).unwrap_or(&false) {
-                // A
-                app.camera_location -= right * 20.0 / 60.0;
-            }
-            if *app.scancode_status.get(&32u32).unwrap_or(&false) {
-                // D
-                app.camera_location += right * 20.0 / 60.0;
-            }
-            if *app.scancode_status.get(&42u32).unwrap_or(&false) {
-                // LSHIFT
-                app.camera_location += up * 20.0 / 60.0;
-            }
-            if *app.scancode_status.get(&29u32).unwrap_or(&false) {
-                app.camera_location -= up * 20.0 / 60.0;
-            }
-            if *app.scancode_status.get(&57421u32).unwrap_or(&false) {
-                // arrow right
-                app.camera_yaw += 1.0 / 60.0;
-            }
-            if *app.scancode_status.get(&57419u32).unwrap_or(&false) {
-                app.camera_yaw -= 1.0 / 60.0;
-            }
+                // Don't ask me why the rotation is so different here, _but_ the camera by default looks down,
+                // so it is rotated differently than the carthesian that moves it.
+                let rotation = glam::Mat3A::from_euler(
+                    glam::EulerRot::XYZ,
+                    -app.camera_pitch * PI,
+                    0.0 /* roll */ * PI,
+                    -app.camera_yaw * PI,
+                );
+                let forward: Vec3A = rotation.y_axis;
+                let right: Vec3A = rotation.x_axis;
+                let up: Vec3A = rotation.z_axis;
 
-            // TODO: the following is under redraw requested in https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/lib.rs#L572
-            // technically, we could also invert the view rotation (remember this is not the cams matrix, but the _view_ matrix, so how do you transform
-            // the world to get to the screen (i.e. 0, 0). Hence we also need to invert the camera_location. Inverting the rotation isn't a deal though,
-            // as we can just control the input angles.
-            let view = Mat4::from_euler(
-                glam::EulerRot::XYZ,
-                (-0.5 - app.camera_pitch) * PI,
-                0.0 /* roll */ * PI,
-                app.camera_yaw * PI,
-            );
-            let view = view * Mat4::from_translation((-app.camera_location).into());
+                if *app.scancode_status.get(&17u32).unwrap_or(&false) {
+                    // W
+                    app.camera_location += forward * 30.0 / 60.0 * 5.0; // fake delta time
+                }
+                if *app.scancode_status.get(&31u32).unwrap_or(&false) {
+                    // S
+                    app.camera_location -= forward * 30.0 / 60.0; // fake delta time
+                }
+                if *app.scancode_status.get(&30u32).unwrap_or(&false) {
+                    // A
+                    app.camera_location -= right * 20.0 / 60.0;
+                }
+                if *app.scancode_status.get(&32u32).unwrap_or(&false) {
+                    // D
+                    app.camera_location += right * 20.0 / 60.0;
+                }
+                if *app.scancode_status.get(&42u32).unwrap_or(&false) {
+                    // LSHIFT
+                    app.camera_location += up * 20.0 / 60.0;
+                }
+                if *app.scancode_status.get(&29u32).unwrap_or(&false) {
+                    app.camera_location -= up * 20.0 / 60.0;
+                }
+                if *app.scancode_status.get(&57421u32).unwrap_or(&false) {
+                    // arrow right
+                    app.camera_yaw += 1.0 / 60.0;
+                }
+                if *app.scancode_status.get(&57419u32).unwrap_or(&false) {
+                    app.camera_yaw -= 1.0 / 60.0;
+                }
 
-            // Set camera's location
-            renderer.set_camera_data(rend3::types::Camera {
-                projection: rend3::types::CameraProjection::Perspective {
-                    vfov: 90.0,
-                    near: 0.1,
-                },
-                view,
-            });
+                // technically, we could also invert the view rotation (remember this is not the cams matrix, but the _view_ matrix, so how do you transform
+                // the world to get to the screen (i.e. 0, 0). Hence we also need to invert the camera_location. Inverting the rotation isn't a deal though,
+                // as we can just control the input angles.
+                let view = Mat4::from_euler(
+                    glam::EulerRot::XYZ,
+                    (-0.5 - app.camera_pitch) * PI,
+                    0.0 /* roll */ * PI,
+                    app.camera_yaw * PI,
+                );
+                let view = view * Mat4::from_translation((-app.camera_location).into());
 
-            // Get a frame
-            let frame = surface.get_current_texture().unwrap();
-
-            // Swap the instruction buffers so that our frame's changes can be processed.
-            renderer.swap_instruction_buffers();
-            // Evaluate our frame's world-change instructions
-            let mut eval_output = renderer.evaluate_instructions();
-
-            // Build a rendergraph
-            let mut graph = rend3::graph::RenderGraph::new();
-
-            // Import the surface texture into the render graph.
-            let frame_handle = graph.add_imported_render_target(
-                &frame,
-                0..1,
-                0..1,
-                rend3::graph::ViewportRect::from_size(resolution),
-            );
-            // Add the default rendergraph without a skybox
-            base_rendergraph.add_to_graph(
-                &mut graph,
-                rend3_routine::base::BaseRenderGraphInputs {
-                    eval_output: &eval_output,
-                    routines: BaseRenderGraphRoutines {
-                        pbr: &pbr_routine,
-                        skybox: None,
-                        tonemapping: &tonemapping_routine,
+                // Set camera's location
+                renderer.set_camera_data(rend3::types::Camera {
+                    projection: rend3::types::CameraProjection::Perspective {
+                        vfov: 90.0,
+                        near: 0.1,
                     },
-                    target: OutputRenderTarget {
-                        handle: frame_handle,
-                        resolution,
-                        samples: SampleCount::One,
-                    },
-                },
-                rend3_routine::base::BaseRenderGraphSettings {
-                    ambient_color: glam::Vec4::ZERO,
-                    clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
-                },
-            );
+                    view,
+                });
 
-            // Dispatch a render using the built up rendergraph!
-            graph.execute(&renderer, &mut eval_output);
+                // Get a frame
+                let frame = surface.get_current_texture().unwrap();
 
-            // Present the frame
-            frame.present();
-        }
-        winit::event::Event::WindowEvent {
-            event:
-                winit::event::WindowEvent::KeyboardInput {
-                    input:
-                        winit::event::KeyboardInput {
-                            scancode, state, ..
+                // Swap the instruction buffers so that our frame's changes can be processed.
+                renderer.swap_instruction_buffers();
+                // Evaluate our frame's world-change instructions
+                let mut eval_output = renderer.evaluate_instructions();
+
+                // Build a rendergraph
+                let mut graph = rend3::graph::RenderGraph::new();
+
+                // Import the surface texture into the render graph.
+                let frame_handle = graph.add_imported_render_target(
+                    &frame,
+                    0..1,
+                    0..1,
+                    rend3::graph::ViewportRect::from_size(resolution),
+                );
+                // Add the default rendergraph without a skybox
+                base_rendergraph.add_to_graph(
+                    &mut graph,
+                    rend3_routine::base::BaseRenderGraphInputs {
+                        eval_output: &eval_output,
+                        routines: BaseRenderGraphRoutines {
+                            pbr: &pbr_routine,
+                            skybox: None,
+                            tonemapping: &tonemapping_routine,
                         },
-                    ..
-                },
-            ..
-        } => {
-            if scancode != 17
-                && (scancode < 30 || scancode > 32)
-                && scancode != 29
-                && scancode != 42
-                && scancode != 57419
-                && scancode != 57421
-            {
-                dbg!(scancode);
-            }
+                        target: OutputRenderTarget {
+                            handle: frame_handle,
+                            resolution,
+                            samples: SampleCount::One,
+                        },
+                    },
+                    rend3_routine::base::BaseRenderGraphSettings {
+                        ambient_color: glam::Vec4::ZERO,
+                        clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+                    },
+                );
 
-            app.scancode_status.insert(
-                scancode,
-                match state {
-                    winit::event::ElementState::Pressed => true,
-                    winit::event::ElementState::Released => false,
-                },
-            );
-        }
-        // Other events we don't care about
-        _ => {}
-    });
+                // Dispatch a render using the built up rendergraph!
+                graph.execute(&renderer, &mut eval_output);
+
+                // Present the frame
+                frame.present();
+            }
+            winit::event::Event::WindowEvent {
+                event:
+                    winit::event::WindowEvent::KeyboardInput {
+                        event:
+                            winit::event::KeyEvent {
+                                physical_key,
+                                state,
+                                ..
+                            },
+                        ..
+                    },
+                ..
+            } => {
+                let scancode = PhysicalKeyExtScancode::to_scancode(physical_key).unwrap();
+                if scancode != 17
+                    && (scancode < 30 || scancode > 32)
+                    && scancode != 29
+                    && scancode != 42
+                    && scancode != 57419
+                    && scancode != 57421
+                {
+                    dbg!(scancode);
+                }
+
+                app.scancode_status.insert(
+                    scancode,
+                    match state {
+                        winit::event::ElementState::Pressed => true,
+                        winit::event::ElementState::Released => false,
+                    },
+                );
+            }
+            // Other events we don't care about
+            _ => {}
+        })
+        .expect("Event loop to succeed");
 }
 
 pub fn main_simple_m2(loader: &MPQLoader) -> Result<(), anyhow::Error> {

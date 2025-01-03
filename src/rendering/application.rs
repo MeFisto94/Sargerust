@@ -5,10 +5,12 @@ use std::ops::DerefMut;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, RwLock, Weak};
 use std::time::Instant;
+use winit::event::Event;
 
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
-use log::{error, trace};
+use log::{error, trace, warn};
+use rend3::graph::RenderGraph;
 use rend3::types::{
     Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Surface, Texture2DHandle,
     TextureFormat,
@@ -18,7 +20,9 @@ use rend3::Renderer;
 use rend3_framework::{DefaultRoutines, Event, Grabber, UserResizeEvent};
 use rend3_routine::base::{BaseRenderGraph, BaseRenderGraphRoutines, OutputRenderTarget};
 use winit::event::{ElementState, KeyboardInput, WindowEvent};
+use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use winit::platform::scancode::PhysicalKeyExtScancode;
 use winit::window::Window;
 
 use crate::game::application::GameApplication;
@@ -474,240 +478,58 @@ impl rend3_framework::App for RenderingApplication {
         PresentMode::AutoVsync
     }
 
-    fn setup(
-        &mut self,
-        _event_loop: &EventLoop<UserResizeEvent<()>>,
-        window: &Window,
-        renderer: &Arc<Renderer>,
-        _routines: &Arc<DefaultRoutines>,
-        _surface_format: TextureFormat,
-    ) {
+    fn setup(&mut self, context: SetupContext<'_, ()>) {
         // Push the Renderer into the GameApplication to preload handles.
         if self
             .app
             .upgrade()
             .expect("Application to be initialized")
             .renderer
-            .set(renderer.clone())
+            .set(context.renderer.clone())
             .is_err()
         {
             panic!("Setting the renderer on Application failed: already initialized");
         }
 
-        self.grabber = Some(Grabber::new(window));
+        self.grabber = context
+            .windowing
+            .map(|windowing| Grabber::new(windowing.window));
     }
 
-    fn handle_event(
-        &mut self,
-        window: &Window,
-        renderer: &Arc<Renderer>,
-        routines: &Arc<DefaultRoutines>,
-        base_rendergraph: &BaseRenderGraph,
-        surface: Option<&Arc<Surface>>,
-        resolution: UVec2,
-        event: Event<'_, ()>,
-        control_flow: impl FnOnce(ControlFlow),
-    ) {
+    // TODO: Look at the lifecycles again, compare e.g. https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/lib.rs#L572
+    fn handle_event(&mut self, context: EventContext<'_, ()>, event: Event<()>) {
         match event {
             // Close button was clicked, we should close.
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
-                control_flow(ControlFlow::Exit);
+            Event::LoopExiting => {
                 if let Some(app) = self.app.upgrade() {
                     app.close_requested.store(true, Ordering::SeqCst)
                 };
-            }
-            Event::MainEventsCleared => {
-                let now = Instant::now();
-                let delta_time = now - self.timestamp_last_frame;
-                self.timestamp_last_frame = now;
-
-                let rotation = glam::Mat3A::from_euler(
-                    glam::EulerRot::XYZ,
-                    -self.camera_pitch * PI,
-                    0.0 /* roll */ * PI,
-                    -self.camera_yaw,
-                );
-                let forward: Vec3A = rotation.y_axis;
-                let right: Vec3A = rotation.x_axis;
-                let up: Vec3A = rotation.z_axis;
-
-                let fwd_speed = if self.fly_cam { 30.0 } else { 7.0 };
-                let strafe_speed = if self.fly_cam { 20.0 } else { 7.0 };
-                let back_speed = if self.fly_cam { 20.0 } else { 4.5 };
-
-                let mut delta: Vec3A = Vec3A::new(0.0, 0.0, 0.0);
-                let mut yaw = 0.0;
-
-                // TODO: https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/platform.rs.
-                //  Make platform independent and also add more, or search other crate, rather.
-                if button_pressed(&self.scancode_status, 17u32) {
-                    // W
-                    delta += forward * fwd_speed * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, 31u32) {
-                    // S
-                    delta -= forward * back_speed * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, 30u32) {
-                    // A
-                    delta -= right * strafe_speed * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, 32u32) {
-                    // D
-                    delta += right * strafe_speed * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, 33u32) {
-                    self.fly_cam = !self.fly_cam;
-                }
-                if button_pressed(&self.scancode_status, 42u32) {
-                    // LSHIFT
-                    delta += up * 10.0 * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, 29u32) {
-                    delta -= up * 10.0 * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, 57421u32) {
-                    // arrow right
-                    yaw += PI * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, 57419u32) {
-                    // arrow left
-                    yaw -= PI * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, 57416u32) {
-                    self.camera_pitch += 0.25 * delta_time.as_secs_f32();
-                }
-                if button_pressed(&self.scancode_status, 57424u32) {
-                    self.camera_pitch -= 0.25 * delta_time.as_secs_f32();
-                }
-
-                if self.fly_cam {
-                    self.camera_location += delta;
-                    self.camera_yaw += yaw;
-                } else {
-                    self.camera_yaw += yaw;
-
-                    // location: we will consider the delta for the physics movement and then mirror that to the cam
-                    let gs = self.app().game_state.clone();
-                    let mut player_wlock = gs
-                        .player_orientation
-                        .write()
-                        .expect("Player orientation tainted");
-
-                    let orientation = player_wlock.deref_mut();
-                    *orientation -= yaw;
-
-                    // fancy clamping from -PI to +PI.
-                    while *orientation < -PI {
-                        *orientation += 2.0 * PI;
-                    }
-
-                    while *orientation > PI {
-                        *orientation -= 2.0 * PI;
-                    }
-                }
-
-                self.run_updates(
-                    renderer,
-                    delta_time.as_secs_f32(),
-                    if self.fly_cam { Vec3A::ZERO } else { delta },
-                );
-
-                window.request_redraw();
-            }
-            // Render!
-            Event::RedrawRequested(_) => {
-                // technically, we could also invert the view rotation (remember this is not the cams matrix, but the _view_ matrix, so how do you transform
-                // the world to get to the screen (i.e. 0, 0). Hence we also need to invert the camera_location. Inverting the rotation isn't a deal though,
-                // as we can just control the input angles.
-
-                //let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch + 0.5 * PI, -self.camera_yaw, 0.0);
-                let view = Mat4::from_euler(
-                    glam::EulerRot::XYZ,
-                    (-0.5 - self.camera_pitch) * PI,
-                    0.0 /* roll */ * PI,
-                    self.camera_yaw,
-                );
-                let view = view * Mat4::from_translation((-self.camera_location).into());
-
-                renderer.set_camera_data(Camera {
-                    projection: CameraProjection::Perspective {
-                        vfov: 90.0,
-                        near: 0.1,
-                    },
-                    view,
-                });
-
-                // Get a frame
-                let frame = surface.unwrap().get_current_texture().unwrap();
-
-                // Swap the instruction buffers so that our frame's changes can be processed.
-                renderer.swap_instruction_buffers();
-                // Evaluate our frame's world-change instructions
-                let mut eval_output = renderer.evaluate_instructions();
-
-                // Lock the routines
-                let pbr_routine = rend3_framework::lock(&routines.pbr);
-                let tonemapping_routine = rend3_framework::lock(&routines.tonemapping);
-
-                // Build a rendergraph
-                let mut graph = rend3::graph::RenderGraph::new();
-
-                // Import the surface texture into the render graph.
-                let frame_handle = graph.add_imported_render_target(
-                    &frame,
-                    0..1,
-                    0..1,
-                    rend3::graph::ViewportRect::from_size(resolution),
-                );
-                base_rendergraph.add_to_graph(
-                    &mut graph,
-                    rend3_routine::base::BaseRenderGraphInputs {
-                        eval_output: &eval_output,
-                        routines: BaseRenderGraphRoutines {
-                            pbr: &pbr_routine,
-                            skybox: None,
-                            tonemapping: &tonemapping_routine,
-                        },
-                        target: OutputRenderTarget {
-                            handle: frame_handle,
-                            resolution,
-                            samples: SampleCount::One,
-                        },
-                    },
-                    rend3_routine::base::BaseRenderGraphSettings {
-                        ambient_color: glam::Vec4::ZERO,
-                        clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
-                    },
-                );
-
-                // Dispatch a render using the built up rendergraph!
-                graph.execute(renderer, &mut eval_output);
-
-                // Present the frame
-                frame.present();
             }
             Event::WindowEvent {
                 event: WindowEvent::Focused(focus),
                 ..
             } => {
                 if !focus {
-                    self.grabber.as_mut().unwrap().request_ungrab(window);
+                    self.grabber
+                        .as_mut()
+                        .unwrap()
+                        .request_ungrab(context.window.as_ref().unwrap());
                 }
             }
             Event::WindowEvent {
                 event:
                     WindowEvent::KeyboardInput {
-                        input: KeyboardInput {
-                            scancode, state, ..
-                        },
+                        event:
+                            KeyEvent {
+                                physical_key,
+                                state,
+                                ..
+                            },
                         ..
                     },
                 ..
             } => {
+                let scancode = PhysicalKeyExtScancode::to_scancode(physical_key).unwrap();
                 //log::trace!("WE scancode {:x}", scancode);
                 self.scancode_status.insert(
                     scancode,
@@ -721,4 +543,209 @@ impl rend3_framework::App for RenderingApplication {
             _ => {}
         }
     }
+
+    fn handle_redraw(&mut self, context: RedrawContext<'_, ()>) {
+        let now = Instant::now();
+        let delta_time = now - self.timestamp_last_frame;
+        self.timestamp_last_frame = now;
+
+        let rotation = glam::Mat3A::from_euler(
+            glam::EulerRot::XYZ,
+            -self.camera_pitch * PI,
+            0.0 /* roll */ * PI,
+            -self.camera_yaw,
+        );
+        let forward: Vec3A = rotation.y_axis;
+        let right: Vec3A = rotation.x_axis;
+        let up: Vec3A = rotation.z_axis;
+
+        let fwd_speed = if self.fly_cam { 30.0 } else { 7.0 };
+        let strafe_speed = if self.fly_cam { 20.0 } else { 7.0 };
+        let back_speed = if self.fly_cam { 20.0 } else { 4.5 };
+
+        let mut delta: Vec3A = Vec3A::new(0.0, 0.0, 0.0);
+        let mut yaw = 0.0;
+
+        // TODO: https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/platform.rs.
+        //  Make platform independent and also add more, or search other crate, rather.
+        if button_pressed(&self.scancode_status, 17u32) {
+            // W
+            delta += forward * fwd_speed * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, 31u32) {
+            // S
+            delta -= forward * back_speed * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, 30u32) {
+            // A
+            delta -= right * strafe_speed * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, 32u32) {
+            // D
+            delta += right * strafe_speed * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, 33u32) {
+            self.fly_cam = !self.fly_cam;
+        }
+        if button_pressed(&self.scancode_status, 42u32) {
+            // LSHIFT
+            delta += up * 10.0 * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, 29u32) {
+            delta -= up * 10.0 * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, 57421u32) {
+            // arrow right
+            yaw += PI * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, 57419u32) {
+            // arrow left
+            yaw -= PI * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, 57416u32) {
+            self.camera_pitch += 0.25 * delta_time.as_secs_f32();
+        }
+        if button_pressed(&self.scancode_status, 57424u32) {
+            self.camera_pitch -= 0.25 * delta_time.as_secs_f32();
+        }
+
+        if self.fly_cam {
+            self.camera_location += delta;
+            self.camera_yaw += yaw;
+        } else {
+            self.camera_yaw += yaw;
+
+            // location: we will consider the delta for the physics movement and then mirror that to the cam
+            let gs = self.app().game_state.clone();
+            let mut player_wlock = gs
+                .player_orientation
+                .write()
+                .expect("Player orientation tainted");
+
+            let orientation = player_wlock.deref_mut();
+            *orientation -= yaw;
+
+            // fancy clamping from -PI to +PI.
+            while *orientation < -PI {
+                *orientation += 2.0 * PI;
+            }
+
+            while *orientation > PI {
+                *orientation -= 2.0 * PI;
+            }
+        }
+
+        self.run_updates(
+            context.renderer,
+            delta_time.as_secs_f32(),
+            if self.fly_cam { Vec3A::ZERO } else { delta },
+        );
+
+        context.window.unwrap().request_redraw();
+
+        // technically, we could also invert the view rotation (remember this is not the cams matrix, but the _view_ matrix, so how do you transform
+        // the world to get to the screen (i.e. 0, 0). Hence we also need to invert the camera_location. Inverting the rotation isn't a deal though,
+        // as we can just control the input angles.
+
+        //let view = Mat4::from_euler(glam::EulerRot::XYZ, -self.camera_pitch + 0.5 * PI, -self.camera_yaw, 0.0);
+        let view = Mat4::from_euler(
+            glam::EulerRot::XYZ,
+            (-0.5 - self.camera_pitch) * PI,
+            0.0 /* roll */ * PI,
+            self.camera_yaw,
+        );
+        let view = view * Mat4::from_translation((-self.camera_location).into());
+
+        context.renderer.set_camera_data(Camera {
+            projection: CameraProjection::Perspective {
+                vfov: 90.0,
+                near: 0.1,
+            },
+            view,
+        });
+
+        // Swap the instruction buffers so that our frame's changes can be processed.
+        context.renderer.swap_instruction_buffers();
+        // Evaluate our frame's world-change instructions
+        let mut eval_output = context.renderer.evaluate_instructions();
+
+        // Lock the routines
+        let pbr_routine = rend3_framework::lock(&context.routines.pbr);
+        let tonemapping_routine = rend3_framework::lock(&context.routines.tonemapping);
+
+        // Build a rendergraph
+        let mut graph = rend3::graph::RenderGraph::new();
+
+        // Import the surface texture into the render graph.
+        let frame_handle = graph.add_imported_render_target(
+            context.surface_texture,
+            0..1,
+            0..1,
+            rend3::graph::ViewportRect::from_size(context.resolution),
+        );
+
+        base_rendergraph_add_to_graph(
+            context.base_rendergraph,
+            &mut graph,
+            rend3_routine::base::BaseRenderGraphInputs {
+                eval_output: &eval_output,
+                routines: BaseRenderGraphRoutines {
+                    pbr: &pbr_routine,
+                    skybox: None,
+                    tonemapping: &tonemapping_routine,
+                },
+                target: OutputRenderTarget {
+                    handle: frame_handle,
+                    resolution: context.resolution,
+                    samples: SampleCount::One,
+                },
+            },
+            rend3_routine::base::BaseRenderGraphSettings {
+                ambient_color: glam::Vec4::ZERO,
+                clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+            },
+        );
+
+        // Dispatch a render using the built up rendergraph!
+        graph.execute(context.renderer, &mut eval_output);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn base_rendergraph_add_to_graph<'node>(
+    base_graph: &'node BaseRenderGraph,
+    graph: &mut RenderGraph<'node>,
+    inputs: BaseRenderGraphInputs<'_, 'node>,
+    settings: BaseRenderGraphSettings,
+) {
+    // Create the data and handles for the graph.
+    let mut state = BaseRenderGraphIntermediateState::new(graph, inputs, settings);
+
+    // Clear the shadow buffers. This, as an explicit node, must be done as a limitation of the graph dependency system.
+    // state.clear_shadow_buffers();
+    clear::add_depth_clear_to_graph(state.graph, state.shadow, 0.0);
+
+    // Prepare all the uniforms that all shaders need access to.
+    state.create_frame_uniforms(base_graph);
+
+    // Perform compute based skinning.
+    state.skinning(base_graph);
+
+    // Render all the shadows to the shadow map.
+    state.pbr_shadow_rendering();
+
+    // Do the first pass, rendering the predicted triangles from last frame.
+    state.pbr_render();
+
+    // Render the skybox.
+    state.skybox();
+
+    // Render all transparent objects.
+    //
+    // This _must_ happen after culling, as all transparent objects are
+    // considered "residual".
+    state.pbr_forward_rendering_transparent();
+
+    // Tonemap the HDR inner buffer to the output buffer.
+    state.tonemapping();
 }

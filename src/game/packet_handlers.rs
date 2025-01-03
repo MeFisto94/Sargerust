@@ -1,7 +1,7 @@
+use log::{info, warn};
+use std::sync::atomic::Ordering::SeqCst;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Weak};
-
-use log::{info, warn};
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
 
 use crate::game::application::GameApplication;
@@ -22,6 +22,11 @@ impl PacketHandlers {
 
     pub fn run(&self) {
         loop {
+            if self.app().close_requested.load(SeqCst) {
+                info!("App closing requested, shutting down");
+                return;
+            }
+
             let res = self.receiver.recv();
             if res.is_err() {
                 warn!("PacketHandlers: Broken Pipe");
