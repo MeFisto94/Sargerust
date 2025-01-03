@@ -29,7 +29,8 @@ impl ADTImporter {
         let mcnr = mcnk.get_mcnr()?;
 
         let use_vertex_color: bool = true; // In theory with this flag we can turn it off for debug purposes.
-        let mccv = mcnk.get_mccv()?.filter(|_| use_vertex_color); // smchunk flag has_mccv.
+        // let mccv = mcnk.get_mccv()?.filter(|_| use_vertex_color); // smchunk flag has_mccv.
+        let mccv: Option<MCCVSubChunk> = None; // TODO: For some reason, get_mccv encounters chunks with invalid utf-8??
 
         // Here we're in ADT Terrain space, that is +x -> north, +y -> west. Thus rows grow in -x, columns go to -y.
         // index of 9x9: 17 * row + column
