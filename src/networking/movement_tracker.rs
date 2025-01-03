@@ -6,9 +6,9 @@ use std::f32::consts::PI;
 use std::sync::Weak;
 use std::time::Instant;
 use wow_world_messages::wrath::{
-    MovementFlags, MovementInfo, MovementInfo_MovementFlags, Vector3d, MSG_MOVE_HEARTBEAT, MSG_MOVE_START_BACKWARD,
-    MSG_MOVE_START_FORWARD, MSG_MOVE_START_STRAFE_LEFT, MSG_MOVE_START_STRAFE_RIGHT, MSG_MOVE_START_TURN_LEFT,
-    MSG_MOVE_START_TURN_RIGHT, MSG_MOVE_STOP,
+    MSG_MOVE_HEARTBEAT, MSG_MOVE_START_BACKWARD, MSG_MOVE_START_FORWARD, MSG_MOVE_START_STRAFE_LEFT,
+    MSG_MOVE_START_STRAFE_RIGHT, MSG_MOVE_START_TURN_LEFT, MSG_MOVE_START_TURN_RIGHT, MSG_MOVE_STOP, MovementFlags,
+    MovementInfo, MovementInfo_MovementFlags, Vector3d,
 };
 
 /// The Movement Tracker is the struct responsible for sending the CMSG MOVE packets for the current player.

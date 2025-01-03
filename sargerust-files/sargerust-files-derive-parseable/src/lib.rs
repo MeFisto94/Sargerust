@@ -1,9 +1,9 @@
 extern crate proc_macro2;
 
+use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::{Span, TokenStream};
-use proc_macro_crate::{crate_name, FoundCrate};
 use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Fields, Ident};
+use syn::{Data, DeriveInput, Fields, Ident, parse_macro_input, spanned::Spanned};
 
 #[proc_macro_derive(Parse)]
 pub fn derive_parseable(item: proc_macro::TokenStream) -> proc_macro::TokenStream {

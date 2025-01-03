@@ -3,12 +3,12 @@
 // we use the exact wording from wowdev.wiki
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
+use crate::ParserError;
 use crate::common::reader::Parseable;
 use crate::common::types::CAaBox;
 use crate::m2::types::{
-    M2Array, M2Asset, M2SkinProfile, M2Texture, M2TextureInternal, M2Vertex, Version, FOURCC_M2HEADER, FOURCC_M2SKIN,
+    FOURCC_M2HEADER, FOURCC_M2SKIN, M2Array, M2Asset, M2SkinProfile, M2Texture, M2TextureInternal, M2Vertex, Version,
 };
-use crate::ParserError;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::ffi::CString;
 use std::io::{Read, Seek, SeekFrom};

@@ -2,8 +2,8 @@ use std::io::{Cursor, Read};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-use crate::common::reader::Parseable;
 use crate::ParserError;
+use crate::common::reader::Parseable;
 
 #[derive(Debug, Copy, Clone)]
 pub struct C3Vector {

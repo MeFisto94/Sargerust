@@ -1,7 +1,7 @@
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
-use image_blp::parser::parse_blp_with_externals;
 use image_blp::BlpImage;
+use image_blp::parser::parse_blp_with_externals;
 use log::{error, warn};
 
 pub struct BLPLoader {}

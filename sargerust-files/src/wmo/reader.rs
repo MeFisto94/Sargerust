@@ -1,6 +1,7 @@
 use std::io::ErrorKind::UnexpectedEof;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
+use crate::ParserError;
 use crate::common::reader::Parseable;
 use crate::common::types::{IffChunk, MVerChunk};
 use crate::wmo::types::{
@@ -8,7 +9,6 @@ use crate::wmo::types::{
     MOGNChunk, MOGPChunk, MOHDChunk, MOLRChunk, MOLTChunk, MOMTChunk, MONRChunk, MOPYChunk, MOSBChunk, MOTVChunk,
     MOTXChunk, MOVIChunk, MOVTChunk, WMOGroupAsset, WMORootAsset,
 };
-use crate::ParserError;
 
 pub struct WMOReader {}
 

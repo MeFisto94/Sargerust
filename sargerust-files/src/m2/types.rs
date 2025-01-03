@@ -1,8 +1,8 @@
 #![allow(non_snake_case)] // we use the exact wording from wowdev.wiki
+use crate::ParserError;
 use crate::common::reader::Parseable;
 use crate::common::types::{C2Vector, C3Vector};
 use crate::m2::reader::M2Reader;
-use crate::ParserError;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::{Read, Write};
 

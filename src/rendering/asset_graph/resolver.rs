@@ -1,7 +1,7 @@
 use std::sync::{Arc, Weak};
 
-use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
+use dashmap::mapref::entry::Entry;
 
 pub struct Resolver<G: GraphNodeGenerator<T>, T> {
     ref_cache: DashMap<String, Weak<T>>,

@@ -1,7 +1,7 @@
 #![allow(non_snake_case)] // we use the exact wording from wowdev.wiki
+use crate::ParserError;
 use crate::common::reader::Parseable;
 use crate::common::types::{C3Vector, CAaBox, IffChunk};
-use crate::ParserError;
 use byteorder::{LittleEndian, ReadBytesExt};
 use sargerust_files_derive_parseable::Parse;
 use std::ffi::CStr;

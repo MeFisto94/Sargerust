@@ -1,9 +1,9 @@
 use std::io::ErrorKind::UnexpectedEof;
 use std::io::Read;
 
+use crate::ParserError;
 use crate::common::types::{IffChunk, MVerChunk};
 use crate::wdt::types::{MPHDChunk, MWMOChunk, MainChunk, SMMapObjDef, WDTAsset};
-use crate::ParserError;
 
 pub struct WDTReader {}
 

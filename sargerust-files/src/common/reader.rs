@@ -5,8 +5,8 @@ use std::io::Read;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-use crate::common::types::{C2Vector, C3Vector, C4Quaternion, CAaBox, CArgb, CImVector, IffChunk};
 use crate::ParserError;
+use crate::common::types::{C2Vector, C3Vector, C4Quaternion, CAaBox, CArgb, CImVector, IffChunk};
 
 pub(crate) trait Parseable<T> {
     fn parse<R: Read>(rdr: &mut R) -> Result<T, ParserError>;

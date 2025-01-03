@@ -3,10 +3,10 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use glam::{Affine3A, Vec3, Vec3A};
-use image_blp::convert::blp_to_image;
 use image_blp::BlpImage;
-use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectHandle};
+use image_blp::convert::blp_to_image;
 use rend3::Renderer;
+use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectHandle};
 
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::highlevel_types::PlacedDoodad;

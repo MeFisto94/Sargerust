@@ -2,10 +2,10 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
-use crate::common::reader::{read_chunk_array, GenericStringList, Parseable};
+use crate::ParserError;
+use crate::common::reader::{GenericStringList, Parseable, read_chunk_array};
 use crate::common::types::{C3Vector, CImVector, IffChunk};
 use crate::wdt::types::SMMapObjDef;
-use crate::ParserError;
 use sargerust_files_derive_parseable::Parse;
 use std::collections::HashMap;
 use std::io::{Cursor, ErrorKind, Read};

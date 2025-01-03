@@ -9,9 +9,9 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use num_enum::FromPrimitive;
 use sargerust_files_derive_parseable::Parse;
 
-use crate::common::reader::{read_chunk_array, read_cstring, GenericStringList, Parseable};
-use crate::common::types::{C2Vector, C3Vector, C4Quaternion, CAaBox, CArgb, CImVector, MVerChunk};
 use crate::ParserError;
+use crate::common::reader::{GenericStringList, Parseable, read_chunk_array, read_cstring};
+use crate::common::types::{C2Vector, C3Vector, C4Quaternion, CAaBox, CArgb, CImVector, MVerChunk};
 
 // https://wowdev.wiki/WMO
 

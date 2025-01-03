@@ -5,7 +5,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use std::fmt;
 use std::fs;
 use std::io::{BufReader, SeekFrom};
-use std::io::{prelude::*, Cursor};
+use std::io::{Cursor, prelude::*};
 use std::io::{Error, ErrorKind};
 use std::mem;
 use std::path::Path;
@@ -135,8 +135,8 @@ impl Block {
 }
 
 // hack so that we can store Read + Seek as trait object.
-pub trait ReadAndSeek: Read+Seek {}
-impl <T: Read + Seek> ReadAndSeek for T {}
+pub trait ReadAndSeek: Read + Seek {}
+impl<T: Read + Seek> ReadAndSeek for T {}
 
 type Reader = Box<dyn ReadAndSeek + Sync + Send>;
 
@@ -151,7 +151,6 @@ pub struct Archive {
 }
 
 impl Archive {
-
     pub fn open_owned<P: AsRef<Path>>(path: P) -> Result<Archive, Error> {
         let mut file = fs::File::open(&path).expect("no file found");
         let metadata = fs::metadata(&path).expect("unable to read metadata");
@@ -205,8 +204,7 @@ impl Archive {
         let header = Header::new(&buffer);
 
         // read hash table
-        let mut hash_buff: Vec<u8> =
-            vec![0; (header.hash_table_count as usize) * mem::size_of::<Hash>()];
+        let mut hash_buff: Vec<u8> = vec![0; (header.hash_table_count as usize) * mem::size_of::<Hash>()];
         let mut hash_table: Vec<Hash> = Vec::with_capacity(header.hash_table_count as usize);
 
         cursor.seek(SeekFrom::Start(
@@ -222,8 +220,7 @@ impl Archive {
         }
 
         // read block table
-        let mut block_buff: Vec<u8> =
-            vec![0; (header.block_table_count as usize) * mem::size_of::<Block>()];
+        let mut block_buff: Vec<u8> = vec![0; (header.block_table_count as usize) * mem::size_of::<Block>()];
         let mut block_table: Vec<Block> = Vec::with_capacity(header.block_table_count as usize);
 
         cursor.seek(SeekFrom::Start(
@@ -255,8 +252,7 @@ impl Archive {
 
     // TODO: maybe refactor the common parts into a dedicated method.
     pub fn contains_file(&self, filename: &str) -> bool {
-        let start_index =
-            (hash_string(filename, 0x0) & (self.header.hash_table_count - 1)) as usize;
+        let start_index = (hash_string(filename, 0x0) & (self.header.hash_table_count - 1)) as usize;
         let mut hash;
 
         let hash_a = hash_string(filename, 0x100);
@@ -274,8 +270,7 @@ impl Archive {
     }
 
     pub fn open_file(&mut self, filename: &str) -> Result<File, Error> {
-        let start_index =
-            (hash_string(filename, 0x0) & (self.header.hash_table_count - 1)) as usize;
+        let start_index = (hash_string(filename, 0x0) & (self.header.hash_table_count - 1)) as usize;
         let mut hash;
 
         let hash_a = hash_string(filename, 0x100);
@@ -466,8 +461,7 @@ impl File {
                 }
 
                 if self.block.flags & FILE_COMPRESS != 0 {
-                    if in_buf.len() == archive.sector_size as usize || in_buf.len() == out_buf.len()
-                    {
+                    if in_buf.len() == archive.sector_size as usize || in_buf.len() == out_buf.len() {
                         for (dst, src) in out_buf.iter_mut().zip(in_buf) {
                             *dst = *src;
                             read += 1;
@@ -476,8 +470,7 @@ impl File {
                         read += decompress(in_buf, out_buf)?;
                     }
                 } else if self.block.flags & FILE_IMPLODE != 0 {
-                    if in_buf.len() == archive.sector_size as usize || in_buf.len() == out_buf.len()
-                    {
+                    if in_buf.len() == archive.sector_size as usize || in_buf.len() == out_buf.len() {
                         for (dst, src) in out_buf.iter_mut().zip(in_buf) {
                             *dst = *src;
                             read += 1;

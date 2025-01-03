@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use glam::{Affine3A, EulerRot, Quat, Vec3};
+use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
-use image_blp::BlpImage;
 use mpq::Archive;
 use rendering::common::coordinate_systems::TILE_SIZE;
 use sargerust_files::adt::types::SMDoodadDef;

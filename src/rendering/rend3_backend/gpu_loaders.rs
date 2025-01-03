@@ -1,7 +1,7 @@
 use crate::rendering::asset_graph::nodes::adt_node::{IRMaterial, IRMesh, IRTexture};
 use crate::rendering::rend3_backend::Rend3BackendConverter;
-use rend3::types::{MaterialHandle, MeshHandle, Texture2DHandle};
 use rend3::Renderer;
+use rend3::types::{MaterialHandle, MeshHandle, Texture2DHandle};
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 

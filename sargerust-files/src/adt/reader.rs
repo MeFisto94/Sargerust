@@ -1,13 +1,13 @@
 use std::io::ErrorKind::UnexpectedEof;
 use std::io::Read;
 
+use crate::ParserError;
 use crate::adt::types::{
     ADTAsset, MCINChunk, MCNKChunk, MDDFChunk, MH2OChunk, MHDRChunk, MMDXChunk, MMIDChunk, MODFChunk, MTEXChunk,
     MWIDChunk, MWMOChunk,
 };
 use crate::common::reader::{get_mandatory_chunk_by_name, get_optional_chunk_by_name};
 use crate::common::types::{IffChunk, MVerChunk};
-use crate::ParserError;
 
 pub struct ADTReader {}
 

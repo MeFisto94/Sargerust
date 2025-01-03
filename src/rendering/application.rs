@@ -7,6 +7,11 @@ use std::sync::{Arc, RwLock, Weak};
 use std::time::Instant;
 use winit::event::Event;
 
+use crate::game::application::GameApplication;
+use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, IRMaterial, IRTextureReference};
+use crate::rendering::common::coordinate_systems;
+use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
+use crate::rendering::rend3_backend::{Rend3BackendConverter, gpu_loaders};
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
 use log::{error, trace, warn};
@@ -19,17 +24,10 @@ use rend3::util::typedefs::FastHashMap;
 use rend3::Renderer;
 use rend3_framework::{DefaultRoutines, Event, Grabber, UserResizeEvent};
 use rend3_routine::base::{BaseRenderGraph, BaseRenderGraphRoutines, OutputRenderTarget};
-use winit::event::{ElementState, KeyboardInput, WindowEvent};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::platform::scancode::PhysicalKeyExtScancode;
 use winit::window::Window;
-
-use crate::game::application::GameApplication;
-use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, IRMaterial, IRTextureReference};
-use crate::rendering::common::coordinate_systems;
-use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
-use crate::rendering::rend3_backend::{gpu_loaders, Rend3BackendConverter};
 
 // #[derive(Debug)] // TODO: Ensure Grabber implements Display
 pub struct RenderingApplication {

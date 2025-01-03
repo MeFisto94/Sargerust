@@ -9,7 +9,6 @@ pub struct Chain {
     chain: Vec<Archive>,
 }
 impl Chain {
-
     pub fn new() -> Self {
         Chain { chain: Vec::new() }
     }
