@@ -44,7 +44,7 @@ encase = "0.7.0"
 encase_derive = "0.7.0"
 encase_derive_impl = "0.7.0"
 serde = { version = "1.0.193", features = ["derive"] }
-wgpu = "0.19" # Needs to be in sync with rend3, used for custom materials.
+wgpu = "0.20" # Needs to be in sync with rend3, used for custom materials.
 rust-embed = "8.1.0"
 
 # Framework that deals with the event loop, setting up the renderer, and platform differences.

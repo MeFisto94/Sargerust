@@ -65,7 +65,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee91c0c2905bae44f84bfa4e044536541df26b7703fd0888deeb9060fcc44289"
 dependencies = [
  "android-properties",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "cc",
  "cesu8",
  "jni",
@@ -165,9 +165,9 @@ checksum = "6b4930d2cb77ce62f89ee5d5289b4ac049559b1c45539271f5ed4fdc7db34545"
 
 [[package]]
 name = "arrayvec"
-version = "0.7.4"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
+checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
 name = "as-raw-xcb-connection"
@@ -252,9 +252,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.4.1"
+version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "327762f6e5a765692301e5bb513e0d9fef63be86bbc14528052b1cd3e6f03e07"
+checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
 name = "block"
@@ -330,7 +330,7 @@ version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fba7adb4dd5aa98e5553510223000e7148f621165ec5f9acd7113f6ca4995298"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "log",
  "polling",
  "rustix",
@@ -623,11 +623,11 @@ checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
 
 [[package]]
 name = "d3d12"
-version = "0.19.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e3d747f100290a1ca24b752186f61f6637e1deffe3bf6320de6fcb29510a307"
+checksum = "b28bfe653d79bd16c77f659305b195b82bb5ce0c0eb2a4846b82ddbd77586813"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "libloading 0.8.1",
  "winapi",
 ]
@@ -675,7 +675,7 @@ checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
 dependencies = [
  "cfg-if",
  "crossbeam-utils",
- "hashbrown",
+ "hashbrown 0.14.3",
  "lock_api",
  "once_cell",
  "parking_lot_core",
@@ -726,6 +726,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330c60081dcc4c72131f8eb70510f1ac07223e5d4163db481a04a0befcffa412"
 dependencies = [
  "libloading 0.8.1",
+]
+
+[[package]]
+name = "document-features"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb6969eaabd2421f8a2775cfd2471a2b634372b4a25d41e3bd647b79912850a0"
+dependencies = [
+ "litrs",
 ]
 
 [[package]]
@@ -863,6 +872,12 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
+
+[[package]]
+name = "foldhash"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0d2fde1f7b3d48b8395d5f2de76c18a528bd6a9cdde438df747bfcba3e05d6f"
 
 [[package]]
 name = "foreign-types"
@@ -1044,7 +1059,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fbcd2dba93594b227a1f57ee09b8b9da8892c34d55aa332e034a228d0fe6a171"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "gpu-alloc-types",
 ]
 
@@ -1054,7 +1069,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98ff03b468aa837d70984d55f5d3f846f6ec31fe34bbb97c4f85219caeee1ca4"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
 ]
 
 [[package]]
@@ -1072,22 +1087,22 @@ dependencies = [
 
 [[package]]
 name = "gpu-descriptor"
-version = "0.2.4"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc11df1ace8e7e564511f53af41f3e42ddc95b56fd07b3f4445d2a6048bc682c"
+checksum = "dcf29e94d6d243368b7a56caa16bc213e4f9f8ed38c4d9557069527b5d5281ca"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "gpu-descriptor-types",
- "hashbrown",
+ "hashbrown 0.15.2",
 ]
 
 [[package]]
 name = "gpu-descriptor-types"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bf0b36e6f090b7e1d8a4b49c0cb81c1f8376f72198c65dd3ad9ff3556b8b78c"
+checksum = "fdf242682df893b86f33a73828fb09ca4b2d3bb6cc95249707fc684d27484b91"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
 ]
 
 [[package]]
@@ -1133,12 +1148,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
+dependencies = [
+ "foldhash",
+]
+
+[[package]]
 name = "hassle-rs"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af2a7e73e1f34c48da31fb668a907f250794837e08faa144fd24f0b8b741e890"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "com",
  "libc",
  "libloading 0.8.1",
@@ -1265,7 +1289,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
 dependencies = [
  "equivalent",
- "hashbrown",
+ "hashbrown 0.14.3",
 ]
 
 [[package]]
@@ -1394,7 +1418,7 @@ version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85c833ca1e66078851dba29046874e38f08b2c883700aa29a03ddd3b23814ee8"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "libc",
  "redox_syscall 0.4.1",
 ]
@@ -1405,7 +1429,7 @@ version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3af92c55d7d839293953fcd0fda5ecfe93297cfde6ffbdec13b41d99c0ba6607"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "libc",
  "redox_syscall 0.4.1",
 ]
@@ -1432,6 +1456,12 @@ name = "list-any"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93d1d1b0528cc76bed22884ae4f56f5548d80643f848d6df0c652032f7ca6165"
+
+[[package]]
+name = "litrs"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4ce301924b7887e9d637144fdade93f9dfff9b60981d4ac161db09720d39aa5"
 
 [[package]]
 name = "lock_api"
@@ -1485,11 +1515,11 @@ dependencies = [
 
 [[package]]
 name = "metal"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c43f73953f8cbe511f021b58f18c3ce1c3d1ae13fe953293e13345bf83217f25"
+checksum = "5637e166ea14be6063a3f8ba5ccb9a4159df7d8f6d61c02fc3d480b1f90dcfcb"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "block",
  "core-graphics-types",
  "foreign-types",
@@ -1539,12 +1569,13 @@ dependencies = [
 
 [[package]]
 name = "naga"
-version = "0.19.2"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50e3524642f53d9af419ab5e8dd29d3ba155708267667c2f3f06c88c9e130843"
+checksum = "e536ae46fcab0876853bd4a632ede5df4b1c2527a58f6c5a4150fe86be858231"
 dependencies = [
+ "arrayvec",
  "bit-set",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "codespan-reporting",
  "hexf-parse",
  "indexmap",
@@ -1614,7 +1645,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2076a31b7010b17a38c01907c45b945e8f11495ee4dd588309718901b1f7a5b7"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "jni-sys",
  "log",
  "ndk-sys 0.5.0+25.2.9519653",
@@ -1814,7 +1845,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "915b1b472bc21c53464d6c8461c9d3af805ba1ef837e1cac254428f4a77177b1"
 dependencies = [
  "malloc_buf",
- "objc_exception",
 ]
 
 [[package]]
@@ -1838,15 +1868,6 @@ name = "objc2-encode"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d079845b37af429bfe5dfa76e6d087d788031045b25cfc6fd898486fd9847666"
-
-[[package]]
-name = "objc_exception"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad970fb455818ad6cba4c122ad012fae53ae8b4795f86378bce65e4f6bab2ca4"
-dependencies = [
- "cc",
-]
 
 [[package]]
 name = "object"
@@ -1927,7 +1948,7 @@ checksum = "b5ebb313092c7cd16da86f8a6a14ac823e36ff1d9b8f727d25bdebf3e4bc4d56"
 dependencies = [
  "approx",
  "arrayvec",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "downcast-rs",
  "either",
  "log",
@@ -2130,7 +2151,7 @@ checksum = "7d7c94f8935a9df96bb6380e8592c70edf497a643f94bd23b2f76b399385dbf4"
 dependencies = [
  "ahash",
  "equivalent",
- "hashbrown",
+ "hashbrown 0.14.3",
  "parking_lot",
 ]
 
@@ -2188,7 +2209,7 @@ dependencies = [
  "approx",
  "arrayvec",
  "bit-vec 0.7.0",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "crossbeam",
  "downcast-rs",
  "log",
@@ -2223,9 +2244,9 @@ checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
 
 [[package]]
 name = "rayon"
-version = "1.8.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c27db03db7734835b3f53954b534c91069375ce6ccaa2e065441e07d9b6cdb1"
+checksum = "b418a60154510ca1a002a752ca9714984e21e4241e804d32555251faf8b78ffa"
 dependencies = [
  "either",
  "rayon-core",
@@ -2233,9 +2254,9 @@ dependencies = [
 
 [[package]]
 name = "rayon-core"
-version = "1.12.0"
+version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ce3fb6ad83f861aac485e76e1985cd109d9a3713802152be56c3b1f0e0658ed"
+checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
@@ -2272,11 +2293,11 @@ dependencies = [
 
 [[package]]
 name = "rend3"
-version = "0.3.0"
+version = "0.20.0"
 dependencies = [
  "arrayvec",
  "bimap",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "bumpalo",
  "bytemuck",
  "encase",
@@ -2293,7 +2314,7 @@ dependencies = [
  "pollster",
  "profiling",
  "range-alloc",
- "rend3-types 0.3.0",
+ "rend3-types 0.20.0",
  "rust-embed",
  "rustc-hash 1.1.0",
  "serde",
@@ -2306,12 +2327,12 @@ dependencies = [
 
 [[package]]
 name = "rend3"
-version = "0.3.0"
-source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#f9a42a79e6faa9d58331a8b183b3d8981a8d6aa7"
+version = "0.20.0"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#2c141febf8fcabdbbd1025da88d7ef741b8d5a6d"
 dependencies = [
  "arrayvec",
  "bimap",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "bumpalo",
  "bytemuck",
  "encase",
@@ -2327,7 +2348,7 @@ dependencies = [
  "parking_lot",
  "profiling",
  "range-alloc",
- "rend3-types 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3-types 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
  "rust-embed",
  "rustc-hash 1.1.0",
  "serde",
@@ -2340,7 +2361,7 @@ dependencies = [
 
 [[package]]
 name = "rend3-framework"
-version = "0.3.0"
+version = "0.20.0"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -2356,8 +2377,8 @@ dependencies = [
  "parking_lot",
  "pollster",
  "profiling",
- "rend3 0.3.0",
- "rend3-routine 0.3.0",
+ "rend3 0.20.0",
+ "rend3-routine 0.20.0",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -2369,8 +2390,8 @@ dependencies = [
 
 [[package]]
 name = "rend3-framework"
-version = "0.3.0"
-source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#f9a42a79e6faa9d58331a8b183b3d8981a8d6aa7"
+version = "0.20.0"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#2c141febf8fcabdbbd1025da88d7ef741b8d5a6d"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -2386,8 +2407,8 @@ dependencies = [
  "parking_lot",
  "pollster",
  "profiling",
- "rend3 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
- "rend3-routine 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3-routine 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -2399,10 +2420,10 @@ dependencies = [
 
 [[package]]
 name = "rend3-routine"
-version = "0.3.0"
+version = "0.20.0"
 dependencies = [
  "arrayvec",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "bytemuck",
  "codespan-reporting",
  "encase",
@@ -2413,7 +2434,7 @@ dependencies = [
  "ordered-float",
  "parking_lot",
  "profiling",
- "rend3 0.3.0",
+ "rend3 0.20.0",
  "rust-embed",
  "serde",
  "serde_json",
@@ -2423,11 +2444,11 @@ dependencies = [
 
 [[package]]
 name = "rend3-routine"
-version = "0.3.0"
-source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#f9a42a79e6faa9d58331a8b183b3d8981a8d6aa7"
+version = "0.20.0"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#2c141febf8fcabdbbd1025da88d7ef741b8d5a6d"
 dependencies = [
  "arrayvec",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "bytemuck",
  "codespan-reporting",
  "encase",
@@ -2438,7 +2459,7 @@ dependencies = [
  "ordered-float",
  "parking_lot",
  "profiling",
- "rend3 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
  "rust-embed",
  "serde",
  "serde_json",
@@ -2448,9 +2469,9 @@ dependencies = [
 
 [[package]]
 name = "rend3-types"
-version = "0.3.0"
+version = "0.20.0"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "bytemuck",
  "cfg-if",
  "encase",
@@ -2463,10 +2484,10 @@ dependencies = [
 
 [[package]]
 name = "rend3-types"
-version = "0.3.0"
-source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#f9a42a79e6faa9d58331a8b183b3d8981a8d6aa7"
+version = "0.20.0"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#2c141febf8fcabdbbd1025da88d7ef741b8d5a6d"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "bytemuck",
  "cfg-if",
  "encase",
@@ -2479,9 +2500,9 @@ dependencies = [
 
 [[package]]
 name = "renderdoc-sys"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "216080ab382b992234dda86873c18d4c48358f5cfcb70fd693d7f6f2131b628b"
+checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "robust"
@@ -2559,7 +2580,7 @@ version = "0.38.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f93dc38ecbab2eb790ff964bb77fa94faf256fd3e73285fd7ba0903b76bedb85"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "errno",
  "libc",
  "linux-raw-sys",
@@ -2609,9 +2630,9 @@ dependencies = [
  "pollster",
  "quick_cache",
  "rapier3d",
- "rend3 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
- "rend3-framework 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
- "rend3-routine 0.3.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3-framework 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3-routine 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
  "rust-embed",
  "sargerust-files",
  "serde",
@@ -2801,7 +2822,7 @@ version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "922fd3eeab3bd820d76537ce8f582b1cf951eceb5475c28500c7457d9d17f53a"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "calloop",
  "calloop-wayland-source",
  "cursor-icon",
@@ -2845,7 +2866,7 @@ version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93f5ef1f863aca7d1d7dda7ccfc36a0a4279bd6d3c375176e5e0712e25cb4889"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.14.3",
  "num-traits",
  "robust",
  "smallvec",
@@ -2866,7 +2887,7 @@ version = "0.3.0+sdk-1.3.268.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eda41003dc44290527a59b13432d4a0379379fa074b70174882adfbdfd917844"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
 ]
 
 [[package]]
@@ -3245,7 +3266,7 @@ version = "0.31.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b66249d3fc69f76fd74c82cc319300faa554e9d865dab1f7cd66cc20db10b280"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "rustix",
  "wayland-backend",
  "wayland-scanner",
@@ -3257,7 +3278,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "625c5029dbd43d25e6aa9615e88b829a5cad13b2819c4ae129fdbb7c31ab4c7e"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "cursor-icon",
  "wayland-backend",
 ]
@@ -3279,7 +3300,7 @@ version = "0.31.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f81f365b8b4a97f422ac0e8737c438024b5951734506b0e1d775c73030561f4"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "wayland-backend",
  "wayland-client",
  "wayland-scanner",
@@ -3291,7 +3312,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23803551115ff9ea9bce586860c5c5a971e360825a0309264102a9495a5ff479"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "wayland-backend",
  "wayland-client",
  "wayland-protocols",
@@ -3304,7 +3325,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad1f61b76b6c2d8742e10f9ba5c3737f6530b4c243132c2a2ccc8aa96fe25cd6"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "wayland-backend",
  "wayland-client",
  "wayland-protocols",
@@ -3366,19 +3387,20 @@ dependencies = [
 
 [[package]]
 name = "weezl"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9193164d4de03a926d909d3bc7c30543cecb35400c02114792c2cae20d5e2dbb"
+checksum = "53a85b86a771b1c87058196170769dd264f66c0782acf1ae6cc51bfd64b39082"
 
 [[package]]
 name = "wgpu"
-version = "0.19.4"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbd7311dbd2abcfebaabf1841a2824ed7c8be443a0f29166e5d3c6a53a762c01"
+checksum = "90e37c7b9921b75dfd26dd973fdcbce36f13dfa6e2dc82aece584e0ed48c355c"
 dependencies = [
  "arrayvec",
  "cfg-if",
  "cfg_aliases",
+ "document-features",
  "js-sys",
  "log",
  "naga",
@@ -3397,15 +3419,16 @@ dependencies = [
 
 [[package]]
 name = "wgpu-core"
-version = "0.19.4"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28b94525fc99ba9e5c9a9e24764f2bc29bad0911a7446c12f446a8277369bf3a"
+checksum = "d50819ab545b867d8a454d1d756b90cd5f15da1f2943334ca314af10583c9d39"
 dependencies = [
  "arrayvec",
  "bit-vec 0.6.3",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "cfg_aliases",
  "codespan-reporting",
+ "document-features",
  "indexmap",
  "log",
  "naga",
@@ -3423,15 +3446,15 @@ dependencies = [
 
 [[package]]
 name = "wgpu-hal"
-version = "0.19.5"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfabcfc55fd86611a855816326b2d54c3b2fd7972c27ce414291562650552703"
+checksum = "172e490a87295564f3fcc0f165798d87386f6231b04d4548bca458cbbfd63222"
 dependencies = [
  "android_system_properties",
  "arrayvec",
  "ash",
  "bit-set",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "block",
  "cfg_aliases",
  "core-graphics-types",
@@ -3468,9 +3491,9 @@ dependencies = [
 
 [[package]]
 name = "wgpu-profiler"
-version = "0.16.2"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "198b96a1940b527c6e21ab829b3630eb4e8ffb602fd12839d8c5e088c8e06192"
+checksum = "8065ff7bd32ba1b0b0de591cc124bb5ca2d0e7df294d31f7ea3aa8c19dc0924b"
 dependencies = [
  "parking_lot",
  "thiserror",
@@ -3479,11 +3502,11 @@ dependencies = [
 
 [[package]]
 name = "wgpu-types"
-version = "0.19.2"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b671ff9fb03f78b46ff176494ee1ebe7d603393f42664be55b64dc8d53969805"
+checksum = "1353d9a46bff7f955a680577f34c69122628cc2076e1d6f3a9be6ef00ae793ef"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "js-sys",
  "web-sys",
 ]
@@ -3761,7 +3784,7 @@ dependencies = [
  "ahash",
  "android-activity",
  "atomic-waker",
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "bytemuck",
  "calloop",
  "cfg_aliases",
@@ -3886,7 +3909,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d039de8032a9a8856a6be89cea3e5d12fdd82306ab7c94d74e6deab2460651c5"
 dependencies = [
- "bitflags 2.4.1",
+ "bitflags 2.6.0",
  "dlib",
  "log",
  "once_cell",
