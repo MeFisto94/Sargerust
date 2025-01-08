@@ -14,9 +14,7 @@ use wow_world_messages::Guid;
 use wow_world_messages::errors::ExpectedOpcodeError;
 use wow_world_messages::wrath::expect_server_message_encryption;
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
-use wow_world_messages::wrath::{
-    CMSG_CHAR_ENUM, CMSG_PLAYER_LOGIN, SMSG_AUTH_RESPONSE, SMSG_AUTH_RESPONSE_WorldResult, SMSG_CHAR_ENUM,
-};
+use wow_world_messages::wrath::{CMSG_CHAR_ENUM, CMSG_PLAYER_LOGIN, SMSG_AUTH_RESPONSE, SMSG_CHAR_ENUM};
 use wow_world_messages::wrath::{
     CMSG_TIME_SYNC_RESP, ClientMessage, SMSG_CLIENTCACHE_VERSION, SMSG_TUTORIAL_FLAGS, SMSG_WARDEN_DATA,
 };
@@ -67,7 +65,7 @@ impl WorldServer {
             let s =
                 expect_server_message_encryption::<SMSG_AUTH_RESPONSE, _>(&mut self.stream(), dec.deref_mut()).unwrap();
 
-            if !matches!(s.result, SMSG_AUTH_RESPONSE_WorldResult::AuthOk { .. }) {
+            if !matches!(s, SMSG_AUTH_RESPONSE::AuthOk { .. }) {
                 panic!()
             }
 

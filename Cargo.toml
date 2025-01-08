@@ -62,8 +62,8 @@ quick_cache = "0.6.9"
 # Multiplayer/Networking
 # "srp-fast-math" is not supported with the MSVC target. Also the version needs to match the version defined in the messages
 wow_srp = { version = "0.7.0", default-features = false, features = ["tbc-header", "wrath-header", "srp-default-math"] }
-wow_login_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync"] }
-wow_world_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync", "wrath", "print-testcase"] }
+wow_login_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync"], rev = "d30a0aea8213e963534c638c8166cae0d36e9f9f" }
+wow_world_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync", "wrath", "print-testcase"], rev = "d30a0aea8213e963534c638c8166cae0d36e9f9f" }
 
 # async
 tokio = { version = "1.33.0", features = ["full"] }
