@@ -6,10 +6,10 @@ use crate::ParserError;
 use crate::common::reader::{GenericStringList, Parseable, read_chunk_array};
 use crate::common::types::{C3Vector, CImVector, IffChunk};
 use crate::wdt::types::SMMapObjDef;
+use bitflags::bitflags;
 use sargerust_files_derive_parseable::Parse;
 use std::collections::HashMap;
 use std::io::{Cursor, ErrorKind, Read};
-
 // https://wowdev.wiki/ADT/v18
 
 #[derive(Debug)]
@@ -223,12 +223,33 @@ impl Parseable<MH2OChunk> for MH2OChunk {
     }
 }
 
+bitflags! {
+    #[derive(Debug, Copy, Clone)]
+    pub struct MCNKHeaderFlags: u32 {
+        const HAS_MCSH = 1 << 0;
+        const IMPASS = 1 << 1;
+        const LQ_RIVER = 1 << 2;
+        const LQ_OCEAN = 1 << 3;
+        const LQ_MAGMA = 1 << 4;
+        const LQ_SLIME = 1 << 5;
+        const HAS_MCCV = 1 << 6;
+        const DO_NOT_FIX_ALPHA_MAP = 1 << 14;
+        const HIGH_RES_HOLES = 1 << 15;
+    }
+}
+
+impl Parseable<MCNKHeaderFlags> for MCNKHeaderFlags {
+    fn parse<R: Read>(rdr: &mut R) -> Result<MCNKHeaderFlags, ParserError> {
+        Ok(MCNKHeaderFlags::from_bits_retain(u32::parse(rdr)?))
+    }
+}
+
 // 256 individual MCNK chunks, row by row, starting from top-left (northwest).
 // The MCNK chunks have a large block of data that starts with a header, and then has sub-chunks of its own.
 #[derive(Debug, Parse)]
 /// SMChunk
 pub struct MCNKChunkHeader {
-    pub flags: u32,
+    pub flags: MCNKHeaderFlags,
     pub IndexX: u32,
     pub IndexY: u32,
     pub nLayers: u32,
@@ -294,9 +315,8 @@ impl MCNKChunk {
         Ok(Some(read_chunk_array(&mut Cursor::new(&iff.data))?))
     }
 
-    pub fn get_mccv(&self) -> Result<Option<MCCVSubChunk>, ParserError> {
-        if self.header.ofsMCCV == 0 {
-            // TODO: check for flags has_mccv.
+    pub fn get_mccv(&self, mcnk: &MCNKChunkHeader) -> Result<Option<MCCVSubChunk>, ParserError> {
+        if self.header.ofsMCCV == 0 || !mcnk.flags.contains(MCNKHeaderFlags::HAS_MCCV) {
             return Ok(None);
         }
 
@@ -340,6 +360,21 @@ impl MCNKChunk {
         Ok(Some(read_chunk_array(&mut Cursor::new(&iff.data))?))
     }
 
+    pub fn get_mcal(&self) -> Result<Option<MCALSubChunk>, ParserError> {
+        if self.header.ofsAlpha == 0 {
+            return Ok(None);
+        }
+
+        let mut rdr = Cursor::new(&self.sub_chunks[(self.header.ofsAlpha - 136) as usize..]);
+        let iff = IffChunk::read_next_chunk(&mut rdr)?;
+
+        if !iff.is_magic("MCAL") {
+            return Err(ParserError::InvalidMagicValue { magic: iff.magic });
+        }
+
+        Ok(Some(iff.data.clone()))
+    }
+
     pub fn get_index_low(row: u8, column: u8) -> u8 {
         17 * row + column
     }
@@ -368,14 +403,34 @@ pub struct MCNREntry {
 
 pub type MCNRSubChunk = Vec<MCNREntry>;
 
+bitflags! {
+    #[derive(Debug, Copy, Clone)]
+    pub struct SMLayerFlags: u32 {
+        // lowest 3 bits: animation rotation, next 3 bits: animation speed
+        const ANIMATION_ENABLED = 1 << 6;
+        const OVERBRIGHT = 1 << 7; // used for lava to make it glow
+        const USE_ALPHA_MAP = 1 << 8; // should be set for every layer after the first.
+        const ALPHA_MAP_COMPRESSED = 1 << 9;
+        const USE_CUBE_MAP_REFLECTION = 1 << 10;
+    }
+}
+
+impl Parseable<SMLayerFlags> for SMLayerFlags {
+    fn parse<R: Read>(rdr: &mut R) -> Result<SMLayerFlags, ParserError> {
+        let flags = u32::parse(rdr)?;
+        Ok(SMLayerFlags::from_bits_retain(flags))
+    }
+}
+
 #[derive(Debug, Parse)]
 pub struct SMLayer {
     pub textureId: u32,
-    pub flags: u32,
+    pub flags: SMLayerFlags,
+    pub offset_in_mcal: u32,
     pub effectId: u32, // foreign_key <uint32_t, &GroundEffectTextureRec::m_ID>
 }
 
-/// Up to 4 layers apparently.
+/// Up to 4 layers, apparently.
 pub type MCLYSubChunk = Vec<SMLayer>;
 
 /// uint32_t doodad_refs[header.nDoodadRefs]; // into MDDF

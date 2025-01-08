@@ -206,7 +206,7 @@ pub(crate) fn read_chunk_array<T: Parseable<T>, R: Read>(rdr: &mut R) -> Result<
     let mut list = Vec::<T>::new();
     let mut element = T::parse(rdr);
     while element.is_ok() {
-        list.push(element.unwrap());
+        list.push(element?);
         element = T::parse(rdr);
     }
 

@@ -12,6 +12,7 @@ thiserror = "1.0.48"
 cfg-if = "1.0.0"
 num_enum = "0.7.0"
 sargerust-files-derive-parseable = { path = "sargerust-files-derive-parseable" }
+bitflags = "2.6.0"
 
 [dev-dependencies]
 anyhow = "1.0.75"

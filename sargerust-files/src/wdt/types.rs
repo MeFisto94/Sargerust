@@ -2,11 +2,11 @@
 use crate::ParserError;
 use crate::common::reader::Parseable;
 use crate::common::types::{C3Vector, CAaBox, IffChunk};
+use bitflags::bitflags;
 use byteorder::{LittleEndian, ReadBytesExt};
 use sargerust_files_derive_parseable::Parse;
 use std::ffi::CStr;
 use std::io::Read;
-
 // https://wowdev.wiki/WDT
 
 pub struct WDTAsset {
@@ -16,17 +16,31 @@ pub struct WDTAsset {
     pub mwmo: Option<MWMOChunk>,
 }
 
+bitflags! {
+    #[derive(Debug, Copy, Clone)]
+    pub struct MPHDFlags: u32 {
+        const WDT_USES_GLOBAL_MAP_OBJ = 1 << 0;
+
+        #[cfg(feature = "wotlk")]
+        /// With this flag every ADT in the map _must_ have MCCV chunk at least with default values, else only base texture layer is rendered on such ADTs.
+        const ADT_HAS_MCCV = 1 << 1;
+
+        const ADT_HAS_BIG_ALPHA = 1 << 2;
+        const ADT_HAS_DOODADREFS_SORTED_BY_SIZE_CAT = 1 << 3;
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 /// Also known as SMMapHeader
 pub struct MPHDChunk {
-    pub flags: u32,
+    pub flags: MPHDFlags,
     pub something: u32,
     pub unused: [u32; 6],
 }
 
 impl Parseable<MPHDChunk> for MPHDChunk {
     fn parse<R: Read>(rdr: &mut R) -> Result<MPHDChunk, ParserError> {
-        let flags = rdr.read_u32::<LittleEndian>()?;
+        let flags = MPHDFlags::from_bits_retain(rdr.read_u32::<LittleEndian>()?);
         let something = rdr.read_u32::<LittleEndian>()?;
 
         let mut unused: [u32; 6] = [0; 6];

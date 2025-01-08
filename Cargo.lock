@@ -2649,6 +2649,7 @@ name = "sargerust-files"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bitflags 2.6.0",
  "byteorder",
  "cfg-if",
  "num_enum 0.7.1",
