@@ -102,13 +102,13 @@ impl RenderingApplication {
                 .expect("Write lock on physics state")
                 .update_fixed(coordinate_systems::blender_to_adt(delta_movement).into());
 
-            app.world_server
-                .clone()
-                .expect("World Server to be present")
-                .movement_tracker
-                .write()
-                .expect("Movement Tracker Write Lock tainted")
-                .track_movement(player_movement_info);
+            if let Some(ws) = app.world_server.as_ref() {
+                // Otherwise: Standalone mode. We need a better API
+                ws.movement_tracker
+                    .write()
+                    .expect("Movement Tracker Write Lock tainted")
+                    .track_movement(player_movement_info);
+            }
 
             if !self.fly_cam {
                 // TODO: Third Person controls.

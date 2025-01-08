@@ -26,11 +26,11 @@ enum DemoMode {
     Wmo,
     Adt,
     MultipleAdt,
-    NoDemo,
+    NoDemo(bool),
 }
 
 fn main() {
-    let mode = DemoMode::NoDemo;
+    let mode = DemoMode::NoDemo(true);
     env_logger::init();
 
     // TODO: perspectively, this folder will be a CLI argument
@@ -44,15 +44,17 @@ fn main() {
         DemoMode::Wmo => demos::main_simple_wmo(&mpq_loader).unwrap(),
         DemoMode::Adt => demos::main_simple_adt(&mpq_loader).unwrap(),
         DemoMode::MultipleAdt => demos::main_multiple_adt(&mpq_loader).unwrap(),
-        DemoMode::NoDemo => {
+        DemoMode::NoDemo(standalone) => {
             let mut recv = None;
             let app = Arc::new_cyclic(|weak| {
                 let mut app = GameApplication::new(weak, mpq_loader);
-                recv = Some(app.realm_logon("127.0.0.1:3724", "user", "user"));
+                if !standalone {
+                    recv = Some(app.realm_logon("127.0.0.1:3724", "user", "user"));
+                }
                 app
             });
 
-            app.run(recv.unwrap());
+            app.run(recv);
         }
     }
 }

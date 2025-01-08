@@ -9,7 +9,9 @@ use winit::dpi::LogicalSize;
 use wow_srp::normalized_string::NormalizedString;
 use wow_srp::wrath_header::ProofSeed;
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
-use wow_world_messages::wrath::{CMSG_AUTH_SESSION, ClientMessage, SMSG_AUTH_CHALLENGE, expect_server_message};
+use wow_world_messages::wrath::{
+    CMSG_AUTH_SESSION, ClientMessage, Map, SMSG_AUTH_CHALLENGE, Vector3d, expect_server_message,
+};
 
 use crate::game::game_state::GameState;
 use crate::game::packet_handlers::PacketHandlers;
@@ -43,36 +45,63 @@ impl GameApplication {
         }
     }
 
+    // TODO: Most of the network specific stuff could be refactored out into a NetworkApplication. Composition over Inheritance
     pub fn realm_logon(&mut self, address: &str, username: &str, password: &str) -> Receiver<Box<ServerOpcodeMessage>> {
         let (sender, receiver) = channel();
         self.prepare_network(sender, address, username, password);
         receiver
     }
 
-    pub fn run(&self, receiver: Receiver<Box<ServerOpcodeMessage>>) {
-        let ws = self.world_server.as_ref().unwrap().clone();
+    pub fn run(&self, receiver_opt: Option<Receiver<Box<ServerOpcodeMessage>>>) {
         let cloned_self = self.weak_self.clone();
-        let net_thread = std::thread::Builder::new()
-            .name("Network".into())
-            .spawn(move || {
-                ws.run(cloned_self);
-            })
-            .unwrap();
 
-        let logic_thread = self.run_packet_handlers(receiver);
+        let net_thread_opt = self.world_server.as_ref().map(|ws_arc| {
+            let ws = ws_arc.clone();
+            std::thread::Builder::new()
+                .name("Network".into())
+                .spawn(move || {
+                    ws.run(cloned_self);
+                })
+                .unwrap()
+        });
+
+        let logic_thread_opt = receiver_opt.map(|receiver| self.run_packet_handlers(receiver));
 
         let wnd = winit::window::WindowBuilder::new()
             .with_title("Sargerust: Wrath of the Rust King")
             .with_inner_size(LogicalSize::new(1024, 768));
         let render_app = RenderingApplication::new(self.weak_self.clone());
-        rend3_framework::start(render_app, wnd);
 
-        net_thread
-            .join()
-            .expect("Network Thread to terminate normally");
-        logic_thread
-            .join()
-            .expect("Logic Thread to terminate normally");
+        if logic_thread_opt.is_none() {
+            // TODO: Derive standalone *and* otherwise the map from the launch args.
+            self.game_state.change_map(
+                Map::EasternKingdoms,
+                Vector3d {
+                    x: -8924.0,
+                    y: -117.0,
+                    z: 82.0,
+                },
+                0.0,
+            );
+        }
+
+        rend3_framework::start(render_app, wnd); // This blocks until the window is closed
+
+        // TODO: We could have a boolean "standalone" flag and only then tolerate the absence of receiver and WorldServer.
+        //  otherwise we allow for some frankenstein situations where half of the things are running (here: WorldServer but not recv)
+        //  this would however become better if we refactored networking out into a NetworkApplication that can only do that and thus
+        //  is a single Option carrying everything.
+        if let Some(net_thread) = net_thread_opt {
+            net_thread
+                .join()
+                .expect("Network Thread to terminate normally");
+        }
+
+        if let Some(logic_thread) = logic_thread_opt {
+            logic_thread
+                .join()
+                .expect("Logic Thread to terminate normally");
+        }
     }
 
     fn prepare_network(
