@@ -5,6 +5,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use glam::{Vec3, Vec3A};
+use itertools::Itertools;
 use log::{error, info, trace, warn};
 use tokio::runtime::{Builder, Handle, Runtime};
 use tokio::task::JoinSet;
@@ -12,13 +13,14 @@ use tokio::task::JoinSet;
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::ADTAsset;
 use sargerust_files::wdt::reader::WDTReader;
-use sargerust_files::wdt::types::{SMMapObjDef, WDTAsset};
+use sargerust_files::wdt::types::{MPHDChunk, SMMapObjDef, WDTAsset};
 
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::m2_generator::M2Generator;
 use crate::rendering::asset_graph::nodes::adt_node::{
-    ADTNode, DoodadReference, IRTexture, IRTextureReference, M2Node, TerrainTile, WMOGroupNode, WMONode, WMOReference,
+    ADTNode, DoodadReference, IRObject, IRTexture, IRTextureReference, M2Node, TerrainTile, WMOGroupNode, WMONode,
+    WMOReference,
 };
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
@@ -94,7 +96,7 @@ impl MapManager {
                 );
 
                 if wdt.has_chunk(chunk_coords.1, chunk_coords.0) {
-                    self.load_chunk(&map, &chunk_coords);
+                    self.load_chunk(&map, &chunk_coords, &wdt.mphd);
                 } else {
                     error!("We load into the world on unmapped terrain?!");
                 }
@@ -108,15 +110,16 @@ impl MapManager {
 
     fn try_load_chunk(&mut self, coords: &(u8, u8)) -> bool {
         if let Some((map, wdt)) = self.current_map.as_ref() {
+            let mphd = wdt.mphd;
             if wdt.has_chunk(coords.1, coords.0) {
-                self.load_chunk(&map.clone(), coords);
+                self.load_chunk(&map.clone(), coords, &mphd);
                 return true;
             }
         }
 
         false
     }
-    fn load_chunk(&mut self, map: &String, chunk_coords: &(u8, u8)) {
+    fn load_chunk(&mut self, map: &String, chunk_coords: &(u8, u8), mphd: &MPHDChunk) {
         let adt_buf = self.mpq_loader.as_ref().load_raw_owned(&format!(
             "world\\maps\\{}\\{}_{}_{}.adt",
             map, map, chunk_coords.1, chunk_coords.0
@@ -124,11 +127,11 @@ impl MapManager {
         let adt =
             ADTReader::parse_asset(&mut Cursor::new(adt_buf.expect("Cannot load map adt"))).expect("Error parsing ADT");
         trace!("Loaded tile {}_{}_{}", map, chunk_coords.1, chunk_coords.0);
-        let graph = self.handle_adt_lazy(&adt).unwrap();
+        let graph = self.handle_adt_lazy(&adt, mphd).unwrap();
         self.tile_graph.insert(*chunk_coords, Arc::new(graph));
     }
 
-    fn handle_adt_lazy(&self, adt: &ADTAsset) -> Result<ADTNode, anyhow::Error> {
+    fn handle_adt_lazy(&self, adt: &ADTAsset, mphd: &MPHDChunk) -> Result<ADTNode, anyhow::Error> {
         let mut direct_doodad_refs = Vec::new();
         let mut wmos = Vec::new();
 
@@ -140,7 +143,7 @@ impl MapManager {
                 .unwrap()];
             //trace!("M2 {} has been referenced from ADT", name);
 
-            // fix name: currently it ends with .mdx but we need .m2
+            // fix name: currently it ends with .mdx, but we need .m2
             let name = name
                 .to_lowercase()
                 .replace(".mdx", ".m2")
@@ -183,19 +186,43 @@ impl MapManager {
             }
         }
 
+        let mut set = JoinSet::new();
+
         let mut terrain_chunk = vec![];
         for mcnk in &adt.mcnks {
-            let mesh = ADTImporter::create_mesh(mcnk, false)?;
+            let mesh = ADTImporter::create_mesh(mcnk, false, &adt.mtex, mphd)?;
+
+            let texture_layers = mesh
+                .2
+                .into_iter()
+                .map(|tref| {
+                    let tex_ref = Arc::new(tref.texture_path.into());
+                    let alpha = tref
+                        .alpha_map
+                        .map(|data| RwLock::new(IRObject { data, handle: None }));
+                    (tex_ref, alpha)
+                })
+                .collect_vec();
+
             let tile = TerrainTile {
                 position: mesh.0.into(),
                 mesh: RwLock::new(mesh.1.into()),
                 object_handle: RwLock::new(None),
+                texture_layers,
             };
+
+            // TODO: This is a bit sketchy, why do we need to kick this off manually. Also think about the JoinSet again, this isn't exactly lazy then.
+            let references = tile.texture_layers.iter().map(|(t, _)| t.clone()).collect();
+            Self::resolve_tex_reference(
+                self.runtime.handle(),
+                &mut set,
+                self.tex_resolver.clone(),
+                references,
+            );
             terrain_chunk.push(tile);
         }
 
         // TODO: Resolving should be a matter of the rendering app, not this code here? But then their code relies on things being preloaded?
-        let mut set = JoinSet::new();
         for wmo in &wmos {
             if wmo
                 .reference

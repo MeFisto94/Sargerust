@@ -19,6 +19,10 @@ pub struct TerrainTile {
     pub position: Vec3A,
     pub mesh: RwLock<IRMesh>,
     pub object_handle: RwLock<Option<ObjectHandle>>,
+    pub texture_layers: Vec<(
+        Arc<IRTextureReference>,
+        Option<RwLock<IRObject<Vec<u8>, Texture2DHandle>>>,
+    )>,
 }
 
 // TODO: commons.rs in nodes?
@@ -154,6 +158,15 @@ impl From<M2Texture> for IRTextureReference {
         Self {
             reference: RwLock::new(None),
             reference_str: value.filename,
+        }
+    }
+}
+
+impl From<String> for IRTextureReference {
+    fn from(value: String) -> Self {
+        Self {
+            reference: RwLock::new(None),
+            reference_str: value,
         }
     }
 }

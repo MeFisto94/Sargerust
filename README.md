@@ -23,12 +23,13 @@ a lot of `// TODO:` comments everywhere I have an idea while coding).
 
 Things that still need to be implemented (loosely sorted by priority):
 
-- Rendering of the terrain material (create a dedicated shader)
+- More standalone focus without always requiring a fully running dedicated server.
 - Physics: Cleaning up, debug rendering (because I think the shapes are mis-rotated or placed),
-  debugging crashes once the above is accomplished.
+  debugging crashes once the above is accomplished. Walking is sluggish, everything.
 - Third Person Camera Controller (and sending `MOVE_FACING` packets)
 - Entity Component System (hecs?) to keep track of all the gameobjects (moving geometry), especially NPCs
     - Rendering thereof
+- Debug Shader Reloading
 - Reading of DBC files, especially in preparation for:
 - Game Logic. Casting spells and showing stats (mana, health) mainly.
 - Portals, Water, and other less important render objects
@@ -38,5 +39,5 @@ Things that still need to be implemented (loosely sorted by priority):
   a lot of API surface and especially the related event handling and layout management
   needs to be handled from scratch.
 - Advanced game "logic" (e.g. chat, friend list, guilds, trading, auction house)
-- Advanced rendering techniques (triplanar for the dedicated terrain shader), AO, TAA, VXGI?
+- Advanced rendering techniques: AO, TAA, VXGI?
 - https://docs.rs/arc-swap/latest/arc_swap/

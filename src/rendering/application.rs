@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use std::hash::BuildHasher;
 use std::ops::DerefMut;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex, MutexGuard, RwLock, Weak};
+use std::sync::{Arc, Mutex, RwLock, Weak};
 use std::time::Instant;
 use winit::event::Event;
 
@@ -16,15 +16,15 @@ use crate::rendering::rend3_backend::material::terrain::terrain_routine::Terrain
 use crate::rendering::rend3_backend::{Rend3BackendConverter, gpu_loaders};
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
-use log::{error, trace, warn};
+use log::{trace, warn};
 use rend3::graph::RenderGraph;
 use rend3::types::{
-    Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Surface, Texture2DHandle,
+    Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Surface, Texture, Texture2DHandle,
     TextureFormat,
 };
 use rend3::util::typedefs::FastHashMap;
 use rend3::{Renderer, ShaderPreProcessor};
-use rend3_framework::{DefaultRoutines, EventContext, Grabber, RedrawContext, SetupContext};
+use rend3_framework::{EventContext, Grabber, RedrawContext, SetupContext};
 use rend3_routine::base::{
     BaseRenderGraph, BaseRenderGraphInputs, BaseRenderGraphIntermediateState, BaseRenderGraphRoutines,
     BaseRenderGraphSettings, OutputRenderTarget,
@@ -33,9 +33,7 @@ use rend3_routine::common::CameraSpecifier;
 use rend3_routine::forward::ForwardRoutineArgs;
 use rend3_routine::{clear, forward};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
 use winit::platform::scancode::PhysicalKeyExtScancode;
-use winit::window::Window;
 
 // #[derive(Debug)] // TODO: Ensure Grabber implements Display
 pub struct RenderingApplication {
@@ -338,13 +336,70 @@ impl RenderingApplication {
                 }
             }
 
-        let material = TerrainMaterial {};
+            let loaded_texture_layers = tile
+                .texture_layers
+                .iter()
+                .map(|(base_ref, alpha_opt)| {
+                    let base_layer = gpu_loaders::gpu_load_texture(renderer, &base_ref.reference).unwrap();
+
+                    let alpha_layer = alpha_opt.as_ref().map(|alpha_ref| {
+                        // TODO: Since this code is completely ugly anyway, we can also right away take the write lock instead of checking for previous success.
+                        //  the whole principle and "API" will probably need a good overhaul anyway.
+
+                        let mut wlock = alpha_ref.write().expect("Alpha Handle Write Lock");
+
+                        let alpha_tex = Texture {
+                            label: Some(format!("Alpha Layer Terrain {}", tile.position)),
+                            data: wlock.data.clone(),
+                            format: rend3::types::TextureFormat::R8Unorm,
+                            size: UVec2::new(64, 64),
+                            mip_count: rend3::types::MipmapCount::ONE,
+                            mip_source: rend3::types::MipmapSource::Uploaded,
+                        };
+
+                        let alpha_handle = renderer
+                            .add_texture_2d(alpha_tex)
+                            .expect("Texture creation successful");
+
+                        wlock.handle = Some(alpha_handle.clone());
+                        alpha_handle
+                    });
+
+                    (base_layer, alpha_layer)
+                })
+                .collect_vec();
 
             let mut wlock = tile
                 .object_handle
                 .write()
                 .expect("Object Handle Write Lock");
 
+            assert!(
+                !loaded_texture_layers.is_empty(),
+                "At least one texture layer has to be present"
+            );
+
+            let base_texture = loaded_texture_layers[0].0.clone();
+            let mut additional_layers = [const { None }; 6];
+
+            for (idx, (base, alpha_opt)) in loaded_texture_layers.iter().skip(1).enumerate() {
+                if idx > 2 {
+                    warn!("Terrain: Skipping texture layer {}, only 4 supported", idx);
+                    break;
+                }
+
+                if let Some(alpha) = alpha_opt {
+                    additional_layers[2 * idx] = Some(base.clone());
+                    additional_layers[2 * idx + 1] = Some(alpha.clone());
+                } else {
+                    warn!("Terrain: Skipping texture layer {}, missing alpha map", idx);
+                }
+            }
+
+            let material = TerrainMaterial {
+                base_texture,
+                additional_layers,
+            };
             let material_handle = renderer.add_material(material);
             let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, &tile.mesh);
 

@@ -1,5 +1,6 @@
 use crate::rendering::rend3_backend::material::terrain::terrain_material::TerrainMaterial;
-use rend3::{Renderer, RendererDataCore, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
+use rend3::RendererProfile::GpuDriven;
+use rend3::{Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
 use rend3_routine::common::{PerMaterialArchetypeInterface, WholeFrameInterfaces};
 use rend3_routine::forward::{ForwardRoutine, ForwardRoutineCreateArgs, RoutineType, ShaderModulePair};
 use rend3_routine::pbr::TransparencyType;
@@ -43,7 +44,8 @@ impl TerrainRoutine {
                     spp.render_shader(
                         "sargerust/terrain-opaque.wgsl",
                         &ShaderConfig {
-                            profile: Some(renderer.profile),
+                            //profile: Some(renderer.profile),
+                            profile: Some(GpuDriven),
                             ..Default::default()
                         },
                         Some(&ShaderVertexBufferConfig::from_material::<TerrainMaterial>()),
@@ -56,7 +58,7 @@ impl TerrainRoutine {
         let transparency = TransparencyType::Opaque;
 
         let opaque_routine = ForwardRoutine::new(ForwardRoutineCreateArgs {
-            name: &format!("terrain {routine_type:?} {transparency:?}"),
+            name: &format!("Terrain {routine_type:?} {transparency:?}"),
             renderer,
             data_core,
             spp,

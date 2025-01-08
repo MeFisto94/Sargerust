@@ -3,6 +3,7 @@ use crate::io::mpq::loader::MPQLoader;
 use crate::rendering;
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::highlevel_types::PlacedDoodad;
+use crate::rendering::common::special_types::TerrainTextureLayer;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod};
 use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::rendering::importer::m2_importer::M2Importer;
@@ -19,6 +20,7 @@ use rend3_routine::base::{BaseRenderGraphRoutines, OutputRenderTarget};
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::ADTAsset;
 use sargerust_files::m2::reader::M2Reader;
+use sargerust_files::wdt::types::{MPHDChunk, MPHDFlags};
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::sync::Arc;
@@ -40,7 +42,7 @@ pub fn render<'a, W>(
     placed_doodads: Vec<PlacedDoodad>,
     wmos: W,
     textures: HashMap<String, BlpImage>,
-    terrain_chunk: Vec<(Vec3, Mesh)>,
+    terrain_chunk: Vec<(Vec3, Mesh, Vec<TerrainTextureLayer>)>,
     camera_location: Vec3A,
 ) where
     W: IntoIterator<
@@ -454,7 +456,7 @@ pub fn main_multiple_adt(loader: &MPQLoader) -> Result<(), anyhow::Error> {
     let mut render_list = Vec::new();
     let mut texture_map = HashMap::new();
     let mut wmos = Vec::new();
-    let mut terrain_chunks: Vec<(Vec3, Mesh)> = Vec::new();
+    let mut terrain_chunks: Vec<(Vec3, Mesh, Vec<TerrainTextureLayer>)> = Vec::new();
 
     for row in 0..2 {
         for column in 0..2 {
@@ -492,7 +494,7 @@ fn handle_adt(
     render_list: &mut Vec<PlacedDoodad>,
     texture_map: &mut HashMap<String, BlpImage>,
     wmos: &mut Vec<(Affine3A, Vec<(MeshWithLod, Vec<Material>)>)>,
-) -> Result<Vec<(Vec3, Mesh)>, anyhow::Error> {
+) -> Result<Vec<(Vec3, Mesh, Vec<TerrainTextureLayer>)>, anyhow::Error> {
     for wmo_ref in adt.modf.mapObjDefs.iter() {
         let name = &adt.mwmo.filenames[*adt
             .mwmo
@@ -565,7 +567,14 @@ fn handle_adt(
 
     let mut terrain_chunk = vec![];
     for mcnk in &adt.mcnks {
-        terrain_chunk.push(ADTImporter::create_mesh(mcnk, false)?);
+        // TODO: theoretically we would have to load the WDT, but the future of these demos is questionable anyway.
+        let mphd: MPHDChunk = MPHDChunk {
+            flags: MPHDFlags::empty(),
+            something: 0,
+            unused: [0, 0, 0, 0, 0, 0],
+        };
+
+        terrain_chunk.push(ADTImporter::create_mesh(mcnk, false, &adt.mtex, &mphd)?);
     }
 
     Ok(terrain_chunk)

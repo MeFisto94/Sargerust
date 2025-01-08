@@ -10,6 +10,7 @@ use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectHandle};
 
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::highlevel_types::PlacedDoodad;
+use crate::rendering::common::special_types::TerrainTextureLayer;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, TransparencyType};
 use crate::rendering::rend3_backend::Rend3BackendConverter;
 
@@ -44,11 +45,11 @@ fn create_object(transform: Affine3A, mesh_handle: MeshHandle, material_handle: 
 }
 
 pub fn add_terrain_chunks(
-    terrain_chunk: &Vec<(Vec3, Mesh)>,
+    terrain_chunk: &Vec<(Vec3, Mesh, Vec<TerrainTextureLayer>)>,
     renderer: &Arc<Renderer>,
     object_list: &mut Vec<ObjectHandle>,
 ) {
-    for (position, _mesh) in terrain_chunk {
+    for (position, _mesh, _) in terrain_chunk {
         let mesh = Rend3BackendConverter::create_mesh_from_ir(_mesh).unwrap();
 
         let mesh_handle = renderer
