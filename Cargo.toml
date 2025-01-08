@@ -24,6 +24,10 @@ lto = "fat"
 debug = 1
 codegen-units = 1
 
+[build-dependencies]
+anyhow = "1.0.95"
+vergen-gitcl = { version = "1.0.2", features = [], default-features = false }
+
 [dependencies]
 # Logging, but getting rid of the regex feature/dependency for regex filters.
 env_logger = { version = "0.11.3", default-features = false, features = ["auto-color", "humantime"] }

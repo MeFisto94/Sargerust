@@ -67,8 +67,16 @@ impl GameApplication {
 
         let logic_thread_opt = receiver_opt.map(|receiver| self.run_packet_handlers(receiver));
 
+        const WINDOW_TITLE: &str = concat!(
+            "Sargerust: Wrath of the Rust King (",
+            env!("VERGEN_GIT_BRANCH"),
+            "/",
+            env!("VERGEN_GIT_SHA"),
+            ")"
+        );
+
         let wnd = winit::window::WindowBuilder::new()
-            .with_title("Sargerust: Wrath of the Rust King")
+            .with_title(WINDOW_TITLE)
             .with_inner_size(LogicalSize::new(1024, 768));
         let render_app = RenderingApplication::new(self.weak_self.clone());
 
