@@ -339,10 +339,11 @@ impl RenderingApplication {
             let loaded_texture_layers = tile
                 .texture_layers
                 .iter()
-                .map(|(base_ref, alpha_opt)| {
-                    let base_layer = gpu_loaders::gpu_load_texture(renderer, &base_ref.reference).unwrap();
+                .map(|layer| {
+                    let base_layer =
+                        gpu_loaders::gpu_load_texture(renderer, &layer.base_texture_ref.reference).unwrap();
 
-                    let alpha_layer = alpha_opt.as_ref().map(|alpha_ref| {
+                    let alpha_layer = layer.alpha_map_ref.as_ref().map(|alpha_ref| {
                         // TODO: Since this code is completely ugly anyway, we can also right away take the write lock instead of checking for previous success.
                         //  the whole principle and "API" will probably need a good overhaul anyway.
 

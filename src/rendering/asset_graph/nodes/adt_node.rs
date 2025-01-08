@@ -1,3 +1,4 @@
+use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::common::types::{Material, Mesh};
 use glam::{Affine3A, Mat4, Vec3A};
 use image_blp::BlpImage;
@@ -19,10 +20,7 @@ pub struct TerrainTile {
     pub position: Vec3A,
     pub mesh: RwLock<IRMesh>,
     pub object_handle: RwLock<Option<ObjectHandle>>,
-    pub texture_layers: Vec<(
-        Arc<IRTextureReference>,
-        Option<RwLock<IRObject<Vec<u8>, Texture2DHandle>>>,
-    )>,
+    pub texture_layers: Vec<TerrainTextureLayerRend3>,
 }
 
 // TODO: commons.rs in nodes?

@@ -24,6 +24,7 @@ use crate::rendering::asset_graph::nodes::adt_node::{
 };
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
+use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::{transform_for_doodad_ref, transform_for_wmo_ref};
 
@@ -200,7 +201,7 @@ impl MapManager {
                     let alpha = tref
                         .alpha_map
                         .map(|data| RwLock::new(IRObject { data, handle: None }));
-                    (tex_ref, alpha)
+                    TerrainTextureLayerRend3::new(tex_ref, alpha)
                 })
                 .collect_vec();
 
@@ -212,7 +213,11 @@ impl MapManager {
             };
 
             // TODO: This is a bit sketchy, why do we need to kick this off manually. Also think about the JoinSet again, this isn't exactly lazy then.
-            let references = tile.texture_layers.iter().map(|(t, _)| t.clone()).collect();
+            let references = tile
+                .texture_layers
+                .iter()
+                .map(|(layer)| layer.base_texture_ref.clone())
+                .collect();
             Self::resolve_tex_reference(
                 self.runtime.handle(),
                 &mut set,

@@ -40,4 +40,5 @@ Things that still need to be implemented (loosely sorted by priority):
   needs to be handled from scratch.
 - Advanced game "logic" (e.g. chat, friend list, guilds, trading, auction house)
 - Advanced rendering techniques: AO, TAA, VXGI?
+- Anisotropic Filtering, basically setting SamplerDesc#anisotropy_clamp > 1, POT, < 16 (based on the device limits)
 - https://docs.rs/arc-swap/latest/arc_swap/
