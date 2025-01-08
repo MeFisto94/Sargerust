@@ -19,6 +19,11 @@ opt-level = 3
 [profile.dev.package.glam]
 opt-level = 3
 
+[profile.release]
+lto = "fat"
+debug = 1
+codegen-units = 1
+
 [dependencies]
 # Logging, but getting rid of the regex feature/dependency for regex filters.
 env_logger = { version = "0.11.3", default-features = false, features = ["auto-color", "humantime"] }
