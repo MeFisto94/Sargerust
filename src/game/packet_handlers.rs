@@ -2,6 +2,7 @@ use log::{info, warn};
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Weak};
+use std::time::Duration;
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
 
 use crate::game::application::GameApplication;
@@ -27,8 +28,11 @@ impl PacketHandlers {
                 return;
             }
 
-            let res = self.receiver.recv();
-            if res.is_err() {
+            let res = self.receiver.recv_timeout(Duration::from_millis(100));
+
+            if let Err(std::sync::mpsc::RecvTimeoutError::Timeout) = res {
+                continue;
+            } else if res.is_err() {
                 warn!("PacketHandlers: Broken Pipe");
                 return;
             }
