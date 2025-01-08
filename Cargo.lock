@@ -907,15 +907,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
-name = "framexml-parser"
-version = "0.1.0"
-dependencies = [
- "quick-xml 0.30.0",
- "serde",
- "serde_derive",
-]
-
-[[package]]
 name = "futures-core"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2126,16 +2117,6 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eff6510e86862b57b210fd8cbe8ed3f0d7d600b9c2863cd4549a2e033c66e956"
-dependencies = [
- "memchr",
- "serde",
-]
-
-[[package]]
-name = "quick-xml"
 version = "0.36.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7649a7b4df05aed9ea7ec6f628c67c9953a43869b8bc50929569b2999d443fe"
@@ -2294,40 +2275,6 @@ dependencies = [
 [[package]]
 name = "rend3"
 version = "0.20.0"
-dependencies = [
- "arrayvec",
- "bimap",
- "bitflags 2.6.0",
- "bumpalo",
- "bytemuck",
- "encase",
- "flume",
- "glam",
- "handlebars",
- "indexmap",
- "list-any",
- "log",
- "noop-waker",
- "num-traits",
- "once_cell",
- "parking_lot",
- "pollster",
- "profiling",
- "range-alloc",
- "rend3-types 0.20.0",
- "rust-embed",
- "rustc-hash 1.1.0",
- "serde",
- "smallvec",
- "smartstring",
- "thiserror",
- "wgpu",
- "wgpu-profiler",
-]
-
-[[package]]
-name = "rend3"
-version = "0.20.0"
 source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#2c141febf8fcabdbbd1025da88d7ef741b8d5a6d"
 dependencies = [
  "arrayvec",
@@ -2348,7 +2295,7 @@ dependencies = [
  "parking_lot",
  "profiling",
  "range-alloc",
- "rend3-types 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3-types",
  "rust-embed",
  "rustc-hash 1.1.0",
  "serde",
@@ -2357,35 +2304,6 @@ dependencies = [
  "thiserror",
  "wgpu",
  "wgpu-profiler",
-]
-
-[[package]]
-name = "rend3-framework"
-version = "0.20.0"
-dependencies = [
- "anyhow",
- "cfg-if",
- "console_error_panic_hook",
- "console_log",
- "env_logger",
- "glam",
- "gloo-net",
- "js-sys",
- "log",
- "ndk-glue",
- "once_cell",
- "parking_lot",
- "pollster",
- "profiling",
- "rend3 0.20.0",
- "rend3-routine 0.20.0",
- "thiserror",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "web-time 1.1.0",
- "wgpu",
- "winit",
 ]
 
 [[package]]
@@ -2407,8 +2325,8 @@ dependencies = [
  "parking_lot",
  "pollster",
  "profiling",
- "rend3 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
- "rend3-routine 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3",
+ "rend3-routine",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -2416,30 +2334,6 @@ dependencies = [
  "web-time 1.1.0",
  "wgpu",
  "winit",
-]
-
-[[package]]
-name = "rend3-routine"
-version = "0.20.0"
-dependencies = [
- "arrayvec",
- "bitflags 2.6.0",
- "bytemuck",
- "codespan-reporting",
- "encase",
- "flume",
- "glam",
- "log",
- "naga",
- "ordered-float",
- "parking_lot",
- "profiling",
- "rend3 0.20.0",
- "rust-embed",
- "serde",
- "serde_json",
- "wgpu",
- "wgpu-profiler",
 ]
 
 [[package]]
@@ -2459,27 +2353,12 @@ dependencies = [
  "ordered-float",
  "parking_lot",
  "profiling",
- "rend3 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3",
  "rust-embed",
  "serde",
  "serde_json",
  "wgpu",
  "wgpu-profiler",
-]
-
-[[package]]
-name = "rend3-types"
-version = "0.20.0"
-dependencies = [
- "bitflags 2.6.0",
- "bytemuck",
- "cfg-if",
- "encase",
- "glam",
- "list-any",
- "once_cell",
- "thiserror",
- "wgpu-types",
 ]
 
 [[package]]
@@ -2630,9 +2509,9 @@ dependencies = [
  "pollster",
  "quick_cache",
  "rapier3d",
- "rend3 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
- "rend3-framework 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
- "rend3-routine 0.20.0 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3",
+ "rend3-framework",
+ "rend3-routine",
  "rust-embed",
  "sargerust-files",
  "serde",
@@ -3340,7 +3219,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "597f2001b2e5fc1121e3d5b9791d3e78f05ba6bfa4641053846248e3a13661c3"
 dependencies = [
  "proc-macro2",
- "quick-xml 0.36.2",
+ "quick-xml",
  "quote",
 ]
 
