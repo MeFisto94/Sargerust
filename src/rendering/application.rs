@@ -471,7 +471,7 @@ impl RenderingApplication {
 }
 
 fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -> bool {
-    map.get(&key).map_or(false, |b| *b)
+    map.get(&key).is_some_and(|b| *b)
 }
 
 impl rend3_framework::App for RenderingApplication {
