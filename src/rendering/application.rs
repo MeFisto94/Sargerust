@@ -330,20 +330,22 @@ impl RenderingApplication {
     }
 
     fn load_terrain_chunks(&self, renderer: &Arc<Renderer>, graph: &Arc<ADTNode>) {
-        // TODO: Currently one hardcoded material per adt
-        let _material = Material {
-            is_unlit: true,
-            albedo: AlbedoType::Vertex { srgb: true },
-            transparency: TransparencyType::Opaque,
-        };
+        for tile in &graph.terrain {
+            {
+                let rlock = tile.object_handle.read().expect("Object Handle Read Lock");
+                if rlock.is_some() {
+                    continue;
+                }
+            }
 
-        // TODO: Fix for the new custom shaders
-        //let material = Rend3BackendConverter::create_material_from_ir(&_material, None);
         let material = TerrainMaterial {};
 
-        let material_handle = renderer.add_material(material);
+            let mut wlock = tile
+                .object_handle
+                .write()
+                .expect("Object Handle Write Lock");
 
-        for tile in &graph.terrain {
+            let material_handle = renderer.add_material(material);
             let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, &tile.mesh);
 
             let object = rend3::types::Object {
@@ -356,10 +358,6 @@ impl RenderingApplication {
                 )),
             };
 
-            let mut wlock = tile
-                .object_handle
-                .write()
-                .expect("Object Handle Write Lock");
             *wlock.deref_mut() = Some(renderer.add_object(object));
         }
     }
