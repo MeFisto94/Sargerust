@@ -1,7 +1,7 @@
 use std::net::TcpStream;
 use std::ops::DerefMut;
 use std::sync::mpsc::Sender;
-use std::sync::{Mutex, OnceLock, RwLock, Weak};
+use std::sync::{Arc, Mutex, OnceLock, RwLock, Weak};
 use std::time::Instant;
 
 use crate::game::application::GameApplication;
@@ -54,6 +54,13 @@ impl WorldServer {
 
     pub fn stream(&self) -> &TcpStream {
         &self.stream
+    }
+
+    pub fn spawn_thread(world_server: Arc<WorldServer>, game: Weak<GameApplication>) -> std::thread::JoinHandle<()> {
+        std::thread::Builder::new()
+            .name("World Server".into())
+            .spawn(move || world_server.run(game))
+            .expect("Spawning the World Server Thread succeeds")
     }
 
     pub fn run(&self, weak: Weak<GameApplication>) {

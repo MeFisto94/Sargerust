@@ -16,19 +16,25 @@ use wow_world_messages::wrath::{
 use crate::game::game_state::GameState;
 use crate::game::packet_handlers::PacketHandlers;
 use crate::io::mpq::loader::MPQLoader;
+use crate::networking::application::NetworkApplication;
 use crate::networking::auth;
 use crate::networking::world::WorldServer;
 use crate::rendering::application::RenderingApplication;
 
+pub enum GameOperationMode {
+    Standalone,
+    Networked(Receiver<Box<ServerOpcodeMessage>>),
+}
+
 pub struct GameApplication {
     pub mpq_loader: Arc<MPQLoader>,
-    pub world_server: Option<Arc<WorldServer>>,
     // TODO: separation? one would expect the world server to carry all kinds of methods to emit and handle packets.
     // at the same time I want different structs for different threads, makes things easier.
     //pub packet_handlers: Option<Arc<PacketHandlers>>
     pub game_state: Arc<GameState>,
     pub close_requested: AtomicBool,
     pub renderer: OnceLock<Arc<Renderer>>,
+    pub network: Option<NetworkApplication>,
     weak_self: Weak<GameApplication>,
 }
 
@@ -38,34 +44,41 @@ impl GameApplication {
         Self {
             mpq_loader: mpq_loader_arc.clone(),
             weak_self: weak_self.clone(),
-            world_server: None,
             game_state: Arc::new(GameState::new(weak_self.clone(), mpq_loader_arc.clone())),
             close_requested: AtomicBool::new(false),
             renderer: OnceLock::new(),
+            network: None,
         }
     }
 
-    // TODO: Most of the network specific stuff could be refactored out into a NetworkApplication. Composition over Inheritance
-    pub fn realm_logon(&mut self, address: &str, username: &str, password: &str) -> Receiver<Box<ServerOpcodeMessage>> {
-        let (sender, receiver) = channel();
-        self.prepare_network(sender, address, username, password);
+    pub fn connect_to_realm(
+        &mut self,
+        address: &str,
+        username: &str,
+        password: &str,
+    ) -> Receiver<Box<ServerOpcodeMessage>> {
+        let (network, receiver) = NetworkApplication::connect(address, username, password);
+        self.network = Some(network);
         receiver
     }
 
-    pub fn run(&self, receiver_opt: Option<Receiver<Box<ServerOpcodeMessage>>>) {
-        let cloned_self = self.weak_self.clone();
+    /// Run the game application. This will block until the window is closed and take care of
+    /// starting and ending all the relevant threads. The Receiver is optional and only used when
+    /// standalone == false and there has been a previous call to connect_to_realm.
+    ///
+    // TODO: Design flaw of the receiver. We can't hide it in the network application, though,
+    //  it has to be consumed by spawning the network threads.
+    pub fn run(&self, operation_mode: GameOperationMode) {
+        let standalone = matches!(operation_mode, GameOperationMode::Standalone); // TODO: Sadly we have to move operation_mode's receiver. Better idea?
 
-        let net_thread_opt = self.world_server.as_ref().map(|ws_arc| {
-            let ws = ws_arc.clone();
-            std::thread::Builder::new()
-                .name("Network".into())
-                .spawn(move || {
-                    ws.run(cloned_self);
-                })
-                .unwrap()
-        });
-
-        let logic_thread_opt = receiver_opt.map(|receiver| self.run_packet_handlers(receiver));
+        let handles = match operation_mode {
+            GameOperationMode::Networked(receiver) => self
+                .network
+                .as_ref()
+                .expect("Network must be initialized in non-standalone mode")
+                .spawn_networking_threads(self.weak_self.clone(), receiver),
+            _ => vec![],
+        };
 
         const WINDOW_TITLE: &str = concat!(
             "Sargerust: Wrath of the Rust King (",
@@ -80,7 +93,7 @@ impl GameApplication {
             .with_inner_size(LogicalSize::new(1024, 768));
         let render_app = RenderingApplication::new(self.weak_self.clone());
 
-        if logic_thread_opt.is_none() {
+        if standalone {
             // TODO: Derive standalone *and* otherwise the map from the launch args.
             self.game_state.change_map(
                 Map::EasternKingdoms,
@@ -95,98 +108,10 @@ impl GameApplication {
 
         rend3_framework::start(render_app, wnd); // This blocks until the window is closed
 
-        // TODO: We could have a boolean "standalone" flag and only then tolerate the absence of receiver and WorldServer.
-        //  otherwise we allow for some frankenstein situations where half of the things are running (here: WorldServer but not recv)
-        //  this would however become better if we refactored networking out into a NetworkApplication that can only do that and thus
-        //  is a single Option carrying everything.
-        if let Some(net_thread) = net_thread_opt {
-            net_thread
+        for handle in handles {
+            handle
                 .join()
-                .expect("Network Thread to terminate normally");
+                .expect("Networking thread to terminate normally");
         }
-
-        if let Some(logic_thread) = logic_thread_opt {
-            logic_thread
-                .join()
-                .expect("Logic Thread to terminate normally");
-        }
-    }
-
-    fn prepare_network(
-        &mut self,
-        packet_handler_sender: Sender<Box<ServerOpcodeMessage>>,
-        address: &str,
-        username: &str,
-        password: &str,
-    ) {
-        let (session_key, world_server_stream, server_id) = {
-            let mut auth_server = TcpStream::connect(address).expect("Connecting to the Server succeeds");
-            let (session_key, realms) = auth::auth(&mut auth_server, username, password);
-            log::trace!("Choosing realm {}", &realms.realms[0].name);
-            (
-                session_key,
-                TcpStream::connect(&realms.realms[0].address).unwrap(),
-                realms.realms[0].realm_id,
-            )
-        };
-
-        // Got the realm, have been connecting to the world server
-        let s = expect_server_message::<SMSG_AUTH_CHALLENGE, _>(&mut &world_server_stream).unwrap();
-
-        let seed = ProofSeed::new();
-        let seed_value = seed.seed();
-        let (client_proof, crypto) = seed.into_client_header_crypto(
-            &NormalizedString::new(username).unwrap(),
-            session_key,
-            s.server_seed,
-        );
-
-        // Caution, crypto implements Copy and then encryption breaks! Do not access encrypt/decrypt here, use the world server.
-        let (encrypter, decrypter) = crypto.split();
-
-        // AddonInfo {
-        //     addon_name: "Test".to_string(),
-        //     addon_crc: 0,
-        //     addon_extra_crc: 0,
-        //     addon_has_signature: 0,
-        // }
-
-        CMSG_AUTH_SESSION {
-            client_build: 12340,
-            login_server_id: server_id as u32,
-            // The trick is that we need to uppercase the account name
-            username: NormalizedString::new(username).unwrap().to_string(),
-            client_seed: seed_value,
-            client_proof,
-            addon_info: vec![],
-            login_server_type: 0, // 0 == "grunt" and 1 == "battle net"??
-            region_id: 0,
-            battleground_id: 0,
-            realm_id: server_id as u32,
-            dos_response: 0,
-        }
-        .write_unencrypted_client(&mut &world_server_stream)
-        .unwrap();
-
-        let ws_arc = Arc::new_cyclic(|weak| {
-            WorldServer::new(
-                weak.clone(),
-                world_server_stream,
-                encrypter,
-                decrypter,
-                packet_handler_sender,
-            )
-        });
-        self.world_server = Some(ws_arc);
-    }
-
-    pub fn run_packet_handlers(&self, receiver: Receiver<Box<ServerOpcodeMessage>>) -> JoinHandle<()> {
-        let weak = self.weak_self.clone();
-        std::thread::Builder::new()
-            .name("Packet Handlers".into())
-            .spawn(|| {
-                PacketHandlers::new(weak, receiver).run();
-            })
-            .unwrap()
     }
 }

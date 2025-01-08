@@ -42,7 +42,7 @@ enum MPQType {
 
 impl MPQLoader {
     pub fn new(data_folder: &str) -> Self {
-        // load-order: base>patch-Z>A>9>1>lichking>expension>common
+        // load-order: base>patch-Z>A>9>1>lichking>expansion>common
         // see also https://github.com/namreeb/namigator/issues/22#issuecomment-833183096 and https://github.com/namreeb/namigator/issues/22#issuecomment-834792971
 
         // TODO: not considering path here makes us fail at subfolders (i.e. locales)

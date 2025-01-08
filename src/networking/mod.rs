@@ -1,5 +1,6 @@
 use wow_srp::wrath_header::ClientDecrypterHalf;
 
+pub mod application;
 pub mod auth;
 pub mod movement_tracker;
 pub mod world;

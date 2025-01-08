@@ -45,16 +45,22 @@ fn main() {
         DemoMode::Adt => demos::main_simple_adt(&mpq_loader).unwrap(),
         DemoMode::MultipleAdt => demos::main_multiple_adt(&mpq_loader).unwrap(),
         DemoMode::NoDemo(standalone) => {
-            let mut recv = None;
+            let mut receiver = None;
             let app = Arc::new_cyclic(|weak| {
                 let mut app = GameApplication::new(weak, mpq_loader);
                 if !standalone {
-                    recv = Some(app.realm_logon("127.0.0.1:3724", "user", "user"));
+                    receiver = Some(app.connect_to_realm("127.0.0.1:3724", "user", "user"));
                 }
                 app
             });
 
-            app.run(recv);
+            let operation_mode = if standalone {
+                game::application::GameOperationMode::Standalone
+            } else {
+                game::application::GameOperationMode::Networked(receiver.unwrap())
+            };
+
+            app.run(operation_mode);
         }
     }
 }

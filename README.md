@@ -23,15 +23,17 @@ a lot of `// TODO:` comments everywhere I have an idea while coding).
 
 Things that still need to be implemented (loosely sorted by priority):
 
-- More standalone focus without always requiring a fully running dedicated server.
 - Physics: Cleaning up, debug rendering (because I think the shapes are mis-rotated or placed),
   debugging crashes once the above is accomplished. Walking is sluggish, everything.
+    - The weird movement is caused by the character controller being "too" physics for it's forces: YOu can barely climb
+      slopes, but run them down.
 - Third Person Camera Controller (and sending `MOVE_FACING` packets)
 - Entity Component System (hecs?) to keep track of all the gameobjects (moving geometry), especially NPCs
     - Rendering thereof
 - Debug Shader Reloading
+- Command Line Arguments (standalone: map, otherwise: server, credentials)
 - Reading of DBC files, especially in preparation for:
-- Game Logic. Casting spells and showing stats (mana, health) mainly.
+    - Game Logic. Casting spells and showing stats (mana, health) mainly.
 - Portals, Water, and other less important render objects
 - Audio System, potentially leveraging HRTF and precise reflection and absorption (e.g. SteamAudio)
 - UI/Addon System: This will most likely be using mlua and if possible port
