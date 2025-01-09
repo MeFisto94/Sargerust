@@ -72,13 +72,13 @@ impl PhysicsState {
     // TODO: Collider with heightfield at low res or rather meshes? Mesh would have the benefit of
     //  already being in adt/whatever space. In the end, it should be a heightfield for performance reasons, though.
     pub fn delta_map(&mut self) {
-        // Find changed (i.e. added or removed) tiles. Currently we don't go after interior changes.
+        // Find changed (i.e. added or removed) tiles. Currently, we don't go after interior changes.
         let app = self.app();
         let mm_lock = app.game_state.clone().map_manager.clone();
         let mm = mm_lock.read().expect("Read Lock on Map Manager");
         let handle = self.terrain_rb();
 
-        for (coords, adt) in &mm.tile_graph {
+        for adt in mm.tile_graph.values() {
             let weak = Arc::downgrade(adt);
             if !self.adt_nodes.iter().any(|entry| entry.0.ptr_eq(&weak)) {
                 let colliders = adt.terrain.iter().map(|terrain| terrain.into()).collect();

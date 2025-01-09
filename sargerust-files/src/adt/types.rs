@@ -9,7 +9,7 @@ use crate::wdt::types::SMMapObjDef;
 use bitflags::bitflags;
 use sargerust_files_derive_parseable::Parse;
 use std::collections::HashMap;
-use std::io::{Cursor, ErrorKind, Read};
+use std::io::{Cursor, Read};
 // https://wowdev.wiki/ADT/v18
 
 #[derive(Debug)]

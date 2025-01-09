@@ -19,8 +19,7 @@ use itertools::Itertools;
 use log::{trace, warn};
 use rend3::graph::RenderGraph;
 use rend3::types::{
-    Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Surface, Texture, Texture2DHandle,
-    TextureFormat,
+    Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Texture, Texture2DHandle,
 };
 use rend3::util::typedefs::FastHashMap;
 use rend3::{Renderer, ShaderPreProcessor};
@@ -102,9 +101,11 @@ impl RenderingApplication {
                 .expect("Write lock on physics state")
                 .update_fixed(coordinate_systems::blender_to_adt(delta_movement).into());
 
-            if let Some(ws) = app.world_server.as_ref() {
+            if let Some(network) = app.network.as_ref() {
                 // Otherwise: Standalone mode. We need a better API
-                ws.movement_tracker
+                network
+                    .world_server
+                    .movement_tracker
                     .write()
                     .expect("Movement Tracker Write Lock tainted")
                     .track_movement(player_movement_info);

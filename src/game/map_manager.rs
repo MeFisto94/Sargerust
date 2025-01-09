@@ -216,7 +216,7 @@ impl MapManager {
             let references = tile
                 .texture_layers
                 .iter()
-                .map(|(layer)| layer.base_texture_ref.clone())
+                .map(|layer| layer.base_texture_ref.clone())
                 .collect();
             Self::resolve_tex_reference(
                 self.runtime.handle(),

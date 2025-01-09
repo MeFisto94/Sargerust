@@ -1,11 +1,11 @@
 use std::net::{Ipv4Addr, TcpStream};
+use wow_login_messages::Message;
 use wow_login_messages::all::{CMD_AUTH_LOGON_CHALLENGE_Client, Locale, Os, Platform, ProtocolVersion, Version};
 use wow_login_messages::helper::expect_server_message;
 use wow_login_messages::version_8::{
     CMD_AUTH_LOGON_CHALLENGE_Server, CMD_AUTH_LOGON_PROOF_Client, CMD_AUTH_LOGON_PROOF_Client_SecurityFlag,
 };
 use wow_login_messages::version_8::{CMD_AUTH_LOGON_PROOF_Server, CMD_REALM_LIST_Client, CMD_REALM_LIST_Server};
-use wow_login_messages::{ClientMessage, Message};
 use wow_srp::client::SrpClientChallenge;
 use wow_srp::normalized_string::NormalizedString;
 use wow_srp::{PublicKey, SESSION_KEY_LENGTH};

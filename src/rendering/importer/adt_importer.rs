@@ -4,10 +4,9 @@ use crate::rendering::common::types::{Mesh, VertexBuffers};
 use anyhow::Error;
 use glam::Vec3;
 use itertools::Itertools;
-use log::{info, warn};
+use log::warn;
 use sargerust_files::adt::types::{
-    MCALSubChunk, MCCVSubChunk, MCNKChunk, MCNKChunkHeader, MCNKHeaderFlags, MCNREntry, MTEXChunk, SMLayer,
-    SMLayerFlags,
+    MCALSubChunk, MCNKChunk, MCNKChunkHeader, MCNKHeaderFlags, MCNREntry, MTEXChunk, SMLayer, SMLayerFlags,
 };
 use sargerust_files::common::types::CImVector;
 use sargerust_files::wdt::types::{MPHDChunk, MPHDFlags};

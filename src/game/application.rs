@@ -1,24 +1,15 @@
 use rend3::Renderer;
-use std::net::TcpStream;
 use std::sync::atomic::AtomicBool;
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::Receiver;
 use std::sync::{Arc, OnceLock, Weak};
-use std::thread::JoinHandle;
 
 use winit::dpi::LogicalSize;
-use wow_srp::normalized_string::NormalizedString;
-use wow_srp::wrath_header::ProofSeed;
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
-use wow_world_messages::wrath::{
-    CMSG_AUTH_SESSION, ClientMessage, Map, SMSG_AUTH_CHALLENGE, Vector3d, expect_server_message,
-};
+use wow_world_messages::wrath::{Map, Vector3d};
 
 use crate::game::game_state::GameState;
-use crate::game::packet_handlers::PacketHandlers;
 use crate::io::mpq::loader::MPQLoader;
 use crate::networking::application::NetworkApplication;
-use crate::networking::auth;
-use crate::networking::world::WorldServer;
 use crate::rendering::application::RenderingApplication;
 
 pub enum GameOperationMode {

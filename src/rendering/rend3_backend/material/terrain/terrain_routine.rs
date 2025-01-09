@@ -1,6 +1,6 @@
 use crate::rendering::rend3_backend::material::terrain::terrain_material::TerrainMaterial;
 use rend3::RendererProfile::GpuDriven;
-use rend3::{Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
+use rend3::{Renderer, RendererDataCore, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
 use rend3_routine::common::{PerMaterialArchetypeInterface, WholeFrameInterfaces};
 use rend3_routine::forward::{ForwardRoutine, ForwardRoutineCreateArgs, RoutineType, ShaderModulePair};
 use rend3_routine::pbr::TransparencyType;
