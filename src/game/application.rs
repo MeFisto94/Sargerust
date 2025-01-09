@@ -19,9 +19,6 @@ pub enum GameOperationMode {
 
 pub struct GameApplication {
     pub mpq_loader: Arc<MPQLoader>,
-    // TODO: separation? one would expect the world server to carry all kinds of methods to emit and handle packets.
-    // at the same time I want different structs for different threads, makes things easier.
-    //pub packet_handlers: Option<Arc<PacketHandlers>>
     pub game_state: Arc<GameState>,
     pub close_requested: AtomicBool,
     pub renderer: OnceLock<Arc<Renderer>>,

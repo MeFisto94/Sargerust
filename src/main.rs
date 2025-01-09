@@ -21,6 +21,7 @@ pub mod networking;
 pub mod physics;
 mod rendering; // Containing the rendering/application for the Asset Viewers.
 
+#[allow(unused)]
 enum DemoMode {
     M2,
     Wmo,
