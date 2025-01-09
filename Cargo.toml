@@ -81,6 +81,6 @@ tokio = { version = "1.33.0", features = ["full"] }
 dashmap = "6.1.0"
 
 # Physics Engine
-rapier3d = { version = "0.22.0", features = ["simd-nightly"] }
+rapier3d = { version = "0.23.0", features = ["simd-nightly"] }
 # Caution: The convert-glam feature needs to match the glam version, otherwise it will cause duplicate dependencies in the tree
-nalgebra = { version = "0.33.1", features = ["convert-glam025"] } # Match version with rapier3d.
+nalgebra = { version = "0.33.2", features = ["convert-glam025"] } # Match version with rapier3d.

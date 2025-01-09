@@ -406,6 +406,8 @@ impl From<&IRMesh> for Collider {
             .array_chunks()
             .collect();
 
-        ColliderBuilder::trimesh(vertices, indices).build()
+        ColliderBuilder::trimesh(vertices, indices)
+            .expect("Valid IRMesh Collider Builder")
+            .build()
     }
 }
