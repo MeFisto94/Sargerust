@@ -14,10 +14,16 @@ members = [
 # Force release builds for rapier
 [profile.dev.package.rapier3d]
 opt-level = 3
+codegen-units = 1
 
 # Force release builds for glam
 [profile.dev.package.glam]
 opt-level = 3
+codegen-units = 1
+
+[profile.dev.package.parry3d]
+opt-level = 3
+codegen-units = 1
 
 [profile.release]
 lto = "fat"
