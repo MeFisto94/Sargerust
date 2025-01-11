@@ -632,13 +632,24 @@ impl rend3_framework::App for RenderingApplication {
         let delta_time = now - self.timestamp_last_frame;
         self.timestamp_last_frame = now;
 
-        let rotation = glam::Mat3A::from_euler(
-            glam::EulerRot::XYZ,
-            -self.camera_pitch * PI,
-            0.0 /* roll */ * PI,
-            -self.camera_yaw,
-        );
-        let forward: Vec3A = rotation.y_axis;
+        let rotation = if self.fly_cam {
+            glam::Mat3A::from_euler(
+                glam::EulerRot::XYZ,
+                -self.camera_pitch * PI,
+                0.0 /* roll */ * PI,
+                -self.camera_yaw,
+            )
+        } else {
+            // We don't want our forward movement to be dictated by the pitch, this is, at best, useful for the fly cam.
+            glam::Mat3A::from_euler(
+                glam::EulerRot::XYZ,
+                0.0, /* pitch */
+                0.0 /* roll */ * PI,
+                -self.camera_yaw,
+            )
+        };
+
+        let forward: Vec3A = rotation.y_axis; // TODO: Only if fly cam do we want to use pitch. Probably we never want that at all?
         let right: Vec3A = rotation.x_axis;
         let up: Vec3A = rotation.z_axis;
 
