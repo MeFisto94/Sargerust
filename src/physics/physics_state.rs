@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex, OnceLock, RwLock, Weak};
 
-use glam::{Quat, Vec3, Vec3A};
+use glam::{Affine3A, Quat, Vec3, Vec3A};
 use log::trace;
 use nalgebra::Isometry3;
 use rapier3d::control::KinematicCharacterController;
@@ -131,7 +131,7 @@ impl PhysicsState {
             .doodad_colliders
             .clone();
 
-        self.process_direct_doodads(handle, &adt.doodads, &doodad_colliders);
+        self.process_doodads(handle, &adt.doodads, &doodad_colliders, None);
     }
 
     fn process_terrain_heightmap(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>, weak: &Weak<ADTNode>) {
@@ -250,16 +250,17 @@ impl PhysicsState {
                     .1
                     .clone();
 
-                self.process_direct_doodads(handle, &wmo.doodads, &colliders);
+                self.process_doodads(handle, &wmo.doodads, &colliders, Some(wmo_ref.transform));
             }
         }
     }
 
-    fn process_direct_doodads(
+    fn process_doodads(
         &mut self,
         handle: RigidBodyHandle,
         doodads: &Vec<Arc<DoodadReference>>,
         doodad_colliders: &RwLock<Vec<DoodadColliderEntry>>,
+        parent_transform: Option<Affine3A>,
     ) {
         // TODO: A lot of those doodads probably shouldn't be collidable (lilypad, jugs, wall shield)
         for doodad in doodads {
@@ -282,18 +283,22 @@ impl PhysicsState {
                 }
             }
 
-            trace!(
-                "Adding Doodad collider for {}",
-                doodad.reference.reference_str
-            );
-
             // doodad has been resolved but hasn't been added to the physics scene, yet
             // We need to counter convert coordinate systems, because physics seem to have yet a different coordinate system.
 
-            let (scale, rotation, translation) = doodad.transform.to_scale_rotation_translation();
+            let transform = parent_transform
+                .map(|parent| parent * doodad.transform)
+                .unwrap_or(doodad.transform);
+
+            let (scale, rotation, translation) = transform.to_scale_rotation_translation();
             let conversion_quat = Quat::from_mat4(&coordinate_systems::blender_to_adt_rot());
             let doodad_translation: Vec3 = coordinate_systems::blender_to_adt(translation.into()).into();
             let doodad_rotation: Quat = conversion_quat.mul_quat(rotation);
+
+            trace!(
+                "Adding Doodad collider for {} at {}",
+                doodad.reference.reference_str, doodad_translation
+            );
 
             if !scale.abs_diff_eq(Vec3::ONE, 1e-3) {
                 log::warn!(
