@@ -33,6 +33,7 @@ fn expand_bits(data: u8) -> u8 {
     (data * 0x10) | (data & 0xF)
 }
 
+#[inline(always)]
 fn unpack_2048_bytes(data: &[u8]) -> Vec<u8> {
     let mut result = Vec::with_capacity(4096);
     assert_eq!(data.len(), 2048);
