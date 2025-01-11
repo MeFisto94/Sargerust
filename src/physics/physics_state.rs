@@ -19,7 +19,7 @@ pub struct PhysicsState {
     physics_simulator: PhysicsSimulator,
     rigid_body_handle: OnceLock<RigidBodyHandle>,
     character_controller: KinematicCharacterController,
-    character_controller_collider: Option<ColliderHandle>,
+    character_controller_collider: Option<ColliderHandle>, // TODO: We could get rid of the Option and just create a collider at (0, 0, 0), we'll teleport it every frame anyway.
     adt_nodes: Vec<(Weak<ADTNode>, TerrainTileColliders)>,
     wmo_doodads: Vec<(
         Weak<WMONode>,
@@ -40,6 +40,16 @@ impl PhysicsState {
             rigid_body_handle: OnceLock::new(),
             character_controller: KinematicCharacterController {
                 up: Vector::z_axis(),
+                max_slope_climb_angle: std::f32::consts::FRAC_PI_2,
+                min_slope_slide_angle: std::f32::consts::FRAC_PI_4,
+                normal_nudge_factor: 5.0e-2, // was e-4. bigger value -> faster ascent, too large: jitter
+                slide: true,
+                //snap_to_ground: Some(CharacterLength::Relative(1.0)),
+                // autostep: Some(CharacterAutostep {
+                //     include_dynamic_bodies: false,
+                //     max_height: CharacterLength::Relative(3.75),
+                //     min_width: CharacterLength::Relative(0.001),
+                // }),
                 ..KinematicCharacterController::default()
             },
             character_controller_collider: None,
@@ -57,12 +67,13 @@ impl PhysicsState {
             self.character_controller_collider = Some(self.create_character_collider());
         }
 
+        let timestep = 1.0 / 60.0; // TODO: why does physics_simulator not have a timestep?
         let collider = self
             .character_controller_collider
             .expect("has to be constructed already");
 
         self.delta_map();
-        let char = self.update_character(collider, movement_relative, false);
+        let char = self.update_character(collider, movement_relative, false, timestep);
         self.physics_simulator.step();
         char
     }
@@ -79,9 +90,9 @@ impl PhysicsState {
         let handle = self.terrain_rb();
 
         for adt in mm.tile_graph.values() {
+            self.process_terrain_tiles(handle, adt);
             self.process_wmo_doodads(handle, adt);
             self.process_wmos(handle, adt);
-            self.process_terrain_tiles(handle, adt);
         }
 
         for (weak, tile_colliders) in self.adt_nodes.deref() {
@@ -313,6 +324,7 @@ impl PhysicsState {
         collider: ColliderHandle,
         movement_relative: Vec3,
         flying: bool,
+        timestep: f32,
     ) -> CharacterMovementInformation {
         // I think rapier does not care about the collider at all, all that is important is that it's a shape with a position
         let mut pos: Vec3 = {
@@ -332,20 +344,30 @@ impl PhysicsState {
         // Update the collider first
         self.physics_simulator.teleport_collider(collider, pos);
 
-        // TODO: when not flying, we could also null z-axis forces in movement_relative.
+        // TODO: when not flying, we should also null z-axis forces in movement_relative, but we keep it for debugging at the moment.
 
-        let gravity = if !flying {
-            Vec3::new(0.0, 0.0, -9.81 * 1.0 / 60.0)
-        } else {
-            Vec3::ZERO
-        };
-
-        let movement = self.physics_simulator.move_character(
+        let mut movement = self.physics_simulator.move_character(
             &self.character_controller,
             collider,
             50.0,
-            movement_relative + gravity,
+            movement_relative,
         );
+
+        if !flying && !movement.grounded {
+            let sliding_movement = movement.translation;
+            self.physics_simulator
+                .teleport_collider(collider, pos + Vec3::from(sliding_movement)); // apply the previous movement
+
+            // TODO: track the timestep to accumulate for acceleration instead of having a constant factor.
+            movement = self.physics_simulator.move_character(
+                &self.character_controller,
+                collider,
+                50.0,
+                Vec3::new(0.0, 0.0, -9.81 / 2.0 * timestep * timestep * 20.0),
+            );
+
+            movement.translation += sliding_movement;
+        }
 
         // TODO: actually, the absolute position is a bit too high, causing flying. Is this the capsule offset?
 
