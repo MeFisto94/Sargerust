@@ -1,14 +1,16 @@
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex, OnceLock, Weak};
+use std::sync::{Arc, Mutex, OnceLock, RwLock, Weak};
 
-use glam::{Vec3, Vec3A};
+use glam::{Quat, Vec3, Vec3A};
+use log::trace;
+use nalgebra::Isometry3;
 use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
 
 use crate::game::application::GameApplication;
 use crate::physics::character_movement_information::CharacterMovementInformation;
 use crate::physics::physics_simulator::PhysicsSimulator;
-use crate::physics::terrain_tile_colliders::TerrainTileColliders;
+use crate::physics::terrain_tile_colliders::{DoodadColliderEntry, TerrainTileColliders};
 use crate::rendering::asset_graph::nodes::adt_node::{
     ADTNode, DoodadReference, IRMesh, M2Node, NodeReference, TerrainTile, WMOGroupNode, WMONode,
 };
@@ -21,10 +23,7 @@ pub struct PhysicsState {
     character_controller: KinematicCharacterController,
     character_controller_collider: Option<ColliderHandle>, // TODO: We could get rid of the Option and just create a collider at (0, 0, 0), we'll teleport it every frame anyway.
     adt_nodes: Vec<(Weak<ADTNode>, TerrainTileColliders)>,
-    wmo_doodads: Vec<(
-        Weak<WMONode>,
-        Arc<Mutex<Vec<(Weak<M2Node>, ColliderHandle)>>>,
-    )>,
+    wmo_doodads: Vec<(Weak<WMONode>, Arc<RwLock<Vec<DoodadColliderEntry>>>)>,
     wmo_colliders: Vec<(
         Weak<WMONode>,
         Arc<Mutex<Vec<(Weak<WMOGroupNode>, ColliderHandle)>>>,
@@ -103,8 +102,18 @@ impl PhysicsState {
                     self.physics_simulator.drop_collider(collider, false);
                 }
 
+                let doodad_colliders = tile_colliders
+                    .doodad_colliders
+                    .read()
+                    .expect("poisoned lock");
+
+                for collider in doodad_colliders.iter() {
+                    self.physics_simulator
+                        .drop_collider(collider.collider_handle, false);
+                }
+
                 // TODO: Drop all other colliders and remove entries.
-            }
+            } // TODO: Else - technically some of the weaks below may be none, it's rather hypothetical, though.
         }
     }
 
@@ -115,13 +124,14 @@ impl PhysicsState {
         // At this point, there has to be a value within adt_nodes that has the terrain colliders
         let doodad_colliders = self
             .adt_nodes
-            .iter_mut()
+            .iter()
             .find(|entry| entry.0.ptr_eq(&weak))
             .expect("Logical error")
             .1
             .doodad_colliders
             .clone();
-        self.process_direct_doodads(handle, &adt.doodads, doodad_colliders);
+
+        self.process_direct_doodads(handle, &adt.doodads, &doodad_colliders);
     }
 
     fn process_terrain_heightmap(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>, weak: &Weak<ADTNode>) {
@@ -240,7 +250,7 @@ impl PhysicsState {
                     .1
                     .clone();
 
-                self.process_direct_doodads(handle, &wmo.doodads, colliders);
+                self.process_direct_doodads(handle, &wmo.doodads, &colliders);
             }
         }
     }
@@ -249,51 +259,42 @@ impl PhysicsState {
         &mut self,
         handle: RigidBodyHandle,
         doodads: &Vec<Arc<DoodadReference>>,
-        doodad_colliders: Arc<Mutex<Vec<(Weak<M2Node>, ColliderHandle)>>>,
+        doodad_colliders: &RwLock<Vec<DoodadColliderEntry>>,
     ) {
+        // TODO: A lot of those doodads probably shouldn't be collidable (lilypad, jugs, wall shield)
         for doodad in doodads {
+            let weak_doodad = Arc::downgrade(doodad);
             let resolved_doodad = doodad.reference.reference.read().expect("poisoned lock");
-            if let Some(dad) = resolved_doodad.deref() {
-                let weak_dad = Arc::downgrade(dad);
 
+            let Some(dad) = resolved_doodad.deref() else {
+                continue;
+            };
+
+            {
                 let has_collider_for_key = doodad_colliders
-                    .lock()
+                    .read()
                     .expect("poisoned lock")
                     .iter()
-                    .any(|dac| dac.0.ptr_eq(&weak_dad));
+                    .any(|entry| entry.reference.ptr_eq(&weak_doodad));
 
-                if !has_collider_for_key {
-                    // doodad has been resolved and hasn't been added to the physics scene yet
-                    // We need to counter convert because physics seem to have a different coordinate system.
-                    // TODO: rotation too?
-                    let doodad_position: Vec3 =
-                        coordinate_systems::blender_to_adt(doodad.transform.to_scale_rotation_translation().2.into())
-                            .into();
+                if has_collider_for_key {
+                    continue;
+                }
+            }
 
+            trace!(
+                "Adding Doodad collider for {}",
+                doodad.reference.reference_str
+            );
 
-                    // TODO: This is questionable. Should all doodads be their own, but fixed, rigid body or part
-                    //  of the terrain body. The latter sounds more reasonable for most cases, provided the physics
-                    //  engine can handle that.
-                    let doodad_handle: ColliderHandle = *self
-                        .physics_simulator
-                        .insert_colliders(vec![doodad_collider], handle)
-                        .first()
-                        .unwrap();
+            // doodad has been resolved but hasn't been added to the physics scene, yet
+            // We need to counter convert coordinate systems, because physics seem to have yet a different coordinate system.
 
-                    doodad_colliders
-                        .lock()
-                        .expect("poisoned lock")
-                        .push((weak_dad, doodad_handle));
             let (scale, rotation, translation) = doodad.transform.to_scale_rotation_translation();
             let conversion_quat = Quat::from_mat4(&coordinate_systems::blender_to_adt_rot());
             let doodad_translation: Vec3 = coordinate_systems::blender_to_adt(translation.into()).into();
             let doodad_rotation: Quat = conversion_quat.mul_quat(rotation);
 
-                    log::trace!(
-                        "Adding Doodad collider for {}",
-                        doodad.reference.reference_str
-                    );
-                }
             if !scale.abs_diff_eq(Vec3::ONE, 1e-3) {
                 log::warn!(
                     "Doodad {} has non-unit scale ({}), which is not supported by the physics engine, yet",
@@ -304,6 +305,24 @@ impl PhysicsState {
 
             let mut doodad_collider: Collider = dad.deref().into();
             doodad_collider.set_position(Isometry3::from((doodad_translation, doodad_rotation)));
+
+            // TODO: This is questionable. Should all doodads be their own, but fixed, rigid body or part
+            //  of the terrain body. The latter sounds more reasonable for most cases, provided the physics
+            //  engine can handle that.
+            let doodad_handle: ColliderHandle = *self
+                .physics_simulator
+                .insert_colliders(vec![doodad_collider], handle)
+                .first()
+                .expect("Insert Colliders exactly inserted one collider");
+
+            {
+                doodad_colliders
+                    .write()
+                    .expect("write lock poisoned")
+                    .push(DoodadColliderEntry {
+                        reference: weak_doodad,
+                        collider_handle: doodad_handle,
+                    });
             }
         }
     }
