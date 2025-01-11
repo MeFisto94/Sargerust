@@ -79,27 +79,9 @@ impl PhysicsState {
         let handle = self.terrain_rb();
 
         for adt in mm.tile_graph.values() {
-            let weak = Arc::downgrade(adt);
-            if !self.adt_nodes.iter().any(|entry| entry.0.ptr_eq(&weak)) {
-                let colliders = adt.terrain.iter().map(|terrain| terrain.into()).collect();
-                let collider_handles = self.physics_simulator.insert_colliders(colliders, handle);
-                self.adt_nodes
-                    .push((weak.clone(), TerrainTileColliders::new(collider_handles)));
-            }
-
-            // At this point, there has to be a value within adt_nodes that has the terrain colliders
-            let colliders = self
-                .adt_nodes
-                .iter_mut()
-                .find(|entry| entry.0.ptr_eq(&weak))
-                .expect("Logical error")
-                .1
-                .doodad_colliders
-                .clone();
-
-            self.process_direct_doodads(handle, &adt.doodads, colliders);
             self.process_wmo_doodads(handle, adt);
             self.process_wmos(handle, adt);
+            self.process_terrain_tiles(handle, adt);
         }
 
         for (weak, tile_colliders) in self.adt_nodes.deref() {
@@ -110,6 +92,31 @@ impl PhysicsState {
 
                 // TODO: Drop all other colliders and remove entries.
             }
+        }
+    }
+
+    fn process_terrain_tiles(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>) {
+        let weak = Arc::downgrade(adt);
+        self.process_terrain_heightmap(handle, adt, &weak);
+
+        // At this point, there has to be a value within adt_nodes that has the terrain colliders
+        let doodad_colliders = self
+            .adt_nodes
+            .iter_mut()
+            .find(|entry| entry.0.ptr_eq(&weak))
+            .expect("Logical error")
+            .1
+            .doodad_colliders
+            .clone();
+        self.process_direct_doodads(handle, &adt.doodads, doodad_colliders);
+    }
+
+    fn process_terrain_heightmap(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>, weak: &Weak<ADTNode>) {
+        if !self.adt_nodes.iter().any(|entry| entry.0.ptr_eq(weak)) {
+            let colliders = adt.terrain.iter().map(|terrain| terrain.into()).collect();
+            let collider_handles = self.physics_simulator.insert_colliders(colliders, handle);
+            self.adt_nodes
+                .push((weak.clone(), TerrainTileColliders::new(collider_handles)));
         }
     }
 
