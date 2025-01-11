@@ -85,7 +85,7 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     let tex_scale = -9.3333333;
-    let blend_sharpness = 5.0;
+    let blend_sharpness = 25.0;
     var blend_weights = pow(abs(vs_out.normal), vec3(blend_sharpness));
     blend_weights /= blend_weights.x + blend_weights.y + blend_weights.z;
     // blend_weights = vec3(0.0, 1.0, 0.0); // TODO: Use this to disable triplanar mapping, I have yet to encounter a mountain where it improves visuals...
