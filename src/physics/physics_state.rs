@@ -29,6 +29,7 @@ pub struct PhysicsState {
         Weak<WMONode>,
         Arc<Mutex<Vec<(Weak<WMOGroupNode>, ColliderHandle)>>>,
     )>,
+    time_since_airborne: f32,
 }
 
 impl PhysicsState {
@@ -55,6 +56,7 @@ impl PhysicsState {
             character_controller_collider: None,
             wmo_doodads: vec![],
             wmo_colliders: vec![],
+            time_since_airborne: 0.0,
         }
     }
 
@@ -354,19 +356,25 @@ impl PhysicsState {
         );
 
         if !flying && !movement.grounded {
+            self.time_since_airborne += timestep;
+
             let sliding_movement = movement.translation;
             self.physics_simulator
                 .teleport_collider(collider, pos + Vec3::from(sliding_movement)); // apply the previous movement
 
-            // TODO: track the timestep to accumulate for acceleration instead of having a constant factor.
-            movement = self.physics_simulator.move_character(
-                &self.character_controller,
-                collider,
-                50.0,
-                Vec3::new(0.0, 0.0, -9.81 / 2.0 * timestep * timestep * 20.0),
-            );
+            if self.time_since_airborne >= 4.0 * timestep {
+                let gravity_velocity = -9.81 * self.time_since_airborne * 0.5; /* TODO: Find the actual gravity that is good for the game-sense */
+                movement = self.physics_simulator.move_character(
+                    &self.character_controller,
+                    collider,
+                    50.0,
+                    Vec3::new(0.0, 0.0, gravity_velocity * timestep),
+                );
 
-            movement.translation += sliding_movement;
+                movement.translation += sliding_movement;
+            }
+        } else {
+            self.time_since_airborne = 0.0;
         }
 
         // TODO: actually, the absolute position is a bit too high, causing flying. Is this the capsule offset?
