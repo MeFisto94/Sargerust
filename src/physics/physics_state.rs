@@ -270,8 +270,6 @@ impl PhysicsState {
                         coordinate_systems::blender_to_adt(doodad.transform.to_scale_rotation_translation().2.into())
                             .into();
 
-                    let mut doodad_collider: Collider = dad.deref().into();
-                    doodad_collider.set_position(doodad_position.into());
 
                     // TODO: This is questionable. Should all doodads be their own, but fixed, rigid body or part
                     //  of the terrain body. The latter sounds more reasonable for most cases, provided the physics
@@ -286,12 +284,26 @@ impl PhysicsState {
                         .lock()
                         .expect("poisoned lock")
                         .push((weak_dad, doodad_handle));
+            let (scale, rotation, translation) = doodad.transform.to_scale_rotation_translation();
+            let conversion_quat = Quat::from_mat4(&coordinate_systems::blender_to_adt_rot());
+            let doodad_translation: Vec3 = coordinate_systems::blender_to_adt(translation.into()).into();
+            let doodad_rotation: Quat = conversion_quat.mul_quat(rotation);
 
                     log::trace!(
                         "Adding Doodad collider for {}",
                         doodad.reference.reference_str
                     );
                 }
+            if !scale.abs_diff_eq(Vec3::ONE, 1e-3) {
+                log::warn!(
+                    "Doodad {} has non-unit scale ({}), which is not supported by the physics engine, yet",
+                    doodad.reference.reference_str,
+                    scale
+                );
+            }
+
+            let mut doodad_collider: Collider = dad.deref().into();
+            doodad_collider.set_position(Isometry3::from((doodad_translation, doodad_rotation)));
             }
         }
     }

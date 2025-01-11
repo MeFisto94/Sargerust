@@ -21,6 +21,12 @@ pub fn adt_to_blender_rot() -> Mat4 {
 }
 
 #[inline]
+pub fn blender_to_adt_rot() -> Mat4 {
+    // flip 90 degrees positive around the Z axis
+    Mat4::from_euler(EulerRot::XYZ, 0.0 * PI, 0.0 * PI, 0.5 * PI)
+}
+
+#[inline]
 pub fn adt_to_blender_transform(source: Vec3A) -> Mat4 {
     Mat4::from_translation(adt_to_blender(source).into()) * adt_to_blender_rot()
 }
