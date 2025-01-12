@@ -3,14 +3,15 @@ use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, OnceLock, Weak};
 
-use winit::dpi::LogicalSize;
-use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
-use wow_world_messages::wrath::{Map, Vector3d};
-
+use crate::entity::entity_tracker::EntityTracker;
+use crate::entity::systems::rendering_system::RenderingSystem;
 use crate::game::game_state::GameState;
 use crate::io::mpq::loader::MPQLoader;
 use crate::networking::application::NetworkApplication;
 use crate::rendering::application::RenderingApplication;
+use winit::dpi::LogicalSize;
+use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
+use wow_world_messages::wrath::{Map, Vector3d};
 
 pub enum GameOperationMode {
     Standalone,
@@ -23,6 +24,8 @@ pub struct GameApplication {
     pub close_requested: AtomicBool,
     pub renderer: OnceLock<Arc<Renderer>>,
     pub network: Option<NetworkApplication>,
+    pub entity_tracker: EntityTracker,
+    rendering_system: RenderingSystem,
     weak_self: Weak<GameApplication>,
 }
 
@@ -35,7 +38,9 @@ impl GameApplication {
             game_state: Arc::new(GameState::new(weak_self.clone(), mpq_loader_arc.clone())),
             close_requested: AtomicBool::new(false),
             renderer: OnceLock::new(),
+            entity_tracker: EntityTracker::new(),
             network: None,
+            rendering_system: RenderingSystem::new(weak_self.clone()),
         }
     }
 
@@ -101,5 +106,9 @@ impl GameApplication {
                 .join()
                 .expect("Networking thread to terminate normally");
         }
+    }
+
+    pub fn logic_update(&self) {
+        self.rendering_system.update();
     }
 }

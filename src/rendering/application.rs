@@ -84,6 +84,10 @@ impl RenderingApplication {
         }
 
         let app = self.app();
+
+        // TODO: A lot of the things that are done here, are game logic and should belong to the game application (e.g. physics)
+        app.logic_update();
+
         let mm_lock = app.game_state.clone().map_manager.clone();
         {
             // TODO: Either this gets a proper delta time calculation (i.e. running [0, n] times,

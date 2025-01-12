@@ -53,6 +53,17 @@ impl PacketHandlers {
                     }
                 }
                 ServerOpcodeMessage::SMSG_MESSAGECHAT(chat) => info!("CHAT: {}", &chat.message),
+                ServerOpcodeMessage::SMSG_COMPRESSED_UPDATE_OBJECT(obj) => {
+                    self.app().entity_tracker.update_objects(&obj.objects);
+                }
+                ServerOpcodeMessage::SMSG_UPDATE_OBJECT(obj) => {
+                    self.app().entity_tracker.update_objects(&obj.objects);
+                }
+                ServerOpcodeMessage::SMSG_DESTROY_OBJECT(obj) => {
+                    self.app()
+                        .entity_tracker
+                        .destroy_object(obj.guid, obj.target_died);
+                }
                 opcode => info!("Unhandled opcode: {}", opcode),
             }
         }

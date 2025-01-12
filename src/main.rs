@@ -15,6 +15,7 @@ use crate::game::application::GameApplication;
 use crate::io::mpq::loader::MPQLoader;
 
 mod demos;
+pub mod entity;
 mod game;
 mod io;
 pub mod networking;

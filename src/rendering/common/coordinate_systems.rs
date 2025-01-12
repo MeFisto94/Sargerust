@@ -2,6 +2,7 @@ use glam::{EulerRot, Mat4, Vec3, Vec3A};
 use std::f32::consts::PI;
 use std::ops::Add;
 
+// TODO: rename to _aligned or _simd.
 /// ADT is RH, Up: Z, East: -Y, North: +X
 #[inline]
 pub fn adt_to_blender(source: Vec3A) -> Vec3A {
@@ -9,6 +10,12 @@ pub fn adt_to_blender(source: Vec3A) -> Vec3A {
     // assert_eq!(res, Mat4::from_euler(EulerRot::XYZ, 0.0, 0.0 * PI, -0.5 * PI).transform_point3a(source)); -> epsilon missing
 }
 
+#[inline]
+pub fn adt_to_blender_unaligned(source: Vec3) -> Vec3 {
+    Vec3::new(source.y, -source.x, source.z)
+}
+
+// TODO: rename to _aligned or _simd.
 #[inline]
 pub fn blender_to_adt(source: Vec3A) -> Vec3A {
     Vec3A::new(-source.y, source.x, source.z)

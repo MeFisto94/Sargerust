@@ -47,6 +47,9 @@ mpq = { path = "mpq-rust" } # mpq = "0.8"
 image-blp = "1"
 sargerust-files = { path = "sargerust-files", features = ["wotlk"] }
 
+# To Track the entities/objects (i.e. NPCs, Mobs, Players)
+hecs = "0.10.5"
+
 # For the Rendering/Game Engine
 # Linear algebra library
 glam = { version = "0.25.0", features = ["approx"] }

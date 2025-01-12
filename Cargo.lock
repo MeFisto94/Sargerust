@@ -1257,6 +1257,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hecs"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1cbc675ee8d97b4d206a985137f8ad59666538f56f906474f554467a63c776d"
+dependencies = [
+ "hashbrown 0.14.3",
+ "spin",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2627,11 +2637,13 @@ dependencies = [
  "encase_derive_impl",
  "env_logger",
  "glam",
+ "hecs",
  "image-blp",
  "itertools",
  "log",
  "mpq",
  "nalgebra",
+ "parry3d",
  "pollster",
  "quick_cache",
  "rapier3d",
