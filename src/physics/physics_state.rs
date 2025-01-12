@@ -364,9 +364,9 @@ impl PhysicsState {
                 .expect("player read lock"))
             .into()
         };
-        pos_vec3.z += 3.0; // compare this in update_character for the reasoning.
+        pos_vec3.z += 1.0; // compare this in update_character for the reasoning.
 
-        let coll = ColliderBuilder::capsule_z(3.0, 0.5)
+        let coll = ColliderBuilder::capsule_z(1.0, 0.5)
             .position(pos_vec3.into())
             .build();
         self.physics_simulator.insert_collider(coll)
@@ -391,8 +391,7 @@ impl PhysicsState {
         };
 
         // I think this is because of the capsule shape and considering the physics position to be the center?
-        pos.z += 3.0;
-        pos.z += 0.2 * 3.0; // offset
+        pos.z += 2.0;
 
         // Update the collider first
         self.physics_simulator.teleport_collider(collider, pos);

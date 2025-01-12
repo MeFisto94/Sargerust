@@ -116,7 +116,7 @@ impl RenderingApplication {
                 // TODO: if this is required, this is a sign that we're missing adt_to_blender calls on the inputs to the physics simulation,
                 //  at least for the player start transform, but potentially also for the terrain meshes
                 let mut player_loc = *app.game_state.player_location.read().expect("");
-                player_loc += Vec3A::new(0.0, 0.0, 3.0); // character height half.
+                player_loc += Vec3A::new(0.0, 0.0, 4.0); // TODO: Find out why this number. Capsule Height is barely 2.
                 self.camera_location = coordinate_systems::adt_to_blender(player_loc);
             }
         }
