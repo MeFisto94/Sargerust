@@ -92,6 +92,7 @@ impl RenderingApplication {
             //  consequences on interfaces (e.g. updating a new player movement may be enqueued and
             //  the result is ready in a later frame and then needs to traverse the network)
 
+            let pre_physics = Instant::now();
             let player_movement_info = app
                 .game_state
                 .clone()
@@ -100,6 +101,11 @@ impl RenderingApplication {
                 .write()
                 .expect("Write lock on physics state")
                 .update_fixed(coordinate_systems::blender_to_adt(delta_movement).into());
+
+            let duration_physics = (Instant::now() - pre_physics).as_millis();
+            if duration_physics > 6 {
+                warn!("Physics update took too long: {:?} ms", duration_physics);
+            }
 
             if let Some(network) = app.network.as_ref() {
                 // Otherwise: Standalone mode. We need a better API
