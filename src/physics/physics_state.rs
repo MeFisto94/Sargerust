@@ -1,5 +1,5 @@
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Mutex, OnceLock, RwLock, Weak};
+use std::sync::{Arc, OnceLock, RwLock, Weak};
 
 use glam::{Affine3A, Quat, Vec3, Vec3A};
 use log::trace;
@@ -12,7 +12,7 @@ use crate::physics::character_movement_information::CharacterMovementInformation
 use crate::physics::physics_simulator::PhysicsSimulator;
 use crate::physics::terrain_tile_colliders::{DoodadColliderEntry, TerrainTileColliders};
 use crate::rendering::asset_graph::nodes::adt_node::{
-    ADTNode, DoodadReference, IRMesh, M2Node, NodeReference, TerrainTile, WMOGroupNode, WMONode,
+    ADTNode, DoodadReference, IRMesh, M2Node, NodeReference, TerrainTile, WMOGroupNode, WMONode, WMOReference,
 };
 use crate::rendering::common::coordinate_systems;
 
@@ -26,7 +26,7 @@ pub struct PhysicsState {
     wmo_doodads: Vec<(Weak<WMONode>, Arc<RwLock<Vec<DoodadColliderEntry>>>)>,
     wmo_colliders: Vec<(
         Weak<WMONode>,
-        Arc<Mutex<Vec<(Weak<WMOGroupNode>, ColliderHandle)>>>,
+        Arc<RwLock<Vec<(Weak<WMOGroupNode>, ColliderHandle)>>>,
     )>,
     time_since_airborne: f32,
 }
@@ -92,7 +92,6 @@ impl PhysicsState {
 
         for adt in mm.tile_graph.values() {
             self.process_terrain_tiles(handle, adt);
-            self.process_wmo_doodads(handle, adt);
             self.process_wmos(handle, adt);
         }
 
@@ -143,7 +142,7 @@ impl PhysicsState {
         }
     }
 
-    fn process_wmos(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>) {
+    fn process_wmos(&mut self, handle: RigidBodyHandle, adt: &ADTNode) {
         for wmo_ref in &adt.wmos {
             let resolved_wmo = wmo_ref.reference.reference.read().expect("poisoned lock");
             if let Some(wmo) = resolved_wmo.deref() {
@@ -166,93 +165,109 @@ impl PhysicsState {
                     .1
                     .clone();
 
-                let wmo_root_translation: Vec3A = wmo_ref.transform.translation;
-                self.process_wmo_groups(handle, wmo_root_translation, &wmo.subgroups, colliders);
+                self.process_wmo_groups(handle, wmo_ref, &wmo.subgroups, &colliders);
+                self.process_wmo_doodads(handle, &weak_wmo, wmo_ref, wmo);
             }
         }
     }
 
-    // TODO: maybe make this method generic.
     fn process_wmo_groups(
         &mut self,
         handle: RigidBodyHandle,
-        wmo_root_translation: Vec3A,
+        wmo_ref: &WMOReference,
         groups: &Vec<Arc<NodeReference<WMOGroupNode>>>,
-        colliders: Arc<Mutex<Vec<(Weak<WMOGroupNode>, ColliderHandle)>>>,
+        colliders: &RwLock<Vec<(Weak<WMOGroupNode>, ColliderHandle)>>,
     ) {
+        let (scale, rotation, translation) = wmo_ref.transform.to_scale_rotation_translation();
+
         for group_reference in groups {
             let resolved_group = group_reference.reference.read().expect("poisoned lock");
             if let Some(group) = resolved_group.deref() {
                 let weak_grp = Arc::downgrade(group);
 
-                let has_collider_for_key = colliders
-                    .lock()
-                    .expect("poisoned lock")
-                    .iter()
-                    .any(|dac| dac.0.ptr_eq(&weak_grp));
+                {
+                    let has_collider_for_key = colliders
+                        .read()
+                        .expect("poisoned read lock")
+                        .iter()
+                        .any(|entry| entry.0.ptr_eq(&weak_grp));
 
-                if !has_collider_for_key {
-                    // Technically, these aren't multiple batches, just multiple LoD levels.
-                    let mesh_lock = group.mesh_batches.first().expect("at least one LoD level");
-                    let mesh = mesh_lock.read().expect("poisoned lock");
+                    if has_collider_for_key {
+                        continue;
+                    }
+                }
 
-                    // TODO: maybe this also needs to be done for the actual rotation?
-                    // We need to counter convert because physics seem to have a different coordinate system.
-                    let doodad_position: Vec3 = coordinate_systems::blender_to_adt(wmo_root_translation).into();
+                trace!(
+                    "Adding collider for WMO Group {}",
+                    group_reference.reference_str
+                );
 
-                    let mut doodad_collider: Collider = mesh.deref().into();
-                    doodad_collider.set_position(doodad_position.into());
-
-                    // TODO: This is questionable. Should all doodads be their own, but fixed, rigid body or part
-                    //  of the terrain body. The latter sounds more reasonable for most cases, provided the physics
-                    //  engine can handle that.
-                    let doodad_handle: ColliderHandle = *self
-                        .physics_simulator
-                        .insert_colliders(vec![doodad_collider], handle)
-                        .first()
-                        .unwrap();
-
-                    colliders
-                        .lock()
-                        .expect("poisoned lock")
-                        .push((weak_grp, doodad_handle));
-
-                    log::trace!(
-                        "Adding collider for WMO Group {}",
-                        group_reference.reference_str
+                // This is placed here, because that way it will log once per group, not once per frame!
+                if !scale.abs_diff_eq(Vec3::ONE, 1e-3) {
+                    log::warn!(
+                        "WMO {} has non-unit scale ({}), which is not supported by the physics engine, yet",
+                        wmo_ref.reference.reference_str,
+                        scale
                     );
+                }
+
+                // Technically, these aren't multiple batches, just multiple LoD levels.
+                let mesh_lock = group.mesh_batches.first().expect("at least one LoD level");
+                let mesh = mesh_lock.read().expect("poisoned read lock");
+
+                // We need to counter convert because physics seem to have a different coordinate system.
+                let conversion_quat = Quat::from_mat4(&coordinate_systems::blender_to_adt_rot());
+                let wmo_translation: Vec3 = coordinate_systems::blender_to_adt(translation.into()).into();
+                let wmo_rotation: Quat = conversion_quat.mul_quat(rotation);
+
+                let mut wmo_collider: Collider = mesh.deref().into();
+                wmo_collider.set_position(Isometry3::from((wmo_translation, wmo_rotation)));
+
+                // TODO: This is questionable. Should all doodads be their own, but fixed, rigid body or part
+                //  of the terrain body. The latter sounds more reasonable for most cases, provided the physics
+                //  engine can handle that.
+                let wmo_handle: ColliderHandle = *self
+                    .physics_simulator
+                    .insert_colliders(vec![wmo_collider], handle)
+                    .first()
+                    .expect("Insert Colliders exactly inserted one collider");
+
+                {
+                    colliders
+                        .write()
+                        .expect("poisoned write lock")
+                        .push((weak_grp, wmo_handle));
                 }
             }
         }
     }
 
-    fn process_wmo_doodads(&mut self, handle: RigidBodyHandle, adt: &Arc<ADTNode>) {
-        for wmo_ref in &adt.wmos {
-            let resolved_wmo = wmo_ref.reference.reference.read().expect("poisoned lock");
-            if let Some(wmo) = resolved_wmo.deref() {
-                let weak_wmo = Arc::downgrade(wmo);
-
-                if !self
-                    .wmo_doodads
-                    .iter_mut()
-                    .any(|entry| entry.0.ptr_eq(&weak_wmo))
-                {
-                    // No collider for that wmo yet, but we have resolved the reference, so we can submit collision handles.
-                    self.wmo_doodads
-                        .push((weak_wmo.clone(), Default::default()));
-                }
-
-                let colliders = self
-                    .wmo_doodads
-                    .iter_mut()
-                    .find(|entry| entry.0.ptr_eq(&weak_wmo))
-                    .expect("Logical error")
-                    .1
-                    .clone();
-
-                self.process_doodads(handle, &wmo.doodads, &colliders, Some(wmo_ref.transform));
-            }
+    fn process_wmo_doodads(
+        &mut self,
+        handle: RigidBodyHandle,
+        weak_wmo: &Weak<WMONode>,
+        wmo_ref: &WMOReference,
+        wmo: &WMONode,
+    ) {
+        if !self
+            .wmo_doodads
+            .iter_mut()
+            .any(|entry| entry.0.ptr_eq(weak_wmo))
+        {
+            // No collider for that wmo yet, but we have resolved the reference, so we can submit collision handles.
+            self.wmo_doodads
+                .push((weak_wmo.clone(), Default::default()));
         }
+
+        let colliders = self
+            .wmo_doodads
+            .iter_mut()
+            .find(|entry| entry.0.ptr_eq(weak_wmo))
+            .expect("Logical error")
+            .1
+            .clone();
+
+        self.process_doodads(handle, &wmo.doodads, &colliders, Some(wmo_ref.transform));
     }
 
     fn process_doodads(
@@ -479,7 +494,11 @@ impl From<&IRMesh> for Collider {
             .array_chunks()
             .collect();
 
-        ColliderBuilder::trimesh(vertices, indices)
+        // TODO: depending on settings, we may as well use convex hull / convex decomposition, but convex hull had bad (unpredictable) results and convex decomposition took a *long* time
+        //  to the point where using the trimesh and the building the convex decomposition in the background may be required.
+        let converter = MeshConverter::TriMesh;
+
+        ColliderBuilder::converted_trimesh(vertices, indices, converter)
             .expect("Valid IRMesh Collider Builder")
             .build()
     }

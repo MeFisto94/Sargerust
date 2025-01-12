@@ -23,15 +23,17 @@ a lot of `// TODO:` comments everywhere I have an idea while coding).
 
 Things that still need to be implemented (loosely sorted by priority):
 
-- Physics: Cleaning up, debug rendering (because I think the shapes are mis-rotated or placed),
-  debugging crashes once the above is accomplished. Walking is sluggish, everything.
-    - The weird movement is caused by the character controller being "too" physics for it's forces: YOu can barely climb
-      slopes, but run them down.
+- Physics:
+    - WMO Group Collisions still seem to be odd-rotated or degenerated
+    - Character Controller has room for improvements (using the tangent instead of the normals)
+    - Offload into a dedicated thread (cpu time rises when colliding, slowing down FPS) -> We need a concept for
+      syncing. Currently we tick at 1/60, but per frame, so wrong.
 - Third Person Camera Controller (and sending `MOVE_FACING` packets)
 - Entity Component System (hecs?) to keep track of all the gameobjects (moving geometry), especially NPCs
     - Rendering thereof
 - Debug Shader Reloading
 - Command Line Arguments (standalone: map, otherwise: server, credentials)
+- Cross Plattform support (i.e. better keybinds, investigate MBP 2011 failure)
 - Reading of DBC files, especially in preparation for:
     - Game Logic. Casting spells and showing stats (mana, health) mainly.
 - Portals, Water, and other less important render objects
