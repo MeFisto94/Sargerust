@@ -89,7 +89,9 @@ pub struct WMONode {
 
 #[derive(Debug)]
 pub struct WMOGroupNode {
-    /// API trickery: One LoD Level is one batch
+    /// According to the wiki, the mesh batches are *not* (as previously noted) LoDs, but rather proper
+    /// mesh batches, whereby the meshes with the same material id are batched together to reduce
+    /// draw calls.
     pub mesh_batches: Vec<RwLock<IRMesh>>,
     pub material_ids: Vec<u8>,
 }

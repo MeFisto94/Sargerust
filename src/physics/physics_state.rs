@@ -1,12 +1,6 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, OnceLock, RwLock, Weak};
 
-use glam::{Affine3A, Quat, Vec3, Vec3A};
-use log::trace;
-use nalgebra::Isometry3;
-use rapier3d::control::KinematicCharacterController;
-use rapier3d::prelude::*;
-
 use crate::game::application::GameApplication;
 use crate::physics::character_movement_information::CharacterMovementInformation;
 use crate::physics::physics_simulator::PhysicsSimulator;
@@ -15,6 +9,14 @@ use crate::rendering::asset_graph::nodes::adt_node::{
     ADTNode, DoodadReference, IRMesh, M2Node, NodeReference, TerrainTile, WMOGroupNode, WMONode, WMOReference,
 };
 use crate::rendering::common::coordinate_systems;
+use crate::rendering::common::mesh_merger::MeshMerger;
+use crate::rendering::common::types::Mesh;
+use glam::{Affine3A, Quat, Vec3, Vec3A};
+use itertools::Itertools;
+use log::trace;
+use nalgebra::Isometry3;
+use rapier3d::control::KinematicCharacterController;
+use rapier3d::prelude::*;
 
 pub struct PhysicsState {
     app: Weak<GameApplication>,
@@ -179,7 +181,6 @@ impl PhysicsState {
         colliders: &RwLock<Vec<(Weak<WMOGroupNode>, ColliderHandle)>>,
     ) {
         let (scale, rotation, translation) = wmo_ref.transform.to_scale_rotation_translation();
-
         for group_reference in groups {
             let resolved_group = group_reference.reference.read().expect("poisoned lock");
             if let Some(group) = resolved_group.deref() {
@@ -211,21 +212,22 @@ impl PhysicsState {
                     );
                 }
 
-                // Technically, these aren't multiple batches, just multiple LoD levels.
-                let mesh_lock = group.mesh_batches.first().expect("at least one LoD level");
-                let mesh = mesh_lock.read().expect("poisoned read lock");
+                let mesh_batches = group
+                    .mesh_batches
+                    .iter()
+                    // TODO: Get rid of that clone
+                    .map(|mesh_lock| mesh_lock.read().expect("poisoned read lock").data.clone())
+                    .collect_vec();
+                let mesh = MeshMerger::merge_meshes_index_only(&mesh_batches);
 
                 // We need to counter convert because physics seem to have a different coordinate system.
                 let conversion_quat = Quat::from_mat4(&coordinate_systems::blender_to_adt_rot());
                 let wmo_translation: Vec3 = coordinate_systems::blender_to_adt(translation.into()).into();
                 let wmo_rotation: Quat = conversion_quat.mul_quat(rotation);
 
-                let mut wmo_collider: Collider = mesh.deref().into();
+                let mut wmo_collider: Collider = (&mesh).into();
                 wmo_collider.set_position(Isometry3::from((wmo_translation, wmo_rotation)));
 
-                // TODO: This is questionable. Should all doodads be their own, but fixed, rigid body or part
-                //  of the terrain body. The latter sounds more reasonable for most cases, provided the physics
-                //  engine can handle that.
                 let wmo_handle: ColliderHandle = *self
                     .physics_simulator
                     .insert_colliders(vec![wmo_collider], handle)
@@ -477,8 +479,13 @@ impl From<&M2Node> for Collider {
 
 impl From<&IRMesh> for Collider {
     fn from(value: &IRMesh) -> Self {
+        (&value.data).into()
+    }
+}
+
+impl From<&Mesh> for Collider {
+    fn from(value: &Mesh) -> Self {
         let vertices = value
-            .data
             .vertex_buffers
             .position_buffer
             .iter()
@@ -486,7 +493,6 @@ impl From<&IRMesh> for Collider {
             .collect();
 
         let indices = value
-            .data
             .index_buffer
             .clone()
             .into_iter()
