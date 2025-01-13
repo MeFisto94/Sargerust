@@ -119,9 +119,10 @@ pub struct M2Texture {
     // TODO: better typing for type and flags.
     pub texture_type: u32,
     pub texture_flags: u32,
-    pub filename: String,
+    pub filename: String, // maximum of 0x108 chars
 }
 
+#[derive(Debug)]
 pub(crate) struct M2TextureInternal {
     pub texture_type: u32,
     pub texture_flags: u32,
