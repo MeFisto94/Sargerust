@@ -1,17 +1,13 @@
 use crate::entity::components::objects::{TmpLocation, TmpOrientation};
 use crate::entity::components::render::Renderable;
 use crate::game::application::GameApplication;
+use crate::rendering::application::RenderingApplication;
 use crate::rendering::common::coordinate_systems::{adt_to_blender_rot, adt_to_blender_unaligned};
 use glam::{Mat4, Quat, Vec4};
 use rend3::Renderer;
 use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectMeshKind};
 use rend3_routine::pbr::{AlbedoComponent, PbrMaterial};
-use std::sync::{Arc, OnceLock, Weak};
-
-pub struct RenderingSystem {
-    app: Weak<GameApplication>,
-    debug_object: OnceLock<(MeshHandle, MaterialHandle)>,
-}
+use std::sync::{Arc, OnceLock};
 
 // cube_example from rend3.
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
@@ -67,16 +63,15 @@ fn create_debug_mesh() -> rend3::types::Mesh {
         .unwrap()
 }
 
+pub struct RenderingSystem {
+    debug_object: OnceLock<(MeshHandle, MaterialHandle)>,
+}
+
 impl RenderingSystem {
-    pub fn new(app: Weak<GameApplication>) -> Self {
+    pub fn new() -> Self {
         Self {
-            app,
             debug_object: OnceLock::new(),
         }
-    }
-
-    fn app(&self) -> Arc<GameApplication> {
-        self.app.upgrade().expect("Weak Pointer expired")
     }
 
     fn debug_object(&self, renderer: &Arc<Renderer>) -> &(MeshHandle, MaterialHandle) {
@@ -95,8 +90,7 @@ impl RenderingSystem {
         })
     }
 
-    pub fn update(&self) {
-        let app = self.app();
+    pub fn update(&self, app: &GameApplication) {
         let renderer = app.renderer.get().expect("Renderer not initialized");
 
         // TODO: Think about the whole hecs threading. We should probably enqueue changes and batch do them in a big write lock?

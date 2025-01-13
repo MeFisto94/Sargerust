@@ -4,7 +4,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, OnceLock, Weak};
 
 use crate::entity::entity_tracker::EntityTracker;
-use crate::entity::systems::rendering_system::RenderingSystem;
+use crate::entity::systems::systems::Systems;
 use crate::game::game_state::GameState;
 use crate::io::mpq::loader::MPQLoader;
 use crate::networking::application::NetworkApplication;
@@ -25,7 +25,7 @@ pub struct GameApplication {
     pub renderer: OnceLock<Arc<Renderer>>,
     pub network: Option<NetworkApplication>,
     pub entity_tracker: EntityTracker,
-    rendering_system: RenderingSystem,
+    systems: Systems,
     weak_self: Weak<GameApplication>,
 }
 
@@ -48,7 +48,7 @@ impl GameApplication {
             renderer: OnceLock::new(),
             entity_tracker: EntityTracker::new(),
             network: None,
-            rendering_system: RenderingSystem::new(weak_self.clone()),
+            systems: Systems::new(weak_self.clone(), mpq_loader_arc.clone()),
         }
     }
 
@@ -109,6 +109,6 @@ impl GameApplication {
     }
 
     pub fn logic_update(&self) {
-        self.rendering_system.update();
+        self.systems.update(&self);
     }
 }
