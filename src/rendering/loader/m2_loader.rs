@@ -78,10 +78,11 @@ impl M2Loader {
         let textures: Vec<Arc<IRTextureReference>> = m2_asset
             .textures
             .into_iter()
+            .filter(|tex| tex.texture_type == 0) // TODO: TextureReference needs to support resolving that.
             .map(|tex| Arc::new(tex.into()))
             .collect();
 
-        let material = M2Importer::create_material_texname(&textures.get(0).map(|tex| tex.reference_str.clone()));
+        let material = M2Importer::create_material_texname(&textures.first().map(|tex| tex.reference_str.clone()));
 
         LoadedM2Graph {
             mesh,
