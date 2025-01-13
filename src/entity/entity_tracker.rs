@@ -1,5 +1,6 @@
 use crate::entity::components::objects::{TmpLocation, TmpOrientation};
 use crate::entity::components::render::Renderable;
+use crate::entity::components::units::UnitDisplayId;
 use glam::Vec3;
 use hecs::World;
 use itertools::Itertools;
@@ -80,10 +81,11 @@ impl EntityTracker {
                     let level = unit.unit_level().expect("Unit Level to be mandatory");
                     world.insert_one(entity, level).expect("Insert Level");
 
-                    // TODO: Find a better condition, not necessarily exactly every unit has to be renderable.
-                    world
-                        .insert_one(entity, Renderable::default())
-                        .expect("Insert Renderable");
+                    if let Some(display_id) = unit.unit_displayid() {
+                        world
+                            .insert_one(entity, UnitDisplayId(display_id))
+                            .expect("Insert DisplayId");
+                    }
                 }
                 UpdateMask::Player(player) => {
                     let level = player.unit_level().expect("Unit Level to be mandatory");
