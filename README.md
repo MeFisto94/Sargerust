@@ -23,7 +23,8 @@ a lot of `// TODO:` comments everywhere I have an idea while coding).
 
 Things that still need to be implemented (loosely sorted by priority):
 
-- Third Person Camera Controller (and sending `MOVE_FACING` packets)
+- MPQ: Load order of interface MPQs
+- Third Person Camera Controller (and sending `MOVE_FACING` packets / reworking the movement tracker)
 - hecs:
     - Add more components and unpack update messages further
     - Implement spline walking (NPCs have predefined splines)

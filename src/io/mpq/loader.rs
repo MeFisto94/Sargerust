@@ -45,7 +45,6 @@ impl MPQLoader {
         // load-order: base>patch-Z>A>9>1>lichking>expansion>common
         // see also https://github.com/namreeb/namigator/issues/22#issuecomment-833183096 and https://github.com/namreeb/namigator/issues/22#issuecomment-834792971
 
-        // TODO: not considering path here makes us fail at subfolders (i.e. locales)
         let prioritized_archives = fs::read_dir(data_folder)
             .unwrap_or_else(|_| {
                 panic!(
@@ -53,15 +52,41 @@ impl MPQLoader {
                     data_folder
                 )
             })
-            .filter(|file| file.is_ok())
-            .map(|file| file.unwrap().file_name().into_string().unwrap())
-            .filter(|file| file.to_ascii_lowercase().ends_with("mpq"))
-            .sorted_by(MPQLoader::sorting_order)
-            .map(|file| {
-                let path = Path::new(data_folder).join(Path::new(&file));
+            .filter_map(|file| file.ok())
+            .flat_map(|file| {
+                if file.path().is_dir() {
+                    return fs::read_dir(file.path())
+                        .unwrap_or_else(|_| {
+                            panic!(
+                                "MPQLoader: Failed to enumerate data folder: {}",
+                                data_folder
+                            )
+                        })
+                        .filter_map(|file| file.ok())
+                        .filter(|file| file.path().is_file()) // no further recursion
+                        .collect_vec();
+                }
+
+                vec![file]
+            })
+            .map(|entry| {
                 (
-                    file.clone(),
-                    RwLock::new(Archive::open(path).expect(&format!("Failed to load MPQ {}", &file))),
+                    entry
+                        .file_name()
+                        .into_string()
+                        .expect("Failed to convert filename"),
+                    entry,
+                )
+            })
+            .filter(|(filename, entry)| filename.to_ascii_lowercase().ends_with("mpq"))
+            .sorted_by(|a, b| MPQLoader::sorting_order(&a.0, &b.0))
+            .map(|(filename, entry)| {
+                (
+                    filename,
+                    RwLock::new(
+                        Archive::open(entry.path())
+                            .unwrap_or_else(|_| panic!("Failed to load MPQ {}", entry.path().to_str().unwrap())),
+                    ),
                 )
             })
             .collect_vec();
@@ -72,6 +97,7 @@ impl MPQLoader {
         }
     }
 
+    // TODO: understand locales (e.g. deDE) and their order/priority.
     fn sorting_order(a: &String, b: &String) -> Ordering {
         let type_a = MPQLoader::extract_mpq_type(a);
         let type_b = MPQLoader::extract_mpq_type(b);
