@@ -248,7 +248,12 @@ impl RenderingApplication {
             }
 
             for material in &wmo.materials {
-                self.load_material(renderer, material, &wmo.tex_references);
+                let missing = self
+                    .missing_texture_material
+                    .as_ref()
+                    .expect("Missing Texture Material to be initialized already")
+                    .clone();
+                Self::load_material(missing, renderer, material, &wmo.tex_references);
             }
 
             if wmo_ref.obj_handles.read().expect("Obj Handles").is_empty() {
@@ -462,7 +467,12 @@ impl RenderingApplication {
             }
 
             let material_handle = if all_tex_loaded {
-                self.load_material(renderer, &m2.material, &m2.tex_reference)
+                let missing = self
+                    .missing_texture_material
+                    .as_ref()
+                    .expect("Missing Texture Material to be initialized already")
+                    .clone();
+                Self::load_material(missing, renderer, &m2.material, &m2.tex_reference)
             } else {
                 self.texture_still_loading_material
                     .as_ref()
@@ -488,7 +498,7 @@ impl RenderingApplication {
         }
     }
 
-    fn are_all_textures_loaded(tex_reference: &Vec<Arc<IRTextureReference>>) -> bool {
+    pub fn are_all_textures_loaded(tex_reference: &Vec<Arc<IRTextureReference>>) -> bool {
         !tex_reference.iter().any(|tex| {
             tex.reference
                 .read()
@@ -497,8 +507,8 @@ impl RenderingApplication {
         })
     }
 
-    fn load_material(
-        &self,
+    pub fn load_material(
+        missing_texture_material: MaterialHandle,
         renderer: &Arc<Renderer>,
         material: &RwLock<IRMaterial>,
         tex_references: &Vec<Arc<IRTextureReference>>,
@@ -526,10 +536,7 @@ impl RenderingApplication {
             //     "Failed loading texture {}, falling back",
             //     tex_name_opt.unwrap()
             // );
-            self.missing_texture_material
-                .as_ref()
-                .expect("Missing Texture Material to be initialized already")
-                .clone()
+            missing_texture_material
         } else {
             gpu_loaders::gpu_load_material(renderer, material, texture_handle_opt)
         };
