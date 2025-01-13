@@ -1,8 +1,9 @@
 use crate::entity::components::objects::{TmpLocation, TmpOrientation};
-use crate::entity::components::render::Renderable;
+use crate::entity::components::render::{Renderable, RenderableSource};
 use crate::game::application::GameApplication;
 use crate::rendering::application::RenderingApplication;
 use crate::rendering::common::coordinate_systems::{adt_to_blender_rot, adt_to_blender_unaligned};
+use crate::rendering::rend3_backend::gpu_loaders;
 use glam::{Mat4, Quat, Vec4};
 use rend3::Renderer;
 use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectMeshKind};
@@ -116,12 +117,40 @@ impl RenderingSystem {
             if let Some(handle) = &renderable.handle {
                 renderer.set_object_transform(handle, transform);
             } else {
-                let dbg = self.debug_object(renderer);
+                let object = match &renderable.source {
+                    RenderableSource::DebugCube => {
+                        let dbg = self.debug_object(renderer);
+                        Object {
+                            mesh_kind: ObjectMeshKind::Static(dbg.0.clone()),
+                            material: dbg.1.clone(),
+                            transform,
+                        }
+                    }
+                    // TODO: unify the code with RenderingApplication, because technically the same M2 could be
+                    //  referenced from both Terrain/ADT *and* dynamic. So we must be in-sync. Also deduplicate code.
+                    //  also, currently there's a lot of blocking going on in the ECS, that's even worse.
 
-                let object = Object {
-                    mesh_kind: ObjectMeshKind::Static(dbg.0.clone()),
-                    material: dbg.1.clone(),
-                    transform,
+                    // TODO: RenderingApplication:are_all_textures_loaded -> Also support gradually loading dynamic
+                    //  entities. or at least not adding them until they are ready. Like just "continue".
+                    RenderableSource::M2(m2) => {
+                        if !RenderingApplication::are_all_textures_loaded(&m2.tex_reference) {
+                            continue; // Try the entity again later.
+                        }
+
+                        let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, &m2.mesh);
+                        let material_handle = RenderingApplication::load_material(
+                            self.debug_object(renderer).1.clone(),
+                            renderer,
+                            &m2.material,
+                            &m2.tex_reference,
+                        );
+
+                        Object {
+                            mesh_kind: ObjectMeshKind::Static(mesh_handle),
+                            material: material_handle,
+                            transform,
+                        }
+                    }
                 };
 
                 renderable.handle = Some(renderer.add_object(object));
