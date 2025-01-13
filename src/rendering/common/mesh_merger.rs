@@ -1,4 +1,5 @@
 use crate::rendering::common::types::{Mesh, VertexBuffers};
+use glam::{Vec3, Vec3A};
 use log::warn;
 
 pub enum MeshMerger {}
@@ -27,5 +28,12 @@ impl MeshMerger {
         }
 
         merged_mesh
+    }
+
+    // TODO: MeshUtils rather than MeshMerger?
+    pub fn mesh_scale_position(mesh: &mut Mesh, scale: Vec3) {
+        for pos in &mut mesh.vertex_buffers.position_buffer {
+            *pos *= scale;
+        }
     }
 }

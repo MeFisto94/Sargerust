@@ -33,7 +33,8 @@ Things that still need to be implemented (loosely sorted by priority):
 - Command Line Arguments (standalone: map, otherwise: server, credentials)
 - Cross Plattform support (i.e. better keybinds, investigate MBP 2011 failure)
 - Physics:
-    - Collider scaling
+    - Verify that the colliders are scaled in the right coordinate system (e.g. scaling along z does the right, expected
+      thing)
     - Character Controller has room for improvements (using the tangent instead of the normals)
     - Offload into a dedicated thread (cpu time rises when colliding, slowing down FPS) -> We need a concept for
       syncing. Currently, we tick at 1/60, but per frame, so wrong.

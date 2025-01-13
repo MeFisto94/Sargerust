@@ -118,22 +118,17 @@ impl ColliderFactory {
                     group_reference.reference_str
                 );
 
-                // This is placed here, because that way it will log once per group, not once per frame!
-                if !scale.abs_diff_eq(Vec3::ONE, 1e-3) {
-                    log::warn!(
-                        "WMO {} has non-unit scale ({}), which is not supported by the physics engine, yet",
-                        wmo_ref.reference.reference_str,
-                        scale
-                    );
-                }
-
                 let mesh_batches = group
                     .mesh_batches
                     .iter()
                     // TODO: Get rid of that clone
                     .map(|mesh_lock| mesh_lock.read().expect("poisoned read lock").data.clone())
                     .collect_vec();
-                let mesh = MeshMerger::merge_meshes_index_only(&mesh_batches);
+                let mut mesh = MeshMerger::merge_meshes_index_only(&mesh_batches);
+
+                // TODO: Validate that the coordinate systems are matching, but since we are rotating the mesh
+                //  afterwards, I think for now mesh and scale are in the same coordinate system
+                MeshMerger::mesh_scale_position(&mut mesh, scale);
 
                 // We need to counter convert because physics seem to have a different coordinate system.
                 let conversion_quat = Quat::from_mat4(&coordinate_systems::blender_to_adt_rot());
@@ -232,15 +227,12 @@ impl ColliderFactory {
                 doodad.reference.reference_str, doodad_translation
             );
 
-            if !scale.abs_diff_eq(Vec3::ONE, 1e-3) {
-                log::warn!(
-                    "Doodad {} has non-unit scale ({}), which is not supported by the physics engine, yet",
-                    doodad.reference.reference_str,
-                    scale
-                );
-            }
+            let mut mesh = dad.deref().mesh.read().expect("Mesh RLock").data.clone();
+            // TODO: Validate that the coordinate systems are matching, but since we are rotating the mesh
+            //  afterwards, I think for now mesh and scale are in the same coordinate system
+            MeshMerger::mesh_scale_position(&mut mesh, scale);
 
-            let mut doodad_collider: Collider = dad.deref().into();
+            let mut doodad_collider: Collider = (&mesh).into();
             doodad_collider.set_position(Isometry3::from((doodad_translation, doodad_rotation)));
 
             // TODO: This is questionable. Should all doodads be their own, but fixed, rigid body or part
