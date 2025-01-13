@@ -40,6 +40,7 @@ Things that still need to be implemented (loosely sorted by priority):
     - WMO: BSP tree (MOBN, MOBR) for collision meshes instead of the render meshes.
 - Reading of DBC files, especially in preparation for:
     - Game Logic. Casting spells and showing stats (mana, health) mainly.
+    - Somehow handle locales. We get MPQs from one locale mostly and that locale is the only one filled in DBC strings
 - Portals, Water, and other less important render objects
 - Audio System, potentially leveraging HRTF and precise reflection and absorption (e.g. SteamAudio)
 - UI/Addon System: This will most likely be using mlua and if possible port

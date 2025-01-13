@@ -50,6 +50,9 @@ sargerust-files = { path = "sargerust-files", features = ["wotlk"] }
 # To Track the entities/objects (i.e. NPCs, Mobs, Players)
 hecs = "0.10.5"
 
+# DBC reading
+wow_dbc = { version = "0.3.0", features = ["wrath"] }
+
 # For the Rendering/Game Engine
 # Linear algebra library
 glam = { version = "0.25.0", features = ["approx"] }

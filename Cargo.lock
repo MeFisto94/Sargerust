@@ -2657,6 +2657,7 @@ dependencies = [
  "vergen-gitcl",
  "wgpu",
  "winit",
+ "wow_dbc",
  "wow_login_messages",
  "wow_srp",
  "wow_world_messages",
@@ -3929,6 +3930,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "wow_dbc"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b265259b30d9a8b873150d09f8114038eb96800bd7f4c6c07d027be6d9e1f237"
+dependencies = [
+ "wow_world_base 0.2.0",
+]
+
+[[package]]
 name = "wow_login_messages"
 version = "0.5.0"
 source = "git+https://github.com/gtker/wow_messages?rev=d30a0aea8213e963534c638c8166cae0d36e9f9f#d30a0aea8213e963534c638c8166cae0d36e9f9f"
@@ -3947,6 +3957,12 @@ dependencies = [
 
 [[package]]
 name = "wow_world_base"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81a9bbbfb34f4898a407a865e95be8bbee685a567df3423fbecb8ffd42fb117a"
+
+[[package]]
+name = "wow_world_base"
 version = "0.3.0"
 source = "git+https://github.com/gtker/wow_messages?rev=d30a0aea8213e963534c638c8166cae0d36e9f9f#d30a0aea8213e963534c638c8166cae0d36e9f9f"
 
@@ -3957,7 +3973,7 @@ source = "git+https://github.com/gtker/wow_messages?rev=d30a0aea8213e963534c638c
 dependencies = [
  "flate2",
  "wow_srp",
- "wow_world_base",
+ "wow_world_base 0.3.0",
 ]
 
 [[package]]
