@@ -29,6 +29,14 @@ pub struct GameApplication {
     weak_self: Weak<GameApplication>,
 }
 
+const WINDOW_TITLE: &str = concat!(
+    "Sargerust: Wrath of the Rust King (",
+    env!("VERGEN_GIT_BRANCH"),
+    "/",
+    env!("VERGEN_GIT_SHA"),
+    ")"
+);
+
 impl GameApplication {
     pub fn new(weak_self: &Weak<GameApplication>, mpq_loader: MPQLoader) -> Self {
         let mpq_loader_arc = Arc::new(mpq_loader);
@@ -72,14 +80,6 @@ impl GameApplication {
                 .spawn_networking_threads(self.weak_self.clone(), receiver),
             _ => vec![],
         };
-
-        const WINDOW_TITLE: &str = concat!(
-            "Sargerust: Wrath of the Rust King (",
-            env!("VERGEN_GIT_BRANCH"),
-            "/",
-            env!("VERGEN_GIT_SHA"),
-            ")"
-        );
 
         let wnd = winit::window::WindowBuilder::new()
             .with_title(WINDOW_TITLE)
