@@ -7,7 +7,8 @@ use crate::ParserError;
 use crate::common::reader::Parseable;
 use crate::common::types::CAaBox;
 use crate::m2::types::{
-    FOURCC_M2HEADER, FOURCC_M2SKIN, M2Array, M2Asset, M2SkinProfile, M2Texture, M2TextureInternal, M2Vertex, Version,
+    FOURCC_M2HEADER, FOURCC_M2SKIN, M2Array, M2Asset, M2SkinProfile, M2Texture, M2TextureFlags, M2TextureInternal,
+    M2TextureType, M2Vertex, Version,
 };
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::ffi::CString;
@@ -106,8 +107,9 @@ impl M2Reader {
         let textures: Vec<M2Texture> = texs
             .iter()
             .map(|tex| M2Texture {
-                texture_type: tex.texture_type,
-                texture_flags: tex.texture_flags,
+                texture_type: M2TextureType::try_from(tex.texture_type)
+                    .unwrap_or_else(|_| panic!("Unknown texture type {}", tex.texture_type)),
+                texture_flags: M2TextureFlags::from_bits_retain(tex.texture_flags),
                 filename: M2Reader::resolve_array_string(rdr, &tex.filename).unwrap(),
             })
             .collect();
@@ -171,10 +173,10 @@ impl M2Reader {
         rdr.seek(SeekFrom::Start(array.offset as u64))?;
         rdr.read_exact(&mut buf)?;
 
-        return CString::from_vec_with_nul(buf)
+        CString::from_vec_with_nul(buf)
             .map_err(|_| ParserError::FormatError {
                 reason: "Cannot convert M2Array<char> to valid UTF-8",
             })
-            .map(|str| str.into_string().unwrap());
+            .map(|str| str.into_string().unwrap())
     }
 }

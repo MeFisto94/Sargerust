@@ -77,9 +77,23 @@ impl M2Loader {
 
         let textures: Vec<Arc<IRTextureReference>> = m2_asset
             .textures
+            .iter()
+            .filter(|tex| {
+                if tex.texture_type != M2TextureType::None {
+                    warn!("Not supported texture type {:?}", tex.texture_type);
+                    return false;
+                }
+
+                true
+                // TODO: TextureReference needs to support resolving that. or rather the API of this fn.
+            })
+            .map(|tex| Arc::new(tex.clone().into())) // TODO: This into should support references too
+            .collect();
+
+        let dynamic_textures = m2_asset
+            .textures
             .into_iter()
-            .filter(|tex| tex.texture_type == 0) // TODO: TextureReference needs to support resolving that.
-            .map(|tex| Arc::new(tex.into()))
+            .filter(|tex| tex.texture_type != M2TextureType::None)
             .collect();
 
         let material = M2Importer::create_material_texname(&textures.first().map(|tex| tex.reference_str.clone()));

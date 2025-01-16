@@ -3,6 +3,7 @@ use crate::ParserError;
 use crate::common::reader::Parseable;
 use crate::common::types::{C2Vector, C3Vector};
 use crate::m2::reader::M2Reader;
+use bitflags::bitflags;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::{Read, Write};
 
@@ -114,12 +115,58 @@ impl Parseable<M2Vertex> for M2Vertex {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum M2TextureType {
+    /// Texture given in filename
+    None,
+    /// Skin / Body + Clothes
+    TexComponentSkin,
+    /// Object Skin (Item, Capes, Item\ObjectComponents\Cape\*.blp)
+    TexComponentObjectSkin,
+    /// WeaponBlade (not used in the client?)
+    TexComponentWeaponBlade,
+    /// Weapon Handle
+    TexComponentWeaponHandle,
+    /// Environment (Obsolete, please remove from source art)
+    #[deprecated]
+    TexComponentEnvironment,
+    /// Character Hair
+    TexComponentCharacterHair,
+    /// Character Facial Hair (Obsolete, please remove from source art)
+    #[deprecated]
+    TexComponentCharacterFacialHair,
+    /// Skin Extra
+    TexComponentSkinExtra,
+    /// UI Skin -- Used on invetory art M2s (1) InventoryArtGeometry.m2 and InventoryArtGeometryOld.m2
+    TexComponentUISkin,
+    /// Character Misc (Tauren Mane), Obsolete, please remove from source art
+    #[deprecated]
+    TexComponentTaurenMane,
+    /// Monster Skin 1 (Skin for Creatures or GameObjects)
+    TexComponentMonster1,
+    /// Monster Skin 2 (Skin for Creatures or GameObjects)
+    TexComponentMonster2,
+    /// Monster Skin 3 (Skin for Creatures or GameObjects)
+    TexComponentMonster3,
+    /// Item Icon (Used on inventory art m2s: ui-button.m2 and forcedbackpackitem.m2)
+    TexComponentItemIcon,
+    // From here on: CATA.
+}
+
+bitflags! {
+    #[derive(Debug, Clone, Copy)]
+    pub struct M2TextureFlags: u32 {
+        const WRAP_X = 0x1;
+        const WRAP_Y = 0x2;
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct M2Texture {
     // TODO: better typing for type and flags.
-    pub texture_type: u32,
-    pub texture_flags: u32,
-    pub filename: String, // maximum of 0x108 chars
+    pub texture_type: M2TextureType,
+    pub texture_flags: M2TextureFlags, // 0x1 wrap x, 0x2 wrap y, 0x3 = wrap x+y (bitflags)
+    pub filename: String,              // maximum of 0x108 chars
 }
 
 #[derive(Debug)]
@@ -127,6 +174,31 @@ pub(crate) struct M2TextureInternal {
     pub texture_type: u32,
     pub texture_flags: u32,
     pub filename: M2Array,
+}
+
+impl TryFrom<u32> for M2TextureType {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(M2TextureType::None),
+            1 => Ok(M2TextureType::TexComponentSkin),
+            2 => Ok(M2TextureType::TexComponentObjectSkin),
+            3 => Ok(M2TextureType::TexComponentWeaponBlade),
+            4 => Ok(M2TextureType::TexComponentWeaponHandle),
+            5 => Ok(M2TextureType::TexComponentEnvironment),
+            6 => Ok(M2TextureType::TexComponentCharacterHair),
+            7 => Ok(M2TextureType::TexComponentCharacterFacialHair),
+            8 => Ok(M2TextureType::TexComponentSkinExtra),
+            9 => Ok(M2TextureType::TexComponentUISkin),
+            10 => Ok(M2TextureType::TexComponentTaurenMane),
+            11 => Ok(M2TextureType::TexComponentMonster1),
+            12 => Ok(M2TextureType::TexComponentMonster2),
+            13 => Ok(M2TextureType::TexComponentMonster3),
+            14 => Ok(M2TextureType::TexComponentItemIcon),
+            _ => Err(()),
+        }
+    }
 }
 
 impl Parseable<M2TextureInternal> for M2TextureInternal {
@@ -178,21 +250,21 @@ pub struct M2SkinSection {
 impl Parseable<M2SkinSection> for M2SkinSection {
     fn parse<R: Read>(rdr: &mut R) -> Result<M2SkinSection, ParserError> {
         Ok(M2SkinSection {
-      skinSectionId: rdr.read_u16::<LittleEndian>()?,
-      Level: rdr.read_u16::<LittleEndian>()?,
-      vertexStart: rdr.read_u16::<LittleEndian>()?,
-      vertexCount: rdr.read_u16::<LittleEndian>()?,
-      indexStart: rdr.read_u16::<LittleEndian>()?,
-      indexCount: rdr.read_u16::<LittleEndian>()?,
-      boneCount: rdr.read_u16::<LittleEndian>()?,
-      boneComboIndex: rdr.read_u16::<LittleEndian>()?,
-      boneInfluences: rdr.read_u16::<LittleEndian>()?,
-      centerBoneIndex: rdr.read_u16::<LittleEndian>()?,
-      centerPosition: C3Vector::parse(rdr)?,
-      #[cfg(any(feature = "wotlk", feature = "tbc"))] // >= TBC
-      sortCenterPosition: C3Vector::parse(rdr)?,
-      #[cfg(any(feature = "wotlk", feature = "tbc"))] // >= TBC
-      sortRadius: rdr.read_f32::<LittleEndian>()?,
-    })
+            skinSectionId: rdr.read_u16::<LittleEndian>()?,
+            Level: rdr.read_u16::<LittleEndian>()?,
+            vertexStart: rdr.read_u16::<LittleEndian>()?,
+            vertexCount: rdr.read_u16::<LittleEndian>()?,
+            indexStart: rdr.read_u16::<LittleEndian>()?,
+            indexCount: rdr.read_u16::<LittleEndian>()?,
+            boneCount: rdr.read_u16::<LittleEndian>()?,
+            boneComboIndex: rdr.read_u16::<LittleEndian>()?,
+            boneInfluences: rdr.read_u16::<LittleEndian>()?,
+            centerBoneIndex: rdr.read_u16::<LittleEndian>()?,
+            centerPosition: C3Vector::parse(rdr)?,
+            #[cfg(any(feature = "wotlk", feature = "tbc"))] // >= TBC
+            sortCenterPosition: C3Vector::parse(rdr)?,
+            #[cfg(any(feature = "wotlk", feature = "tbc"))] // >= TBC
+            sortRadius: rdr.read_f32::<LittleEndian>()?,
+        })
     }
 }
