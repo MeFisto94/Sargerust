@@ -1,5 +1,5 @@
 use crate::entity::components::objects::{TmpLocation, TmpOrientation};
-use crate::entity::components::render::{Renderable, RenderableSource};
+use crate::entity::components::rendering::{Renderable, RenderableSource};
 use crate::game::application::GameApplication;
 use crate::rendering::application::RenderingApplication;
 use crate::rendering::common::coordinate_systems::{adt_to_blender_rot, adt_to_blender_unaligned};

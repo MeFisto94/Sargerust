@@ -1,5 +1,5 @@
 use crate::entity::components::objects::{TmpLocation, TmpOrientation};
-use crate::entity::components::render::Renderable;
+use crate::entity::components::rendering::Renderable;
 use crate::entity::components::units::UnitDisplayId;
 use glam::Vec3;
 use hecs::World;

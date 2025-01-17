@@ -1,3 +1,3 @@
 pub mod objects;
-pub mod render;
+pub mod rendering;
 pub mod units;

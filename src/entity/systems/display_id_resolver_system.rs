@@ -1,4 +1,4 @@
-use crate::entity::components::render::{Renderable, RenderableSource};
+use crate::entity::components::rendering::{Renderable, RenderableSource};
 use crate::entity::components::units::UnitDisplayId;
 use crate::game::application::GameApplication;
 use crate::io::common::loader::RawAssetLoader;
