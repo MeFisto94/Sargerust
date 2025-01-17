@@ -108,7 +108,7 @@ impl GameApplication {
         }
     }
 
-    pub fn logic_update(&self) {
-        self.systems.update(&self);
+    pub fn logic_update(&self, delta_time: f32) {
+        self.systems.update(self, delta_time);
     }
 }

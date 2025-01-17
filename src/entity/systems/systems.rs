@@ -17,7 +17,7 @@ impl Systems {
         }
     }
 
-    pub fn update(&self, app: &GameApplication) {
+    pub fn update(&self, app: &GameApplication, delta_time: f32) {
         self.display_id_resolver_system.update(app);
         self.rendering_system.update(app);
     }
