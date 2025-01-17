@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
-use image_blp::BlpImage;
-
-use sargerust_files::m2::reader::M2Reader;
-
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::nodes::adt_node::IRTextureReference;
 use crate::rendering::common::types::{Material, Mesh};
 use crate::rendering::importer::m2_importer::M2Importer;
 use crate::rendering::loader::blp_loader::BLPLoader;
+use image_blp::BlpImage;
+use log::warn;
+use sargerust_files::m2::reader::M2Reader;
+use sargerust_files::m2::types::{M2Texture, M2TextureType};
 
 #[derive(Debug, Clone)]
 pub struct LoadedM2 {
@@ -25,6 +25,7 @@ pub struct LoadedM2Graph {
     pub mesh: Mesh,
     pub material: Material,
     pub textures: Vec<Arc<IRTextureReference>>,
+    pub dynamic_textures: Vec<M2Texture>, // TODO: This can't be a reference sadly.
 }
 
 pub struct M2Loader {}
@@ -102,6 +103,7 @@ impl M2Loader {
             mesh,
             material,
             textures,
+            dynamic_textures,
         }
     }
 }

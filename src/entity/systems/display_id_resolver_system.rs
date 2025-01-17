@@ -7,7 +7,9 @@ use crate::rendering::asset_graph::m2_generator::M2Generator;
 use crate::rendering::asset_graph::nodes::adt_node::{IRTexture, M2Node};
 use crate::rendering::asset_graph::resolver::Resolver;
 use hecs::Without;
+use itertools::Itertools;
 use log::{info, warn};
+use sargerust_files::m2::types::M2TextureType;
 use std::io::Cursor;
 use std::sync::{Arc, RwLock};
 use wow_dbc::wrath_tables::creature_display_info::CreatureDisplayInfo;
@@ -79,37 +81,45 @@ impl DisplayIdResolverSystem {
                 .replace(".mdx", ".m2")
                 .replace(".mdl", ".m2");
 
-            info!("Got a {}", &name);
-            let result = self.m2_resolver.resolve(name);
+            let base_path = name.split_at(name.rfind('\\').expect("No \\ in name")).0;
+
+            let result = self.m2_resolver.resolve(name.clone());
 
             for reference in &result.tex_reference {
                 let resolve = self.tex_resolver.resolve(reference.reference_str.clone());
                 *reference.reference.write().expect("Write Lock") = Some(resolve);
             }
 
-            warn!(
-                "Result: Tex {:?}, Vertex {}, material: {:?}",
-                result.tex_reference,
-                result
-                    .mesh
-                    .read()
-                    .unwrap()
-                    .data
-                    .vertex_buffers
-                    .position_buffer
-                    .len(),
-                result.material.read().unwrap().data
-            );
-            new_renderables.push((entity, result));
+            let resolved_dynamic_textures = result
+                .dynamic_tex_references
+                .iter()
+                .filter_map(|reference| {
+                    let tex_file_name = match reference.texture_type {
+                        M2TextureType::TexComponentMonster1 => &creature_display_info.texture_variation[0],
+                        M2TextureType::TexComponentMonster2 => &creature_display_info.texture_variation[1],
+                        M2TextureType::TexComponentMonster3 => &creature_display_info.texture_variation[2],
+                        _ => {
+                            warn!("Not supported texture type {:?}", reference.texture_type);
+                            return None;
+                        }
+                    };
+
+                    let tex_name = format!("{}\\{}.blp", base_path, tex_file_name);
+
+                    Some(self.tex_resolver.resolve(tex_name.clone()))
+                })
+                .collect_vec();
+
+            new_renderables.push((entity, (result, resolved_dynamic_textures)));
         }
 
-        for (entity, arc) in new_renderables {
+        for (entity, (arc, dynamic_textures)) in new_renderables {
             write
                 .insert_one(
                     entity,
                     Renderable {
                         handle: None,
-                        source: RenderableSource::M2(arc),
+                        source: RenderableSource::M2(arc, dynamic_textures),
                     },
                 )
                 .expect("Insert Renderable");

@@ -7,8 +7,8 @@ use crate::rendering::rend3_backend::gpu_loaders;
 use glam::{Mat4, Quat, Vec4};
 use rend3::Renderer;
 use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectMeshKind};
-use rend3_routine::pbr::{AlbedoComponent, PbrMaterial};
-use std::sync::{Arc, OnceLock};
+use rend3_routine::pbr::{AlbedoComponent, PbrMaterial, Transparency};
+use std::sync::{Arc, OnceLock, RwLock};
 
 // cube_example from rend3.
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
@@ -132,18 +132,56 @@ impl RenderingSystem {
 
                     // TODO: RenderingApplication:are_all_textures_loaded -> Also support gradually loading dynamic
                     //  entities. or at least not adding them until they are ready. Like just "continue".
-                    RenderableSource::M2(m2) => {
+                    RenderableSource::M2(m2, dynamic_textures) => {
                         if !RenderingApplication::are_all_textures_loaded(&m2.tex_reference) {
                             continue; // Try the entity again later.
                         }
 
+                        if dynamic_textures
+                            .iter()
+                            .any(|tex| tex.read().expect("Texture read lock").is_none())
+                        {
+                            continue; // Try the entity again later.
+                        }
+
                         let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, &m2.mesh);
-                        let material_handle = RenderingApplication::load_material(
-                            self.debug_object(renderer).1.clone(),
-                            renderer,
-                            &m2.material,
-                            &m2.tex_reference,
-                        );
+
+                        // TODO: We need two things here: A sense of order (as static and dynamic textures could be
+                        //  interleaved), as well as a custom shader supporting texture layering to begin with.
+
+                        let material = {
+                            if let Some(first) = m2.tex_reference.first() {
+                                let texture = gpu_loaders::gpu_load_texture(renderer, &first.reference);
+
+                                PbrMaterial {
+                                    unlit: true,
+                                    albedo: AlbedoComponent::Texture(
+                                        texture.expect("Have at least one texture").clone(),
+                                    ),
+                                    transparency: Transparency::Cutout { cutout: 0.1 }, // TODO: How to predict alpha?
+                                    ..Default::default()
+                                }
+                            } else if let Some(first) = dynamic_textures.first() {
+                                let texture =
+                                    gpu_loaders::gpu_load_texture(renderer, &RwLock::new(Some(first.clone())));
+                                PbrMaterial {
+                                    unlit: true,
+                                    albedo: AlbedoComponent::Texture(
+                                        texture.expect("Have at least one texture").clone(),
+                                    ),
+                                    transparency: Transparency::Cutout { cutout: 0.1 }, // TODO: How to predict alpha?
+                                    ..Default::default()
+                                }
+                            } else {
+                                PbrMaterial {
+                                    unlit: true,
+                                    albedo: AlbedoComponent::Value(Vec4::new(1.0, 0.0, 0.5, 1.0)),
+                                    ..Default::default()
+                                }
+                            }
+                        };
+
+                        let material_handle = renderer.add_material(material);
 
                         Object {
                             mesh_kind: ObjectMeshKind::Static(mesh_handle),

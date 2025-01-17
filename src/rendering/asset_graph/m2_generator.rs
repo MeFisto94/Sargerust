@@ -24,9 +24,11 @@ impl GraphNodeGenerator<M2Node> for M2Generator {
         let mesh = RwLock::new(m2.mesh.into());
         let material = RwLock::new(m2.material.into());
         let tex_reference = m2.textures;
+        let dynamic_tex_references = m2.dynamic_textures;
 
         Arc::new(M2Node {
             tex_reference,
+            dynamic_tex_references,
             mesh,
             material,
         })

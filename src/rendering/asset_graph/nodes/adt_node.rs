@@ -49,7 +49,11 @@ impl DoodadReference {
 #[derive(Debug)]
 pub struct M2Node {
     // the vec is immutable after creation, just the tex_reference#reference needs RwLocking
+    // TODO: Rename
+    // TODO: rustdoc linking could somehow work with M2TextureType#variant.None, but then it doesn't even find the parent atm.
+    /// These are the texture references that have been referenced with a [`M2TextureType`] of None.
     pub tex_reference: Vec<Arc<IRTextureReference>>,
+    pub dynamic_tex_references: Vec<M2Texture>,
     pub mesh: RwLock<IRMesh>,
     pub material: RwLock<IRMaterial>,
     // TODO: RWLock inside IRMaterial#handle instead? As no-one should modify the material contents
@@ -116,6 +120,7 @@ impl<T> NodeReference<T> {
 // TODO: the typedefs belong into rend3_backend, as they leak and wrap rend3 types
 pub type IRMaterial = IRObject<Material, MaterialHandle>;
 pub type IRMesh = IRObject<Mesh, MeshHandle>;
+// TODO: Why are textures failable? Depending on the context that may not be a good idea. As is the file location for these.
 // Textures are failable
 pub type IRTextureReference = IRObjectReference<Option<IRTexture>>;
 pub type IRTexture = IRObject<BlpImage, Texture2DHandle>;
