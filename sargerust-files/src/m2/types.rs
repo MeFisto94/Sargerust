@@ -128,19 +128,16 @@ pub enum M2TextureType {
     /// Weapon Handle
     TexComponentWeaponHandle,
     /// Environment (Obsolete, please remove from source art)
-    #[deprecated]
     TexComponentEnvironment,
     /// Character Hair
     TexComponentCharacterHair,
     /// Character Facial Hair (Obsolete, please remove from source art)
-    #[deprecated]
     TexComponentCharacterFacialHair,
     /// Skin Extra
     TexComponentSkinExtra,
     /// UI Skin -- Used on invetory art M2s (1) InventoryArtGeometry.m2 and InventoryArtGeometryOld.m2
     TexComponentUISkin,
     /// Character Misc (Tauren Mane), Obsolete, please remove from source art
-    #[deprecated]
     TexComponentTaurenMane,
     /// Monster Skin 1 (Skin for Creatures or GameObjects)
     TexComponentMonster1,
