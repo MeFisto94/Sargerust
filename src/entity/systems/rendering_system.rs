@@ -4,9 +4,11 @@ use crate::game::application::GameApplication;
 use crate::rendering::application::RenderingApplication;
 use crate::rendering::common::coordinate_systems::{adt_to_blender_rot, adt_to_blender_unaligned};
 use crate::rendering::rend3_backend::gpu_loaders;
+use crate::rendering::rend3_backend::material::units::units_material::UnitsMaterial;
 use glam::{Mat4, Quat, Vec4};
+use itertools::Itertools;
 use rend3::Renderer;
-use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectMeshKind};
+use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectMeshKind, Texture2DHandle};
 use rend3_routine::pbr::{AlbedoComponent, PbrMaterial, Transparency};
 use std::sync::{Arc, OnceLock, RwLock};
 
@@ -146,39 +148,30 @@ impl RenderingSystem {
 
                         let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, &m2.mesh);
 
-                        // TODO: We need two things here: A sense of order (as static and dynamic textures could be
-                        //  interleaved), as well as a custom shader supporting texture layering to begin with.
+                        // TODO: A sense of order (as static and dynamic textures could be interleaved), also could they
+                        //  then exceed 3? i.e. are there fully equipped dynamic textures still having static ones?
 
                         let material = {
-                            if let Some(first) = m2.tex_reference.first() {
-                                let texture = gpu_loaders::gpu_load_texture(renderer, &first.reference);
+                            let mut textures = dynamic_textures
+                                .iter()
+                                .map(|tex| gpu_loaders::gpu_load_texture(renderer, &RwLock::new(Some(tex.clone()))))
+                                .chain(
+                                    m2.tex_reference
+                                        .iter()
+                                        .map(|tex| gpu_loaders::gpu_load_texture(renderer, &tex.reference)),
+                                )
+                                .take(3)
+                                .collect_vec();
 
-                                PbrMaterial {
-                                    unlit: true,
-                                    albedo: AlbedoComponent::Texture(
-                                        texture.expect("Have at least one texture").clone(),
-                                    ),
-                                    transparency: Transparency::Cutout { cutout: 0.1 }, // TODO: How to predict alpha?
-                                    ..Default::default()
-                                }
-                            } else if let Some(first) = dynamic_textures.first() {
-                                let texture =
-                                    gpu_loaders::gpu_load_texture(renderer, &RwLock::new(Some(first.clone())));
-                                PbrMaterial {
-                                    unlit: true,
-                                    albedo: AlbedoComponent::Texture(
-                                        texture.expect("Have at least one texture").clone(),
-                                    ),
-                                    transparency: Transparency::Cutout { cutout: 0.1 }, // TODO: How to predict alpha?
-                                    ..Default::default()
-                                }
-                            } else {
-                                PbrMaterial {
-                                    unlit: true,
-                                    albedo: AlbedoComponent::Value(Vec4::new(1.0, 0.0, 0.5, 1.0)),
-                                    ..Default::default()
-                                }
+                            for _ in textures.len()..3 {
+                                textures.push(None);
                             }
+
+                            let texture_layers: [Option<Texture2DHandle>; 3] = textures
+                                .try_into()
+                                .expect("should match the array length since we call take(3)");
+
+                            UnitsMaterial { texture_layers }
                         };
 
                         let material_handle = renderer.add_material(material);

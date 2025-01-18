@@ -72,6 +72,7 @@ pub fn gpu_load_texture(
         .expect("Texture internal write lock");
 
     let tex = tex_iwlock.as_mut().expect("unreachable!");
+    // TODO: What do we do with the mipmap level? From 0 to tex.data.image_count() as u8 - 1
     let texture = Rend3BackendConverter::create_texture_from_ir(&tex.data, 0);
     let texture_handle = renderer
         .add_texture_2d(texture)

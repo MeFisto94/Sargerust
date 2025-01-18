@@ -13,6 +13,7 @@ use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
 use crate::rendering::rend3_backend::material::terrain::terrain_material::TerrainMaterial;
 use crate::rendering::rend3_backend::material::terrain::terrain_routine::TerrainRoutine;
+use crate::rendering::rend3_backend::material::units::units_routine::UnitsRoutine;
 use crate::rendering::rend3_backend::{Rend3BackendConverter, gpu_loaders};
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
@@ -53,6 +54,7 @@ pub struct RenderingApplication {
     fly_cam: bool,
 
     terrain_routine: Option<Mutex<TerrainRoutine>>,
+    units_routine: Option<Mutex<UnitsRoutine>>,
 }
 
 impl RenderingApplication {
@@ -71,6 +73,7 @@ impl RenderingApplication {
             texture_still_loading_material: None,
             fly_cam: false,
             terrain_routine: None,
+            units_routine: None,
         }
     }
 
@@ -565,6 +568,13 @@ impl rend3_framework::App for RenderingApplication {
             &render_graph.interfaces,
         )));
 
+        self.units_routine = Some(Mutex::new(UnitsRoutine::new(
+            renderer,
+            &mut data_core,
+            spp,
+            &render_graph.interfaces,
+        )));
+
         drop(data_core);
 
         render_graph
@@ -789,6 +799,12 @@ impl rend3_framework::App for RenderingApplication {
             .expect("terrain to be setup")
             .lock()
             .expect("Terrain Routine Lock");
+        let units_routine = self
+            .units_routine
+            .as_ref()
+            .expect("units routine to be setup")
+            .lock()
+            .expect("Units Routine Lock");
 
         // Build a rendergraph
         let mut graph = rend3::graph::RenderGraph::new();
@@ -822,6 +838,7 @@ impl rend3_framework::App for RenderingApplication {
                 clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
             },
             &terrain_routine,
+            &units_routine,
         );
 
         // Dispatch a render using the built up rendergraph!
@@ -836,6 +853,7 @@ fn base_rendergraph_add_to_graph<'node>(
     inputs: BaseRenderGraphInputs<'_, 'node>,
     settings: BaseRenderGraphSettings,
     terrain_routine: &'node TerrainRoutine,
+    units_routine: &'node UnitsRoutine,
 ) {
     // Create the data and handles for the graph.
     let mut state = BaseRenderGraphIntermediateState::new(graph, inputs, settings);
@@ -862,6 +880,21 @@ fn base_rendergraph_add_to_graph<'node>(
             binding_data: forward::ForwardRoutineBindingData {
                 whole_frame_uniform_bg: state.forward_uniform_bg,
                 per_material_bgl: &terrain_routine.per_material,
+                extra_bgs: None,
+            },
+            samples: state.inputs.target.samples,
+            renderpass: state.primary_renderpass.clone(),
+        });
+
+    units_routine
+        .opaque_routine
+        .add_forward_to_graph(ForwardRoutineArgs {
+            graph: state.graph,
+            label: "Units Forward Pass",
+            camera: CameraSpecifier::Viewport,
+            binding_data: forward::ForwardRoutineBindingData {
+                whole_frame_uniform_bg: state.forward_uniform_bg,
+                per_material_bgl: &units_routine.per_material,
                 extra_bgs: None,
             },
             samples: state.inputs.target.samples,

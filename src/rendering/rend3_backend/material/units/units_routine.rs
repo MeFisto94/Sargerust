@@ -1,5 +1,5 @@
 use crate::rendering::rend3_backend::material::SargerustShaderSources;
-use crate::rendering::rend3_backend::material::terrain::terrain_material::TerrainMaterial;
+use crate::rendering::rend3_backend::material::units::units_material::UnitsMaterial;
 use rend3::RendererProfile::GpuDriven;
 use rend3::{Renderer, RendererDataCore, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
 use rend3_routine::common::{PerMaterialArchetypeInterface, WholeFrameInterfaces};
@@ -9,12 +9,12 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use wgpu::{BlendState, ShaderModuleDescriptor, ShaderSource};
 
-pub struct TerrainRoutine {
-    pub opaque_routine: ForwardRoutine<TerrainMaterial>,
-    pub per_material: PerMaterialArchetypeInterface<TerrainMaterial>,
+pub struct UnitsRoutine {
+    pub opaque_routine: ForwardRoutine<UnitsMaterial>,
+    pub per_material: PerMaterialArchetypeInterface<UnitsMaterial>,
 }
 
-impl TerrainRoutine {
+impl UnitsRoutine {
     pub fn new(
         renderer: &Arc<Renderer>,
         data_core: &mut RendererDataCore,
@@ -22,29 +22,30 @@ impl TerrainRoutine {
         interfaces: &WholeFrameInterfaces,
     ) -> Self {
         // TODO: This is not really in-sync with how the other shaders do it, but:
+        // TODO: Pull this out, somehow somewhere more central, otherwise we uselessly read and overwrite the entries.
         spp.add_shaders_embed::<SargerustShaderSources>("sargerust");
-        // profiling::scope!("TerrainRoutine::new");
+        // profiling::scope!("UnitsRoutine::new");
 
         // This ensures the BGLs for the material are created
         data_core
             .material_manager
-            .ensure_archetype::<TerrainMaterial>(&renderer.device, renderer.profile);
+            .ensure_archetype::<UnitsMaterial>(&renderer.device, renderer.profile);
 
-        let per_material = PerMaterialArchetypeInterface::<TerrainMaterial>::new(&renderer.device);
+        let per_material = PerMaterialArchetypeInterface::<UnitsMaterial>::new(&renderer.device);
 
         let module = renderer
             .device
             .create_shader_module(ShaderModuleDescriptor {
-                label: Some("terrain opaque sm"),
+                label: Some("units opaque sm"),
                 source: ShaderSource::Wgsl(Cow::Owned(
                     spp.render_shader(
-                        "sargerust/terrain-opaque.wgsl",
+                        "sargerust/units-opaque.wgsl",
                         &ShaderConfig {
                             //profile: Some(renderer.profile),
                             profile: Some(GpuDriven),
                             ..Default::default()
                         },
-                        Some(&ShaderVertexBufferConfig::from_material::<TerrainMaterial>()),
+                        Some(&ShaderVertexBufferConfig::from_material::<UnitsMaterial>()),
                     )
                     .unwrap(),
                 )),
@@ -54,7 +55,7 @@ impl TerrainRoutine {
         let transparency = TransparencyType::Opaque;
 
         let opaque_routine = ForwardRoutine::new(ForwardRoutineCreateArgs {
-            name: &format!("Terrain {routine_type:?} {transparency:?}"),
+            name: &format!("Units {routine_type:?} {transparency:?}"),
             renderer,
             data_core,
             spp,
