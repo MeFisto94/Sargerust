@@ -1,6 +1,7 @@
 use crate::entity::components::objects::{SplineWalker, TmpLocation, TmpOrientation};
 use crate::entity::components::rendering::Renderable;
 use crate::entity::components::units::UnitDisplayId;
+use crate::networking::utils::net_vector3d_to_glam;
 use glam::Vec3;
 use hecs::World;
 use itertools::Itertools;
@@ -68,7 +69,7 @@ impl EntityTracker {
                     .insert(
                         entity,
                         (
-                            TmpLocation(Vec3::new(position.x, position.y, position.z)),
+                            TmpLocation(net_vector3d_to_glam(position)),
                             TmpOrientation(orientation),
                         ),
                     )

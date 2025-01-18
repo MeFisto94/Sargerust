@@ -2,6 +2,7 @@ use crate::game::application::GameApplication;
 use crate::game::map_manager::MapManager;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
+use crate::networking::utils::net_vector3d_to_glam;
 use crate::physics::physics_state::PhysicsState;
 use glam::{Vec3, Vec3A};
 use log::debug;
@@ -79,7 +80,7 @@ impl GameState {
 
         self.map_manager.write().unwrap().preload_map(
             map_row.directory.clone(),
-            Vec3::new(position.x, position.y, position.z),
+            net_vector3d_to_glam(position),
             orientation,
         );
     }
