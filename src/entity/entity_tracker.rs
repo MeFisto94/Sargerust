@@ -1,4 +1,4 @@
-use crate::entity::components::objects::{TmpLocation, TmpOrientation};
+use crate::entity::components::objects::{SplineWalker, TmpLocation, TmpOrientation};
 use crate::entity::components::rendering::Renderable;
 use crate::entity::components::units::UnitDisplayId;
 use glam::Vec3;
@@ -74,6 +74,14 @@ impl EntityTracker {
                     )
                     .expect("Insert Position and Orientation");
             }
+
+            if let Some(MovementBlock_UpdateFlag_Living::Living { flags, .. }) = movement.update_flag.get_living() {
+                if let Some(spline) = flags.get_spline_enabled() {
+                    world
+                        .insert_one(entity, SplineWalker::from(spline))
+                        .expect("Insert SplineWalker");
+                }
+            };
 
             match mask {
                 UpdateMask::GameObject(_) => (), // Game objects don't seem to have anything useful for us at the moment
