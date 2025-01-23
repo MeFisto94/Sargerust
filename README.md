@@ -36,6 +36,7 @@ Things that still need to be implemented (loosely sorted by priority):
 - Physics:
     - Verify that the colliders are scaled in the right coordinate system (e.g. scaling along z does the right, expected
       thing)
+    - M2 Colliders could be derived from the full mesh instead of trying to merge it again
     - Character Controller has room for improvements (using the tangent instead of the normals)
     - Offload into a dedicated thread (cpu time rises when colliding, slowing down FPS) -> We need a concept for
       syncing. Currently, we tick at 1/60, but per frame, so wrong.
@@ -43,6 +44,7 @@ Things that still need to be implemented (loosely sorted by priority):
 - Reading of DBC files, especially in preparation for:
     - Game Logic. Casting spells and showing stats (mana, health) mainly.
     - Somehow handle locales. We get MPQs from one locale mostly and that locale is the only one filled in DBC strings
+- massive Map Manager rework
 - Portals, Water, and other less important render objects
 - Audio System, potentially leveraging HRTF and precise reflection and absorption (e.g. SteamAudio)
 - UI/Addon System: This will most likely be using mlua and if possible port

@@ -106,7 +106,11 @@ impl DisplayIdResolverSystem {
 
                     let tex_name = format!("{}\\{}.blp", base_path, tex_file_name);
 
-                    Some(self.tex_resolver.resolve(tex_name.clone()))
+                    Some((
+                        reference.texture_type,
+                        reference.texture_flags,
+                        self.tex_resolver.resolve(tex_name.clone()),
+                    ))
                 })
                 .collect_vec();
 
@@ -118,7 +122,7 @@ impl DisplayIdResolverSystem {
                 .insert_one(
                     entity,
                     Renderable {
-                        handle: None,
+                        handles: None,
                         source: RenderableSource::M2(arc, dynamic_textures),
                     },
                 )

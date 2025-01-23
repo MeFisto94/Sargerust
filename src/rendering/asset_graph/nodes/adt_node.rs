@@ -1,5 +1,6 @@
 use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::common::types::{Material, Mesh};
+use crate::rendering::importer::m2_importer::M2Material;
 use glam::{Affine3A, Mat4, Vec3A};
 use image_blp::BlpImage;
 use rend3::types::{MaterialHandle, MeshHandle, ObjectHandle, Texture2DHandle};
@@ -29,9 +30,9 @@ pub struct DoodadReference {
     pub transform: Mat4,
     pub reference: NodeReference<M2Node>,
     // TODO: maybe we should have separate structs, graph/mapmanager and renderer side?
-    pub renderer_object_handle: tokio::sync::RwLock<Option<ObjectHandle>>,
-    pub renderer_has_texture: AtomicBool,
-    pub renderer_is_complete: AtomicBool, // This is redundant with renderer_object_handle.is_some, but lock-free
+    pub renderer_object_handles: tokio::sync::RwLock<Vec<ObjectHandle>>,
+    pub renderer_waiting_for_textures: AtomicBool, // Stage 1: unicolor objects
+    pub renderer_is_complete: AtomicBool,          // Stage 2: textures applied
 }
 
 impl DoodadReference {
@@ -40,8 +41,8 @@ impl DoodadReference {
             transform,
             reference: NodeReference::new(reference),
             renderer_is_complete: AtomicBool::new(false),
-            renderer_has_texture: AtomicBool::new(false),
-            renderer_object_handle: tokio::sync::RwLock::new(None),
+            renderer_waiting_for_textures: AtomicBool::new(false),
+            renderer_object_handles: tokio::sync::RwLock::new(vec![]),
         }
     }
 }
@@ -54,8 +55,9 @@ pub struct M2Node {
     /// These are the texture references that have been referenced with a [`M2TextureType`] of None.
     pub tex_reference: Vec<Arc<IRTextureReference>>,
     pub dynamic_tex_references: Vec<M2Texture>,
-    pub mesh: RwLock<IRMesh>,
-    pub material: RwLock<IRMaterial>,
+
+    // Since we have multiple meshes, we need to link the materials to it.
+    pub meshes_and_materials: Vec<(RwLock<IRMesh>, RwLock<IRM2Material>)>,
     // TODO: RWLock inside IRMaterial#handle instead? As no-one should modify the material contents
     //  and whenever a node has resolved it's reference, it has to be existent/loaded?
 }
@@ -119,6 +121,7 @@ impl<T> NodeReference<T> {
 
 // TODO: the typedefs belong into rend3_backend, as they leak and wrap rend3 types
 pub type IRMaterial = IRObject<Material, MaterialHandle>;
+pub type IRM2Material = IRObject<M2Material, MaterialHandle>;
 pub type IRMesh = IRObject<Mesh, MeshHandle>;
 // TODO: Why are textures failable? Depending on the context that may not be a good idea. As is the file location for these.
 // Textures are failable
@@ -172,6 +175,15 @@ impl From<String> for IRTextureReference {
         Self {
             reference: RwLock::new(None),
             reference_str: value,
+        }
+    }
+}
+
+impl From<M2Material> for IRM2Material {
+    fn from(value: M2Material) -> Self {
+        Self {
+            data: value,
+            handle: None,
         }
     }
 }

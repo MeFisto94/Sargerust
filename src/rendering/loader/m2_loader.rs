@@ -4,9 +4,10 @@ use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::nodes::adt_node::IRTextureReference;
 use crate::rendering::common::types::{Material, Mesh};
-use crate::rendering::importer::m2_importer::M2Importer;
+use crate::rendering::importer::m2_importer::{M2Importer, M2Material};
 use crate::rendering::loader::blp_loader::BLPLoader;
 use image_blp::BlpImage;
+use itertools::Itertools;
 use log::warn;
 use sargerust_files::m2::reader::M2Reader;
 use sargerust_files::m2::types::{M2Texture, M2TextureType};
@@ -21,9 +22,14 @@ pub struct LoadedM2 {
 }
 
 #[derive(Debug)]
-pub struct LoadedM2Graph {
+pub struct M2MeshAndMaterial {
     pub mesh: Mesh,
-    pub material: Material,
+    pub material: M2Material,
+}
+
+#[derive(Debug)]
+pub struct LoadedM2Graph {
+    pub mesh_and_material: Vec<M2MeshAndMaterial>,
     pub textures: Vec<Arc<IRTextureReference>>,
     pub dynamic_textures: Vec<M2Texture>, // TODO: This can't be a reference sadly.
 }
@@ -50,7 +56,7 @@ impl M2Loader {
             blp_opt = BLPLoader::load_blp_from_ldr(loader, &m2_asset.textures[0].filename);
         }
 
-        let mesh = M2Importer::create_mesh(&m2_asset, &skin);
+        let mesh = M2Importer::create_mesh(&m2_asset, &skin, skin.submeshes.first().unwrap());
         let material = M2Importer::create_material(&blp_opt); // TODO: the texture should be intrinsic to the material.
 
         LoadedM2 {
@@ -74,20 +80,36 @@ impl M2Loader {
         );
 
         let skin = M2Reader::parse_skin_profile(&mut skin_file).unwrap();
-        let mesh = M2Importer::create_mesh(&m2_asset, &skin);
+
+        // TODO: We can re-use meshes between batches if we put them in Arcs _and_ ensure that their usage doesn't copy
+        //  them but uses the same backend handle, which is the harder part.
+
+        let mesh_and_material = skin
+            .batches
+            .iter()
+            .map(|batch| {
+                // TODO: panic to thiserror?
+                let sub_mesh = skin
+                    .submeshes
+                    .get(batch.skinSectionIndex as usize)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Batch is linking an invalid skinSectionIndex {}",
+                            batch.skinSectionIndex
+                        )
+                    });
+
+                let mesh = M2Importer::create_mesh(&m2_asset, &skin, &sub_mesh);
+                let material = M2Importer::create_m2_material(&m2_asset, batch);
+
+                M2MeshAndMaterial { mesh, material }
+            })
+            .collect_vec();
 
         let textures: Vec<Arc<IRTextureReference>> = m2_asset
             .textures
             .iter()
-            .filter(|tex| {
-                if tex.texture_type != M2TextureType::None {
-                    warn!("Not supported texture type {:?}", tex.texture_type);
-                    return false;
-                }
-
-                true
-                // TODO: TextureReference needs to support resolving that. or rather the API of this fn.
-            })
+            .filter(|tex| tex.texture_type == M2TextureType::None)
             .map(|tex| Arc::new(tex.clone().into())) // TODO: This into should support references too
             .collect();
 
@@ -97,11 +119,8 @@ impl M2Loader {
             .filter(|tex| tex.texture_type != M2TextureType::None)
             .collect();
 
-        let material = M2Importer::create_material_texname(&textures.first().map(|tex| tex.reference_str.clone()));
-
         LoadedM2Graph {
-            mesh,
-            material,
+            mesh_and_material,
             textures,
             dynamic_textures,
         }

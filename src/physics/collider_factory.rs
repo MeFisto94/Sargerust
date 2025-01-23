@@ -227,7 +227,14 @@ impl ColliderFactory {
                 doodad.reference.reference_str, doodad_translation
             );
 
-            let mut mesh = dad.deref().mesh.read().expect("Mesh RLock").data.clone();
+            // TODO: I have the feeling the colliders don't work as before anymore, but maybe I am mistaken.
+            let meshes: Vec<Mesh> = dad
+                .meshes_and_materials
+                .iter()
+                .map(|(mesh, _)| mesh.read().expect("Mesh Read Lock").data.clone())
+                .collect();
+            let mut mesh = MeshMerger::merge_meshes_vertices_only(&meshes);
+
             // TODO: Validate that the coordinate systems are matching, but since we are rotating the mesh
             //  afterwards, I think for now mesh and scale are in the same coordinate system
             MeshMerger::mesh_scale_position(&mut mesh, scale);
@@ -267,7 +274,16 @@ impl From<&TerrainTile> for Collider {
 
 impl From<&M2Node> for Collider {
     fn from(value: &M2Node) -> Self {
-        value.mesh.read().expect("Mesh RLock").deref().into()
+        // We opted for silently merging, because there won't be a reason to treat submeshes as their own collider. They
+        // only exist because they have different materials
+
+        let meshes: Vec<Mesh> = value
+            .meshes_and_materials
+            .iter()
+            .map(|(mesh, _)| mesh.read().expect("Mesh Read Lock").data.clone())
+            .collect();
+
+        (&MeshMerger::merge_meshes_vertices_only(&meshes)).into()
     }
 }
 

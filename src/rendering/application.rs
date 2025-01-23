@@ -8,19 +8,27 @@ use std::time::Instant;
 use winit::event::Event;
 
 use crate::game::application::GameApplication;
-use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, IRMaterial, IRTextureReference};
+use crate::rendering::asset_graph::m2_generator::M2Generator;
+use crate::rendering::asset_graph::nodes::adt_node::{
+    ADTNode, DoodadReference, IRM2Material, IRMaterial, IRTexture, IRTextureReference,
+};
+use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
+use crate::rendering::common::mesh_merger::MeshMerger;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
+use crate::rendering::importer::m2_importer::M2Material;
 use crate::rendering::rend3_backend::material::terrain::terrain_material::TerrainMaterial;
 use crate::rendering::rend3_backend::material::terrain::terrain_routine::TerrainRoutine;
+use crate::rendering::rend3_backend::material::units::units_material::UnitsMaterial;
 use crate::rendering::rend3_backend::material::units::units_routine::UnitsRoutine;
 use crate::rendering::rend3_backend::{Rend3BackendConverter, gpu_loaders};
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
-use log::{trace, warn};
+use log::{info, trace, warn};
 use rend3::graph::RenderGraph;
 use rend3::types::{
-    Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Texture, Texture2DHandle,
+    Camera, CameraProjection, Handedness, MaterialHandle, ObjectHandle, PresentMode, SampleCount, Texture,
+    Texture2DHandle,
 };
 use rend3::util::typedefs::FastHashMap;
 use rend3::{Renderer, ShaderPreProcessor};
@@ -32,6 +40,7 @@ use rend3_routine::base::{
 use rend3_routine::common::CameraSpecifier;
 use rend3_routine::forward::ForwardRoutineArgs;
 use rend3_routine::{clear, forward};
+use sargerust_files::m2::types::{M2TextureFlags, M2TextureType};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::platform::scancode::PhysicalKeyExtScancode;
 
@@ -461,42 +470,58 @@ impl RenderingApplication {
                 m2_rlock.as_ref().expect("previous is_none check.").clone()
             };
 
+            //  TODO: This ignores dynamic textures, but I think they can't be supported here anyway.
             let all_tex_loaded = Self::are_all_textures_loaded(&m2.tex_reference);
-            let has_object_handle = { doodad.renderer_object_handle.blocking_read().is_some() };
 
-            if has_object_handle && !all_tex_loaded {
-                // We're waiting on textures and that hasn't changed yet.
+            // We did the first pass, creating an object with a "loading texture" material, so we are waiting for the
+            // second, but unfortunately, textures still aren't loaded.
+            if doodad.renderer_waiting_for_textures.load(Ordering::Acquire) && !all_tex_loaded {
                 continue;
             }
 
-            let material_handle = if all_tex_loaded {
-                let missing = self
-                    .missing_texture_material
-                    .as_ref()
-                    .expect("Missing Texture Material to be initialized already")
-                    .clone();
-                Self::load_material(missing, renderer, &m2.material, &m2.tex_reference)
-            } else {
-                self.texture_still_loading_material
-                    .as_ref()
-                    .expect("Material already initialized")
+            let mm = self.app().game_state.clone().map_manager.clone();
+            let tex_resolver = {
+                mm.read()
+                    .expect("Map Manager Read poisoned")
+                    .tex_resolver
                     .clone()
             };
 
-            // TODO: handle the absence of the tex_reference. Currently this will render the missing texture style, but I guess when we _know_ the texture is not ready yet, we should load an albedo grey material.
+            for (mesh, material) in m2.meshes_and_materials.iter() {
+                let material_handle = if all_tex_loaded {
+                    let missing = self
+                        .missing_texture_material
+                        .as_ref()
+                        .expect("Missing Texture Material to be initialized already")
+                        .clone();
 
-            let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, &m2.mesh);
-            let object = rend3::types::Object {
-                mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
-                material: material_handle.clone(),
-                transform: (parent_transform.unwrap_or(Mat4::IDENTITY) * doodad.transform),
-            };
+                    Self::load_material_m2(missing, renderer, material, &tex_resolver, &[])
+                } else {
+                    self.texture_still_loading_material
+                        .as_ref()
+                        .expect("Material already initialized")
+                        .clone()
+                };
 
-            let mut handle_writer = doodad.renderer_object_handle.blocking_write();
-            *handle_writer.deref_mut() = Some(renderer.add_object(object));
+                // TODO: handle the absence of the tex_reference. Currently this will render the missing texture style, but I guess when we _know_ the texture is not ready yet, we should load an albedo grey material.
 
-            if all_tex_loaded {
-                doodad.renderer_is_complete.store(true, Ordering::SeqCst);
+                let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, mesh);
+                let object = rend3::types::Object {
+                    mesh_kind: rend3::types::ObjectMeshKind::Static(mesh_handle),
+                    material: material_handle.clone(),
+                    transform: parent_transform.unwrap_or(Mat4::IDENTITY) * doodad.transform,
+                };
+
+                let mut handle_writer = doodad.renderer_object_handles.blocking_write();
+                handle_writer.push(renderer.add_object(object));
+
+                doodad
+                    .renderer_waiting_for_textures
+                    .store(!all_tex_loaded, Ordering::SeqCst);
+
+                if all_tex_loaded {
+                    doodad.renderer_is_complete.store(true, Ordering::SeqCst);
+                }
             }
         }
     }
@@ -534,7 +559,7 @@ impl RenderingApplication {
             _ => None,
         };
 
-        let material_handle = if tex_name_opt.is_some() && texture_handle_opt.is_none() {
+        if tex_name_opt.is_some() && texture_handle_opt.is_none() {
             // warn!(
             //     "Failed loading texture {}, falling back",
             //     tex_name_opt.unwrap()
@@ -542,8 +567,64 @@ impl RenderingApplication {
             missing_texture_material
         } else {
             gpu_loaders::gpu_load_material(renderer, material, texture_handle_opt)
+        }
+    }
+
+    pub fn load_material_m2(
+        missing_texture_material: MaterialHandle,
+        renderer: &Arc<Renderer>,
+        material: &RwLock<IRM2Material>,
+        tex_resolver: &Resolver<M2Generator, RwLock<Option<IRTexture>>>,
+        dynamic_textures: &[(
+            M2TextureType,
+            M2TextureFlags,
+            Arc<RwLock<Option<IRTexture>>>,
+        )],
+    ) -> MaterialHandle {
+        let mut write = material.write().expect("Material read lock poisoned");
+        let textures = write
+            .data
+            .textures
+            .iter()
+            .filter_map(|tex| {
+                if tex.texture_type == M2TextureType::None {
+                    Some(tex_resolver.resolve(tex.filename.clone()))
+                } else {
+                    // The assumption here is that texture types are unique
+                    dynamic_textures
+                        .iter()
+                        .find(|(dyn_tex_type, _, _)| *dyn_tex_type == tex.texture_type)
+                        .map(|(_, _, tex)| tex.clone())
+                }
+            })
+            .map(|tex| gpu_loaders::gpu_load_texture(renderer, &RwLock::new(Some(tex))))
+            .collect_vec();
+
+        // TODO: There's still the edge-case where loading may have failed and it's thus declared as None. But that requires
+        //  refactoring at some point.
+        let all_tex_loaded = textures.iter().all(|tex| tex.is_some());
+
+        if !all_tex_loaded {
+            return missing_texture_material;
+        }
+
+        if textures.len() > 3 {
+            warn!("UnitsMaterial is currently not supporting more than 3 textures");
+        }
+
+        // TODO: Could/should we use PBR, especially considering we may not even have much layering? But then we also
+        //  have no AOMR textures etc.
+        let mut rend_material = UnitsMaterial {
+            texture_layers: [const { None }; 3],
         };
-        material_handle
+
+        for (idx, tex) in textures.into_iter().enumerate() {
+            rend_material.texture_layers[idx] = tex;
+        }
+
+        let handle = renderer.add_material(rend_material);
+        write.handle = Some(handle.clone());
+        handle
     }
 }
 

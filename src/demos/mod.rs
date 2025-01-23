@@ -342,7 +342,7 @@ pub fn main_simple_m2(loader: &MPQLoader) -> Result<(), anyhow::Error> {
         loader.load_raw_owned(skin_path).unwrap(),
     ))?;
     let blp_opt = BLPLoader::load_blp_from_ldr(loader, tex_path);
-    let imported_mesh = M2Importer::create_mesh(&m2, &skin);
+    let imported_mesh = M2Importer::create_mesh(&m2, &skin, &skin.submeshes.first().unwrap());
     let mat = M2Importer::create_material(&blp_opt);
 
     let dad = PlacedDoodad {

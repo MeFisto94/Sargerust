@@ -4,13 +4,12 @@ use crate::game::application::GameApplication;
 use crate::rendering::application::RenderingApplication;
 use crate::rendering::common::coordinate_systems::{adt_to_blender_rot, adt_to_blender_unaligned};
 use crate::rendering::rend3_backend::gpu_loaders;
-use crate::rendering::rend3_backend::material::units::units_material::UnitsMaterial;
 use glam::{Mat4, Quat, Vec4};
 use itertools::Itertools;
 use rend3::Renderer;
-use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectMeshKind, Texture2DHandle};
-use rend3_routine::pbr::{AlbedoComponent, PbrMaterial, Transparency};
-use std::sync::{Arc, OnceLock, RwLock};
+use rend3::types::{MaterialHandle, MeshHandle, Object, ObjectMeshKind};
+use rend3_routine::pbr::{AlbedoComponent, PbrMaterial};
+use std::sync::{Arc, OnceLock};
 
 // cube_example from rend3.
 fn vertex(pos: [f32; 3]) -> glam::Vec3 {
@@ -107,6 +106,14 @@ impl RenderingSystem {
             .write()
             .expect("World Write Lock");
 
+        let tex_resolver = app
+            .game_state
+            .map_manager
+            .read()
+            .expect("Map Manager Read Lock")
+            .tex_resolver
+            .clone();
+
         for (_, (renderable, location, orientation)) in
             write.query_mut::<(&mut Renderable, &TmpLocation, &TmpOrientation)>()
         {
@@ -116,18 +123,21 @@ impl RenderingSystem {
             let quat: Quat = Quat::from_rotation_z(orientation.0).mul_quat(Quat::from_mat4(&adt_to_blender_rot()));
             let transform: Mat4 = Mat4::from_rotation_translation(quat, adt_to_blender_unaligned(location.0));
 
-            if let Some(handle) = &renderable.handle {
-                renderer.set_object_transform(handle, transform);
+            if let Some(handles) = &renderable.handles {
+                for handle in handles {
+                    renderer.set_object_transform(handle, transform);
+                }
             } else {
-                let object = match &renderable.source {
+                let objects = match &renderable.source {
                     RenderableSource::DebugCube => {
                         let dbg = self.debug_object(renderer);
-                        Object {
+                        vec![Object {
                             mesh_kind: ObjectMeshKind::Static(dbg.0.clone()),
                             material: dbg.1.clone(),
                             transform,
-                        }
+                        }]
                     }
+
                     // TODO: unify the code with RenderingApplication, because technically the same M2 could be
                     //  referenced from both Terrain/ADT *and* dynamic. So we must be in-sync. Also deduplicate code.
                     //  also, currently there's a lot of blocking going on in the ECS, that's even worse.
@@ -141,50 +151,43 @@ impl RenderingSystem {
 
                         if dynamic_textures
                             .iter()
-                            .any(|tex| tex.read().expect("Texture read lock").is_none())
+                            .any(|(_, _, tex)| tex.read().expect("Texture read lock").is_none())
                         {
                             continue; // Try the entity again later.
                         }
 
-                        let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, &m2.mesh);
+                        m2.meshes_and_materials
+                            .iter()
+                            .map(|(mesh, material)| {
+                                // technically not the missing_material_handle, but if we had a missing texture, we
+                                // wouldn't even be here.
+                                let missing_tex_material_handle = self.debug_object(renderer).1.clone();
 
-                        // TODO: A sense of order (as static and dynamic textures could be interleaved), also could they
-                        //  then exceed 3? i.e. are there fully equipped dynamic textures still having static ones?
+                                let material_handle = RenderingApplication::load_material_m2(
+                                    missing_tex_material_handle,
+                                    renderer,
+                                    material,
+                                    &tex_resolver,
+                                    dynamic_textures,
+                                );
+                                let mesh_handle = gpu_loaders::gpu_load_mesh(renderer, mesh);
 
-                        let material = {
-                            let mut textures = dynamic_textures
-                                .iter()
-                                .map(|tex| gpu_loaders::gpu_load_texture(renderer, &RwLock::new(Some(tex.clone()))))
-                                .chain(
-                                    m2.tex_reference
-                                        .iter()
-                                        .map(|tex| gpu_loaders::gpu_load_texture(renderer, &tex.reference)),
-                                )
-                                .take(3)
-                                .collect_vec();
-
-                            for _ in textures.len()..3 {
-                                textures.push(None);
-                            }
-
-                            let texture_layers: [Option<Texture2DHandle>; 3] = textures
-                                .try_into()
-                                .expect("should match the array length since we call take(3)");
-
-                            UnitsMaterial { texture_layers }
-                        };
-
-                        let material_handle = renderer.add_material(material);
-
-                        Object {
-                            mesh_kind: ObjectMeshKind::Static(mesh_handle),
-                            material: material_handle,
-                            transform,
-                        }
+                                Object {
+                                    mesh_kind: ObjectMeshKind::Static(mesh_handle),
+                                    material: material_handle.clone(),
+                                    transform,
+                                }
+                            })
+                            .collect()
                     }
                 };
 
-                renderable.handle = Some(renderer.add_object(object));
+                renderable.handles = Some(
+                    objects
+                        .into_iter()
+                        .map(|object| renderer.add_object(object))
+                        .collect_vec(),
+                );
             }
         }
     }
