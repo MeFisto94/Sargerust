@@ -5,6 +5,7 @@ use crate::common::types::{C2Vector, C3Vector};
 use crate::m2::reader::M2Reader;
 use bitflags::bitflags;
 use byteorder::{LittleEndian, ReadBytesExt};
+use sargerust_files_derive_parseable::Parse;
 use std::io::{Read, Write};
 
 pub const FOURCC_M2HEADER: u32 = u32::from_le_bytes(*b"MD20");
@@ -64,6 +65,12 @@ pub struct M2Asset {
     #[cfg(feature = "wotlk")] // > TBC
     pub num_skin_profiles: u32,
     pub textures: Vec<M2Texture>,
+    /// Aka texture_lookup_table: Is used to lookup from batch to texture index
+    pub textureCombos: Vec<u16>,
+    pub textureCoordCombos: Vec<u16>,
+    /// Aka transparency_lookup_table
+    pub textureWeightCombos: Vec<u16>,
+    pub textureTransformCombos: Vec<u16>,
 }
 
 impl M2Asset {
@@ -160,7 +167,7 @@ bitflags! {
 
 #[derive(Debug, Clone)]
 pub struct M2Texture {
-    // TODO: better typing for type and flags.
+    // TODO: This could be an enum with filename and without
     pub texture_type: M2TextureType,
     pub texture_flags: M2TextureFlags, // 0x1 wrap x, 0x2 wrap y, 0x3 = wrap x+y (bitflags)
     pub filename: String,              // maximum of 0x108 chars
@@ -217,7 +224,7 @@ pub struct M2SkinProfile {
     // TODO: implement
     // pub bones: Vec<[u8; 4]>,
     pub submeshes: Vec<M2SkinSection>,
-    // pub batches: Vec<M2Batch>,
+    pub batches: Vec<M2Batch>,
     pub boneCountMax: u32,
 }
 
@@ -244,6 +251,16 @@ pub struct M2SkinSection {
     pub sortRadius: f32,
 }
 
+impl M2SkinSection {
+    pub fn vertex_start(&self) -> usize {
+        self.vertexStart as usize | ((self.Level as usize) << 16)
+    }
+
+    pub fn index_start(&self) -> usize {
+        self.indexStart as usize | ((self.Level as usize) << 16)
+    }
+}
+
 impl Parseable<M2SkinSection> for M2SkinSection {
     fn parse<R: Read>(rdr: &mut R) -> Result<M2SkinSection, ParserError> {
         Ok(M2SkinSection {
@@ -264,4 +281,34 @@ impl Parseable<M2SkinSection> for M2SkinSection {
             sortRadius: rdr.read_f32::<LittleEndian>()?,
         })
     }
+}
+
+#[derive(Debug, Parse)]
+pub struct M2Batch {
+    /// Usually 16 for static textures, and 0 for animated textures. &0x1: materials invert something; &0x2: transform
+    /// &0x4: projected texture; &0x10: something batch compatible; &0x20: projected texture?;
+    /// &0x40: possibly don't multiply transparency by texture weight transparency to get final transparency value(?)
+    pub flags: u8,
+    pub priorityPlane: i8,
+    pub shader_id: u16,
+    // a duplicate entry of a submesh from the list above
+    pub skinSectionIndex: u16,
+    // See below. New name: flags2 (BfA). 0x2 - projected. 0x8 - EDGF chunk in m2 is mandatory and data from is applied to this mesh
+    pub geosetIndex: u16,
+    // A Color out of the Colors-Block or -1 if none.
+    pub colorIndex: u16,
+    // The renderflags used on this texture-unit.
+    pub materialIndex: u16,
+    // Capped at 7 (see CM2Scene::BeginDraw)
+    pub materialLayer: u16,
+    // 1 to 4. See below. Also seems to be the number of textures to load, starting at the texture lookup in the next field (0x10).
+    pub textureCount: u16,
+    // The index in the texture lookup table.
+    pub textureComboIndex: u16,
+    // The index in the texture mapping lookup table
+    pub textureCoordComboIndex: u16,
+    // The index into the transparency lookup table
+    pub textureWeightComboIndex: u16,
+    // The index into the uvanimation lookup table
+    pub textureTransformComboIndex: u16,
 }

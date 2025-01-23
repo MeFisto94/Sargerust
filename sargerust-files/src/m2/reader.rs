@@ -115,17 +115,21 @@ impl M2Reader {
             .collect();
 
         Ok(M2Asset {
-      magic,
-      version,
-      name,
-      vertices: verts,
-      #[cfg(feature = "wotlk")] // > TBC
-      num_skin_profiles,
-      textures
-    })
+            magic,
+            version,
+            name,
+            vertices: verts,
+            #[cfg(feature = "wotlk")] // > TBC
+            num_skin_profiles,
+            textures,
+            textureCombos: M2Reader::resolve_array(rdr, &textureCombos)?,
+            textureCoordCombos: M2Reader::resolve_array(rdr, &textureCoordCombos)?,
+            textureWeightCombos: M2Reader::resolve_array(rdr, &textureWeightCombos)?,
+            textureTransformCombos: M2Reader::resolve_array(rdr, &textureTransformCombos)?,
+        })
     }
 
-    pub fn parse_skin_profile<R: std::io::Read + std::io::Seek>(rdr: &mut R) -> Result<M2SkinProfile, ParserError> {
+    pub fn parse_skin_profile<R: Read + Seek>(rdr: &mut R) -> Result<M2SkinProfile, ParserError> {
         let magic = rdr.read_u32::<LittleEndian>()?;
 
         #[cfg(feature = "wotlk")] // > TBC
@@ -135,9 +139,9 @@ impl M2Reader {
 
         let vertices = M2Array::parse(rdr)?;
         let indices = M2Array::parse(rdr)?;
-        M2Array::parse(rdr)?; // bones
+        let bones = M2Array::parse(rdr)?;
         let submeshes = M2Array::parse(rdr)?;
-        M2Array::parse(rdr)?; // batches
+        let batches = M2Array::parse(rdr)?;
         let boneCountMax = rdr.read_u32::<LittleEndian>()?;
 
         Ok(M2SkinProfile {
@@ -145,6 +149,8 @@ impl M2Reader {
             vertices: M2Reader::resolve_array(rdr, &vertices)?,
             indices: M2Reader::resolve_array(rdr, &indices)?,
             submeshes: M2Reader::resolve_array(rdr, &submeshes)?,
+            batches: M2Reader::resolve_array(rdr, &batches)?,
+            // bones: M2Reader::resolve_array(rdr, &bones)?,
             boneCountMax,
         })
     }
