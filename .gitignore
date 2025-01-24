@@ -12,3 +12,5 @@ target/
 sargerust-files/test-data
 # Intel V-Tune Profiling data
 vtune/
+# listfiles of MPQs
+*.MPQ.txt

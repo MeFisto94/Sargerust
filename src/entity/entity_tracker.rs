@@ -12,6 +12,8 @@ use wow_world_messages::wrath::{
     MovementBlock, MovementBlock_UpdateFlag_Living, Object, ObjectType, UpdateMask, Vector3d,
 };
 
+// TODO: remove at some point, when we know more about the packet values.
+#[allow(unused_variables)]
 #[derive(Default)]
 pub struct EntityTracker {
     world: RwLock<World>,

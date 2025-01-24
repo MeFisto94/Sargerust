@@ -370,6 +370,7 @@ impl MapManager {
                     result.tex_reference.clone(),
                 );
 
+                // TODO: With an async friendly RwLock, this could become regular async code, without spawn_blocking.
                 handle_clone
                     .spawn_blocking(move || {
                         let mut write_lock = dad

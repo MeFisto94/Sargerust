@@ -14,9 +14,7 @@ use crate::rendering::asset_graph::nodes::adt_node::{
 };
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
-use crate::rendering::common::mesh_merger::MeshMerger;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
-use crate::rendering::importer::m2_importer::M2Material;
 use crate::rendering::rend3_backend::material::terrain::terrain_material::TerrainMaterial;
 use crate::rendering::rend3_backend::material::terrain::terrain_routine::TerrainRoutine;
 use crate::rendering::rend3_backend::material::units::units_material::UnitsMaterial;
@@ -24,7 +22,7 @@ use crate::rendering::rend3_backend::material::units::units_routine::UnitsRoutin
 use crate::rendering::rend3_backend::{Rend3BackendConverter, gpu_loaders};
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
-use log::{info, trace, warn};
+use log::{trace, warn};
 use rend3::graph::RenderGraph;
 use rend3::types::{
     Camera, CameraProjection, Handedness, MaterialHandle, ObjectHandle, PresentMode, SampleCount, Texture,
