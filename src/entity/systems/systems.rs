@@ -3,7 +3,9 @@ use crate::entity::systems::rendering_system::RenderingSystem;
 use crate::entity::systems::spline_walker_system::SplineWalkerSystem;
 use crate::game::application::GameApplication;
 use crate::io::mpq::loader::MPQLoader;
+use log::debug;
 use std::sync::{Arc, Weak};
+use std::time::Instant;
 
 pub struct Systems {
     display_id_resolver_system: DisplayIdResolverSystem,
@@ -21,8 +23,15 @@ impl Systems {
     }
 
     pub fn update(&self, app: &GameApplication, delta_time: f32) {
+        let pre_systems = Instant::now();
+
         self.spline_walker_system.update(app, delta_time);
         self.display_id_resolver_system.update(app);
         self.rendering_system.update(app);
+
+        let duration_systems = (Instant::now() - pre_systems).as_millis();
+        if duration_systems > 6 {
+            debug!("Systems update took too long: {:?} ms", duration_systems);
+        }
     }
 }

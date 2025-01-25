@@ -22,7 +22,7 @@ use crate::rendering::rend3_backend::material::units::units_routine::UnitsRoutin
 use crate::rendering::rend3_backend::{Rend3BackendConverter, gpu_loaders};
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
-use log::{trace, warn};
+use log::{debug, trace, warn};
 use rend3::graph::RenderGraph;
 use rend3::types::{
     Camera, CameraProjection, Handedness, MaterialHandle, ObjectHandle, PresentMode, SampleCount, Texture,
@@ -118,7 +118,7 @@ impl RenderingApplication {
 
             let duration_physics = (Instant::now() - pre_physics).as_millis();
             if duration_physics > 6 {
-                warn!("Physics update took too long: {:?} ms", duration_physics);
+                debug!("Physics update took too long: {:?} ms", duration_physics);
             }
 
             if let Some(network) = app.network.as_ref() {
