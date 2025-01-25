@@ -5,7 +5,7 @@ use rend3_routine::pbr::{AlbedoComponent, PbrMaterial, Transparency};
 
 use crate::rendering::common::types::TransparencyType::{Blend, Cutout, Opaque};
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, VertexBuffers};
-use crate::rendering::create_texture_rgba8;
+use crate::rendering::utils::create_texture_rgba8;
 
 pub mod gpu_loaders;
 pub mod material;

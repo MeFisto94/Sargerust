@@ -26,7 +26,7 @@ use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::importer::adt_importer::ADTImporter;
-use crate::{transform_for_doodad_ref, transform_for_wmo_ref};
+use crate::rendering::utils::{transform_for_doodad_ref, transform_for_wmo_ref};
 
 pub struct MapManager {
     runtime: Runtime,
