@@ -37,7 +37,7 @@ Things that still need to be implemented (loosely sorted by priority):
     - Rendering thereof
 - Debug Shader Reloading
 - Configuration
-- Cross Platform support (i.e. better keybinds, investigate MBP 2011 failure)
+- Cross Platform support (i.e. investigate MBP 2011 failure)
 - Physics:
     - Verify that the colliders are scaled in the right coordinate system (e.g. scaling along z does the right, expected
       thing)

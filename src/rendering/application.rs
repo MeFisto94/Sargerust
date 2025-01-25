@@ -39,11 +39,12 @@ use rend3_routine::forward::ForwardRoutineArgs;
 use rend3_routine::{clear, forward};
 use sargerust_files::m2::types::{M2TextureFlags, M2TextureType};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::platform::scancode::PhysicalKeyExtScancode;
 
 // #[derive(Debug)] // TODO: Ensure Grabber implements Display
 pub struct RenderingApplication {
-    scancode_status: FastHashMap<u32, bool>,
+    scancode_status: FastHashMap<KeyCode, bool>,
     camera_pitch: f32,
     camera_yaw: f32,
     camera_location: Vec3A,
@@ -625,7 +626,7 @@ impl RenderingApplication {
     }
 }
 
-fn button_pressed<Hash: BuildHasher>(map: &HashMap<u32, bool, Hash>, key: u32) -> bool {
+fn button_pressed<Hash: BuildHasher>(map: &HashMap<KeyCode, bool, Hash>, key: KeyCode) -> bool {
     map.get(&key).is_some_and(|b| *b)
 }
 
@@ -717,8 +718,11 @@ impl rend3_framework::App for RenderingApplication {
                     },
                 ..
             } => {
-                let scancode = PhysicalKeyExtScancode::to_scancode(physical_key).unwrap();
-                //log::trace!("WE scancode {:x}", scancode);
+                let PhysicalKey::Code(scancode) = physical_key else {
+                    warn!("Non physical (?) key {:?}", physical_key);
+                    return;
+                };
+
                 self.scancode_status.insert(
                     scancode,
                     match state {
@@ -765,46 +769,37 @@ impl rend3_framework::App for RenderingApplication {
         let mut delta: Vec3A = Vec3A::new(0.0, 0.0, 0.0);
         let mut yaw = 0.0;
 
-        // TODO: https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/platform.rs.
-        //  Make platform independent and also add more, or search other crate, rather.
-        if button_pressed(&self.scancode_status, 17u32) {
-            // W
+        if button_pressed(&self.scancode_status, KeyCode::KeyW) {
             delta += forward * fwd_speed * delta_time.as_secs_f32();
         }
-        if button_pressed(&self.scancode_status, 31u32) {
-            // S
+        if button_pressed(&self.scancode_status, KeyCode::KeyS) {
             delta -= forward * back_speed * delta_time.as_secs_f32();
         }
-        if button_pressed(&self.scancode_status, 30u32) {
-            // A
+        if button_pressed(&self.scancode_status, KeyCode::KeyA) {
             delta -= right * strafe_speed * delta_time.as_secs_f32();
         }
-        if button_pressed(&self.scancode_status, 32u32) {
-            // D
+        if button_pressed(&self.scancode_status, KeyCode::KeyD) {
             delta += right * strafe_speed * delta_time.as_secs_f32();
         }
-        if button_pressed(&self.scancode_status, 33u32) {
+        if button_pressed(&self.scancode_status, KeyCode::KeyF) {
             self.fly_cam = !self.fly_cam;
         }
-        if button_pressed(&self.scancode_status, 42u32) {
-            // LSHIFT
+        if button_pressed(&self.scancode_status, KeyCode::ShiftLeft) {
             delta += up * 10.0 * delta_time.as_secs_f32();
         }
-        if button_pressed(&self.scancode_status, 29u32) {
+        if button_pressed(&self.scancode_status, KeyCode::ControlLeft) {
             delta -= up * 10.0 * delta_time.as_secs_f32();
         }
-        if button_pressed(&self.scancode_status, 57421u32) {
-            // arrow right
+        if button_pressed(&self.scancode_status, KeyCode::ArrowRight) {
             yaw += PI * delta_time.as_secs_f32();
         }
-        if button_pressed(&self.scancode_status, 57419u32) {
-            // arrow left
+        if button_pressed(&self.scancode_status, KeyCode::ArrowLeft) {
             yaw -= PI * delta_time.as_secs_f32();
         }
-        if button_pressed(&self.scancode_status, 57416u32) {
+        if button_pressed(&self.scancode_status, KeyCode::ArrowUp) {
             self.camera_pitch += 0.25 * delta_time.as_secs_f32();
         }
-        if button_pressed(&self.scancode_status, 57424u32) {
+        if button_pressed(&self.scancode_status, KeyCode::ArrowDown) {
             self.camera_pitch -= 0.25 * delta_time.as_secs_f32();
         }
 
