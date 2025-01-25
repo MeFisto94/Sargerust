@@ -100,9 +100,9 @@ impl M2Importer {
         let tex_uv_ids = &m2.textureCoordCombos[batch.textureCoordComboIndex as usize
             ..batch.textureCoordComboIndex as usize + batch.textureCount as usize];
 
-        // TODO: to use this, we need M2Track, which is rather an animation topic.
-        let tex_weight_combos = &m2.textureWeightCombos[batch.textureWeightComboIndex as usize
-            ..batch.textureWeightComboIndex as usize + batch.textureCount as usize];
+        // TODO: to use this, we need M2Track, which is rather an animation topic. Also it did panic in the past.
+        // let tex_weight_combos = &m2.textureWeightCombos[batch.textureWeightComboIndex as usize
+        //     ..batch.textureWeightComboIndex as usize + batch.textureCount as usize];
 
         let mut textures = Vec::with_capacity(batch.textureCount as usize);
 
