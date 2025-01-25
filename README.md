@@ -19,6 +19,12 @@ Now due to the learning nature of the project, feel free to hit me up with sugge
 reviewing my code to suggest more idiomatic rust approaches as well as filling the gaps (I leave
 a lot of `// TODO:` comments everywhere I have an idea while coding).
 
+## Getting Started
+
+When running the code (through `cargo run`), you have to specify a few options, especially if the defaults don't fit.
+Try `cargo run -- --help` to see them. Essentially there are two modes: standalone, which is rendering the world without
+a server and "remote", which is the classic mode that connects to an upstream realm- and worldserver.
+
 ### Roadmap
 
 Things that still need to be implemented (loosely sorted by priority):
@@ -30,9 +36,8 @@ Things that still need to be implemented (loosely sorted by priority):
     - Implement spline walking (NPCs have predefined splines)
     - Rendering thereof
 - Debug Shader Reloading
-- Command Line Arguments (standalone: map, otherwise: server, credentials)
 - Configuration
-- Cross Plattform support (i.e. better keybinds, investigate MBP 2011 failure)
+- Cross Platform support (i.e. better keybinds, investigate MBP 2011 failure)
 - Physics:
     - Verify that the colliders are scaled in the right coordinate system (e.g. scaling along z does the right, expected
       thing)

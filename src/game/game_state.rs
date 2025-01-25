@@ -4,8 +4,8 @@ use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::networking::utils::net_vector3d_to_glam;
 use crate::physics::physics_state::PhysicsState;
-use glam::{Vec3, Vec3A};
-use log::debug;
+use glam::Vec3A;
+use log::{debug, error};
 use std::io::Cursor;
 use std::ops::Deref;
 use std::sync::{Arc, RwLock, Weak};
@@ -46,6 +46,25 @@ impl GameState {
             .expect("Failed to load Map.dbc");
 
         wow_dbc::wrath_tables::map::Map::read(&mut Cursor::new(map_buf)).expect("Failed to parse Map.dbc")
+    }
+
+    pub fn change_map_from_string(&self, map_name: &str, position: Vector3d) {
+        let map = Map::variants()
+            .into_iter()
+            .find(|m| format!("{}", m) == map_name);
+
+        if let Some(map) = map {
+            self.change_map(map, position, 0.0);
+        } else {
+            error!(
+                "Could not find a map that matches the name {}. Whitespace differences?",
+                map_name
+            );
+            panic!(
+                "Could not find a map that matches the name {}. Whitespace differences?",
+                map_name
+            );
+        }
     }
 
     /// Called when first entering the world and whenever the map changes (teleport, portal)

@@ -9,9 +9,9 @@ use crate::game::game_state::GameState;
 use crate::io::mpq::loader::MPQLoader;
 use crate::networking::application::NetworkApplication;
 use crate::rendering::application::RenderingApplication;
+use crate::settings::CliArgs;
 use winit::dpi::LogicalSize;
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
-use wow_world_messages::wrath::{Map, Vector3d};
 
 pub enum GameOperationMode {
     Standalone,
@@ -25,6 +25,7 @@ pub struct GameApplication {
     pub renderer: OnceLock<Arc<Renderer>>,
     pub network: Option<NetworkApplication>,
     pub entity_tracker: EntityTracker,
+    pub locale: String,
     systems: Systems,
     weak_self: Weak<GameApplication>,
 }
@@ -38,7 +39,7 @@ const WINDOW_TITLE: &str = concat!(
 );
 
 impl GameApplication {
-    pub fn new(weak_self: &Weak<GameApplication>, mpq_loader: MPQLoader) -> Self {
+    pub fn new(weak_self: &Weak<GameApplication>, mpq_loader: MPQLoader, args: &CliArgs) -> Self {
         let mpq_loader_arc = Arc::new(mpq_loader);
         Self {
             mpq_loader: mpq_loader_arc.clone(),
@@ -49,6 +50,7 @@ impl GameApplication {
             entity_tracker: EntityTracker::new(),
             network: None,
             systems: Systems::new(weak_self.clone(), mpq_loader_arc.clone()),
+            locale: args.locale.to_string(),
         }
     }
 
@@ -70,8 +72,6 @@ impl GameApplication {
     // TODO: Design flaw of the receiver. We can't hide it in the network application, though,
     //  it has to be consumed by spawning the network threads.
     pub fn run(&self, operation_mode: GameOperationMode) {
-        let standalone = matches!(operation_mode, GameOperationMode::Standalone); // TODO: Sadly we have to move operation_mode's receiver. Better idea?
-
         let handles = match operation_mode {
             GameOperationMode::Networked(receiver) => self
                 .network
@@ -85,19 +85,6 @@ impl GameApplication {
             .with_title(WINDOW_TITLE)
             .with_inner_size(LogicalSize::new(1024, 768));
         let render_app = RenderingApplication::new(self.weak_self.clone());
-
-        if standalone {
-            // TODO: Derive standalone *and* otherwise the map from the launch args.
-            self.game_state.change_map(
-                Map::EasternKingdoms,
-                Vector3d {
-                    x: -8924.0,
-                    y: -117.0,
-                    z: 82.0,
-                },
-                0.0,
-            );
-        }
 
         rend3_framework::start(render_app, wnd); // This blocks until the window is closed
 

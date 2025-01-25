@@ -53,6 +53,9 @@ hecs = "0.10.5"
 # DBC reading
 wow_dbc = { version = "0.3.0", features = ["wrath"] }
 
+# CLI
+clap = { version = "4.5.23", features = ["derive", "env"] }
+
 # For the Rendering/Game Engine
 # Linear algebra library
 glam = { version = "0.25.0", features = ["approx"] }

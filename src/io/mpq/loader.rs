@@ -78,7 +78,7 @@ impl MPQLoader {
                     entry,
                 )
             })
-            .filter(|(filename, entry)| filename.to_ascii_lowercase().ends_with("mpq"))
+            .filter(|(filename, _)| filename.to_ascii_lowercase().ends_with("mpq"))
             .sorted_by(|a, b| MPQLoader::sorting_order(&a.0, &b.0))
             .map(|(filename, entry)| {
                 (

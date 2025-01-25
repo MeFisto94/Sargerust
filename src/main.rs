@@ -1,7 +1,9 @@
 #![feature(iter_array_chunks)]
 
-use std::sync::Arc;
-
+use crate::game::application::GameApplication;
+use crate::io::mpq::loader::MPQLoader;
+use crate::settings::{CliArgs, OperationMode};
+use clap::Parser;
 use glam::{Affine3A, EulerRot, Quat, Vec3};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
@@ -10,61 +12,63 @@ use mpq::Archive;
 use rendering::common::coordinate_systems::TILE_SIZE;
 use sargerust_files::adt::types::SMDoodadDef;
 use sargerust_files::wdt::types::SMMapObjDef;
+use std::sync::Arc;
+use wow_world_messages::wrath::Vector3d;
 
-use crate::game::application::GameApplication;
-use crate::io::mpq::loader::MPQLoader;
-
-mod demos;
 pub mod entity;
 mod game;
 mod io;
 pub mod networking;
 pub mod physics;
-mod rendering; // Containing the rendering/application for the Asset Viewers.
-
-#[allow(unused)]
-enum DemoMode {
-    M2,
-    Wmo,
-    Adt,
-    MultipleAdt,
-    NoDemo(bool),
-}
+mod rendering;
+mod settings;
 
 fn main() {
-    let mode = DemoMode::NoDemo(true);
     env_logger::init();
 
-    // TODO: perspectively, this folder will be a CLI argument
-    let data_folder = std::env::current_dir()
-        .expect("Can't read current working directory!")
-        .join("_data");
-    let mpq_loader = MPQLoader::new(data_folder.to_string_lossy().as_ref());
+    let args = CliArgs::parse();
+    log::trace!("Starting with args: {:?}", args);
 
-    match mode {
-        DemoMode::M2 => demos::main_simple_m2(&mpq_loader).unwrap(),
-        DemoMode::Wmo => demos::main_simple_wmo(&mpq_loader).unwrap(),
-        DemoMode::Adt => demos::main_simple_adt(&mpq_loader).unwrap(),
-        DemoMode::MultipleAdt => demos::main_multiple_adt(&mpq_loader).unwrap(),
-        DemoMode::NoDemo(standalone) => {
-            let mut receiver = None;
-            let app = Arc::new_cyclic(|weak| {
-                let mut app = GameApplication::new(weak, mpq_loader);
-                if !standalone {
-                    receiver = Some(app.connect_to_realm("127.0.0.1:3724", "user", "user"));
-                }
-                app
-            });
+    let mpq_loader = MPQLoader::new(args.data_dir.as_ref());
 
-            let operation_mode = if standalone {
-                game::application::GameOperationMode::Standalone
-            } else {
-                game::application::GameOperationMode::Networked(receiver.unwrap())
-            };
-
-            app.run(operation_mode);
+    let mut receiver = None;
+    let app = Arc::new_cyclic(|weak| {
+        let mut app = GameApplication::new(weak, mpq_loader, &args);
+        if let OperationMode::Remote {
+            server_host,
+            server_port,
+            username,
+            password,
+        } = &args.operation_mode
+        {
+            let address = format!("{}:{}", server_host, server_port);
+            receiver = Some(app.connect_to_realm(&address, username, password));
         }
+        app
+    });
+
+    if let OperationMode::Standalone {
+        map_name,
+        coordinates,
+    } = &args.operation_mode
+    {
+        app.game_state.change_map_from_string(
+            map_name,
+            Vector3d {
+                x: coordinates.x,
+                y: coordinates.y,
+                z: coordinates.z,
+            },
+        );
     }
+
+    let operation_mode = if matches!(args.operation_mode, OperationMode::Standalone { .. }) {
+        game::application::GameOperationMode::Standalone
+    } else {
+        game::application::GameOperationMode::Networked(receiver.unwrap())
+    };
+
+    app.run(operation_mode);
 }
 
 fn transform_for_doodad_ref(dad_ref: &SMDoodadDef) -> Affine3A {

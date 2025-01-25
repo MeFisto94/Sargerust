@@ -38,6 +38,10 @@ impl NetworkApplication {
     }
 
     fn logon_realm(address: &str, username: &str, password: &str) -> ([u8; SESSION_KEY_LENGTH as usize], Vec<Realm>) {
+        trace!(
+            "Connecting to the auth server at {} for user {}",
+            address, username
+        );
         let mut auth_server = TcpStream::connect(address).expect("Connecting to the Server succeeds");
         let (key, realm_msg) = auth::auth(&mut auth_server, username, password);
         (key, realm_msg.realms)
