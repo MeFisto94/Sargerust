@@ -1,5 +1,5 @@
 use crate::rendering::common::types::{Mesh, VertexBuffers};
-use glam::{Vec3, Vec3A};
+use glam::Vec3;
 use log::warn;
 
 pub enum MeshMerger {}

@@ -14,7 +14,7 @@ pub struct Systems {
 }
 
 impl Systems {
-    pub fn new(app: Weak<GameApplication>, mpq_loader: Arc<MPQLoader>) -> Self {
+    pub fn new(_app: Weak<GameApplication>, mpq_loader: Arc<MPQLoader>) -> Self {
         Self {
             display_id_resolver_system: DisplayIdResolverSystem::new(mpq_loader),
             rendering_system: RenderingSystem::new(),

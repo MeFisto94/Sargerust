@@ -25,8 +25,7 @@ use itertools::Itertools;
 use log::{debug, trace, warn};
 use rend3::graph::RenderGraph;
 use rend3::types::{
-    Camera, CameraProjection, Handedness, MaterialHandle, ObjectHandle, PresentMode, SampleCount, Texture,
-    Texture2DHandle,
+    Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Texture, Texture2DHandle,
 };
 use rend3::util::typedefs::FastHashMap;
 use rend3::{Renderer, ShaderPreProcessor};

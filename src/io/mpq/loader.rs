@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 use std::fs;
 use std::io::Cursor;
 use std::ops::DerefMut;
-use std::path::Path;
 use std::sync::RwLock;
 
 use itertools::Itertools;

@@ -8,7 +8,7 @@ use crate::rendering::asset_graph::nodes::adt_node::{IRTexture, M2Node};
 use crate::rendering::asset_graph::resolver::Resolver;
 use hecs::Without;
 use itertools::Itertools;
-use log::{info, warn};
+use log::warn;
 use sargerust_files::m2::types::M2TextureType;
 use std::io::Cursor;
 use std::sync::{Arc, RwLock};

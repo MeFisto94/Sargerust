@@ -1,7 +1,7 @@
 use crate::entity::components::objects::{SplineWalker, TmpLocation};
 use crate::game::application::GameApplication;
 use crate::networking::utils::net_vector3d_to_glam;
-use log::{debug, info, trace};
+use log::debug;
 
 #[derive(Default)]
 pub struct SplineWalkerSystem {}
