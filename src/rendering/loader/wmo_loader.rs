@@ -3,9 +3,8 @@ use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::nodes::adt_node::{
     DoodadReference, IRTextureReference, NodeReference, WMOGroupNode, WMONode,
 };
-use crate::rendering::common::highlevel_types::{PlaceableDoodad, PlaceableWMO};
+use crate::rendering::common::highlevel_types::PlaceableDoodad;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
-use crate::rendering::importer::wmo_importer::WMOGroupImporter;
 use glam::{Affine3A, Quat, Vec3, Vec4};
 use log::debug;
 use sargerust_files::wmo::reader::WMOReader;
@@ -15,24 +14,6 @@ use std::sync::{Arc, RwLock};
 pub struct WMOLoader {}
 
 impl WMOLoader {
-    pub fn load(loader: &MPQLoader, wmo_path: &str) -> Result<PlaceableWMO, anyhow::Error> {
-        // TODO: thiserror
-        let wmo: WMORootAsset = WMOReader::parse_root(&mut std::io::Cursor::new(
-            loader.load_raw_owned(wmo_path).unwrap(),
-        ))?;
-        let doodads = WMOLoader::collect_dooads_for_wmo_root(&wmo);
-        let group_list = WMOGroupImporter::load_wmo_groups(
-            loader,
-            &wmo,
-            wmo_path.to_uppercase().trim_end_matches(".WMO"),
-        );
-
-        Ok(PlaceableWMO {
-            doodads,
-            loaded_groups: group_list,
-        })
-    }
-
     pub fn load_graph(loader: &MPQLoader, wmo_path: &str) -> Result<WMONode, anyhow::Error> {
         // TODO: thiserror
         let wmo: WMORootAsset = WMOReader::parse_root(&mut std::io::Cursor::new(
