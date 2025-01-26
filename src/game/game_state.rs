@@ -20,7 +20,7 @@ pub struct GameState {
     // TODO: this is apparently in ADT space, this _has_ to be changed to blender space?
     pub player_location: RwLock<Vec3A>,
     pub player_orientation: RwLock<f32>,
-    pub physics_state: Arc<RwLock<PhysicsState>>,
+    pub physics_state: Arc<PhysicsState>,
     map_dbc: wow_dbc::wrath_tables::map::Map,
 }
 
@@ -30,7 +30,7 @@ impl GameState {
             map_manager: Arc::new(RwLock::new(MapManager::new(mpq_loader.clone()))),
             player_location: RwLock::new(Vec3A::new(0.0, 0.0, 0.0)),
             player_orientation: RwLock::new(0.0),
-            physics_state: Arc::new(RwLock::new(PhysicsState::new(app.clone()))),
+            physics_state: Arc::new(PhysicsState::new(app.clone())),
             app,
             map_dbc: Self::read_map(mpq_loader.deref()),
         }

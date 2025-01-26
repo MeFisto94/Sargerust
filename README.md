@@ -39,12 +39,11 @@ Things that still need to be implemented (loosely sorted by priority):
 - Configuration
 - Cross Platform support (i.e. investigate MBP 2011 failure)
 - Physics:
+    - Interpolation of Player Position (otherwise stuttery feel)
     - Verify that the colliders are scaled in the right coordinate system (e.g. scaling along z does the right, expected
       thing)
     - M2 Colliders could be derived from the full mesh instead of trying to merge it again
     - Character Controller has room for improvements (using the tangent instead of the normals)
-    - Offload into a dedicated thread (cpu time rises when colliding, slowing down FPS) -> We need a concept for
-      syncing. Currently, we tick at 1/60, but per frame, so wrong.
     - WMO: BSP tree (MOBN, MOBR) for collision meshes instead of the render meshes.
 - Reading of DBC files, especially in preparation for:
     - Game Logic. Casting spells and showing stats (mana, health) mainly.

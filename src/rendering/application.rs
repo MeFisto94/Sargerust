@@ -40,7 +40,6 @@ use rend3_routine::{clear, forward};
 use sargerust_files::m2::types::{M2TextureFlags, M2TextureType};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::platform::scancode::PhysicalKeyExtScancode;
 
 // #[derive(Debug)] // TODO: Ensure Grabber implements Display
 pub struct RenderingApplication {
@@ -98,49 +97,20 @@ impl RenderingApplication {
         // TODO: A lot of the things that are done here, are game logic and should belong to the game application (e.g. physics)
         app.logic_update(delta_time);
 
-        let mm_lock = app.game_state.clone().map_manager.clone();
-        {
-            // TODO: Either this gets a proper delta time calculation (i.e. running [0, n] times,
-            //  according to how many slices of the delta time have been passed), _or_ it gets it's
-            //  own executor and runs unrelated to the rendering, then thread safe and with all
-            //  consequences on interfaces (e.g. updating a new player movement may be enqueued and
-            //  the result is ready in a later frame and then needs to traverse the network)
+        app.game_state
+            .physics_state
+            .notify_delta_movement(delta_movement);
 
-            let pre_physics = Instant::now();
-            let player_movement_info = app
-                .game_state
-                .clone()
-                .physics_state
-                .clone()
-                .write()
-                .expect("Write lock on physics state")
-                .update_fixed(coordinate_systems::blender_to_adt(delta_movement).into());
-
-            let duration_physics = (Instant::now() - pre_physics).as_millis();
-            if duration_physics > 6 {
-                debug!("Physics update took too long: {:?} ms", duration_physics);
-            }
-
-            if let Some(network) = app.network.as_ref() {
-                // Otherwise: Standalone mode. We need a better API
-                network
-                    .world_server
-                    .movement_tracker
-                    .write()
-                    .expect("Movement Tracker Write Lock tainted")
-                    .track_movement(player_movement_info);
-            }
-
-            if !self.fly_cam {
-                // TODO: Third Person controls.
-                // TODO: if this is required, this is a sign that we're missing adt_to_blender calls on the inputs to the physics simulation,
-                //  at least for the player start transform, but potentially also for the terrain meshes
-                let mut player_loc = *app.game_state.player_location.read().expect("");
-                player_loc += Vec3A::new(0.0, 0.0, 3.0); // TODO: Find out why this number. Capsule Height is barely 2.
-                self.camera_location = coordinate_systems::adt_to_blender(player_loc);
-            }
+        if !self.fly_cam {
+            // TODO: Third Person controls.
+            // TODO: if this is required, this is a sign that we're missing adt_to_blender calls on the inputs to the physics simulation,
+            //  at least for the player start transform, but potentially also for the terrain meshes
+            let mut player_loc = *app.game_state.player_location.read().expect("");
+            player_loc += Vec3A::new(0.0, 0.0, 3.0); // TODO: Find out why this number. Capsule Height is barely 2.
+            self.camera_location = coordinate_systems::adt_to_blender(player_loc);
         }
 
+        let mm_lock = app.game_state.clone().map_manager.clone();
         {
             let mm = mm_lock.read().expect("Read Lock on Map Manager");
             if mm.current_map.is_some() != self.current_map.is_some() /* initial load or unload */ ||
@@ -691,7 +661,12 @@ impl rend3_framework::App for RenderingApplication {
             // Close button was clicked, we should close.
             Event::LoopExiting => {
                 if let Some(app) = self.app.upgrade() {
-                    app.close_requested.store(true, Ordering::SeqCst)
+                    app.close_requested.store(true, Ordering::SeqCst);
+
+                    // TODO: How do we want to design shutdowns? Shouldn't every loop just honor the close_requested flag?
+                    //  but then there may be valid reasons to have a separate conditional especially for physics, but
+                    //  requesting a close should also call stop there.
+                    app.game_state.physics_state.stop();
                 };
             }
             Event::WindowEvent {

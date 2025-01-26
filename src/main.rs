@@ -1,4 +1,5 @@
 #![feature(iter_array_chunks)]
+#![feature(duration_millis_float)]
 
 use crate::game::application::GameApplication;
 use crate::io::mpq::loader::MPQLoader;

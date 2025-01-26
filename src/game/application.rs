@@ -1,15 +1,16 @@
-use rend3::Renderer;
-use std::sync::atomic::AtomicBool;
-use std::sync::mpsc::Receiver;
-use std::sync::{Arc, OnceLock, Weak};
-
 use crate::entity::entity_tracker::EntityTracker;
 use crate::entity::systems::systems::Systems;
 use crate::game::game_state::GameState;
 use crate::io::mpq::loader::MPQLoader;
 use crate::networking::application::NetworkApplication;
+use crate::physics::physics_state::PhysicsState;
 use crate::rendering::application::RenderingApplication;
 use crate::settings::CliArgs;
+use log::debug;
+use rend3::Renderer;
+use std::sync::atomic::AtomicBool;
+use std::sync::mpsc::Receiver;
+use std::sync::{Arc, OnceLock, Weak};
 use winit::dpi::LogicalSize;
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
 
@@ -72,7 +73,7 @@ impl GameApplication {
     // TODO: Design flaw of the receiver. We can't hide it in the network application, though,
     //  it has to be consumed by spawning the network threads.
     pub fn run(&self, operation_mode: GameOperationMode) {
-        let handles = match operation_mode {
+        let mut handles = match operation_mode {
             GameOperationMode::Networked(receiver) => self
                 .network
                 .as_ref()
@@ -86,12 +87,14 @@ impl GameApplication {
             .with_inner_size(LogicalSize::new(1024, 768));
         let render_app = RenderingApplication::new(self.weak_self.clone());
 
+        handles.push(PhysicsState::start(self.game_state.physics_state.clone()));
+
         rend3_framework::start(render_app, wnd); // This blocks until the window is closed
 
+        debug!("Window closed, waiting for threads to finish");
+
         for handle in handles {
-            handle
-                .join()
-                .expect("Networking thread to terminate normally");
+            handle.join().expect("Thread to terminate normally");
         }
     }
 
