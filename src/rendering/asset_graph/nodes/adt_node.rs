@@ -6,6 +6,7 @@ use image_blp::BlpImage;
 use rend3::types::{MaterialHandle, MeshHandle, ObjectHandle, Texture2DHandle};
 use sargerust_files::m2::types::M2Texture;
 use sargerust_files::wdt::types::SMMapObjDef;
+use std::hash::{Hash, Hasher};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
 
@@ -34,6 +35,23 @@ pub struct DoodadReference {
     pub renderer_waiting_for_textures: AtomicBool, // Stage 1: unicolor objects
     pub renderer_is_complete: AtomicBool,          // Stage 2: textures applied
 }
+
+impl Hash for DoodadReference {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.reference.hash(state);
+        for val in self.transform.to_cols_array() {
+            (val as u32).hash(state);
+        }
+    }
+}
+
+impl PartialEq for DoodadReference {
+    fn eq(&self, other: &Self) -> bool {
+        self.reference == other.reference && self.transform == other.transform
+    }
+}
+
+impl Eq for DoodadReference {}
 
 impl DoodadReference {
     pub fn new(transform: Mat4, reference: String) -> Self {
@@ -118,6 +136,20 @@ impl<T> NodeReference<T> {
         }
     }
 }
+
+impl<T> Hash for NodeReference<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.reference_str.hash(state);
+    }
+}
+
+impl<T> PartialEq for NodeReference<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.reference_str == other.reference_str
+    }
+}
+
+impl<T> Eq for NodeReference<T> {}
 
 // TODO: the typedefs belong into rend3_backend, as they leak and wrap rend3 types
 pub type IRMaterial = IRObject<Material, MaterialHandle>;
