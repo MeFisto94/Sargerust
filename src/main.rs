@@ -5,7 +5,6 @@ use crate::game::application::GameApplication;
 use crate::io::mpq::loader::MPQLoader;
 use crate::settings::{CliArgs, OperationMode};
 use clap::Parser;
-use glam::{EulerRot, Quat, Vec3};
 use image_blp::BlpImage;
 use image_blp::convert::blp_to_image;
 use image_blp::parser::parse_blp_with_externals;
@@ -20,6 +19,7 @@ pub mod networking;
 pub mod physics;
 mod rendering;
 mod settings;
+pub mod util;
 
 fn main() {
     env_logger::init();

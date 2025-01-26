@@ -6,9 +6,10 @@ use std::time::Instant;
 use crate::physics::character_movement_information::CharacterMovementInformation;
 use crate::physics::collider_factory::ColliderFactory;
 use crate::physics::physics_simulator::PhysicsSimulator;
-use crate::physics::terrain_tile_colliders::{DoodadColliderEntry, TerrainTileColliders};
-use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, WMOGroupNode, WMONode};
+use crate::physics::terrain_tile_colliders::TerrainTileColliders;
+use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference, WMOGroupNode, WMONode};
 use crate::rendering::common::coordinate_systems;
+use crate::util::weak_dashmap::WeakKeyDashMapPruneOnInsert;
 use glam::{Vec3, Vec3A};
 use log::warn;
 use rapier3d::control::KinematicCharacterController;
@@ -17,7 +18,12 @@ use rapier3d::prelude::*;
 #[derive(Default)]
 struct MapData {
     pub adt_nodes: Mutex<Vec<(Weak<ADTNode>, TerrainTileColliders)>>,
-    pub wmo_doodads: Mutex<Vec<(Weak<WMONode>, Arc<RwLock<Vec<DoodadColliderEntry>>>)>>,
+    pub wmo_doodads: Mutex<
+        Vec<(
+            Weak<WMONode>,
+            WeakKeyDashMapPruneOnInsert<DoodadReference, ColliderHandle>,
+        )>,
+    >,
     pub wmo_colliders: Mutex<
         Vec<(
             Weak<WMONode>,
@@ -143,13 +149,14 @@ impl PhysicsState {
                     physics_simulator.drop_collider(collider, false);
                 }
 
-                let doodad_colliders = tile_colliders
-                    .doodad_colliders
-                    .read()
-                    .expect("poisoned lock");
+                let doodad_colliders = &tile_colliders.doodad_colliders;
 
-                for collider in doodad_colliders.iter() {
-                    physics_simulator.drop_collider(collider.collider_handle, false);
+                // TODO: such things have to be re-thought: The map will Drop collider handles if the DoodadReference
+                //  is dropped. That may happen before this code is run, unless it's cross-referenced somewhere else.
+                //  As such, we may need NotifyOnDrop<ColliderHandle>? Or what does the physics engine do on drop?
+                //  maybe we would never need such an explicit removal as dropping a handle automatically drops it?
+                for collider in doodad_colliders.values() {
+                    physics_simulator.drop_collider(collider, false);
                 }
 
                 // TODO: Drop all other colliders and remove entries.
@@ -341,9 +348,14 @@ impl PhysicsState {
                 if time_passed >= TICK_RATE_MS {
                     warn!("Physics tick underrun by {}ms", time_passed);
                 }
+
+                if time_passed >= 1000.0 {
+                    warn!("Physics skipping a second (\"running slower\")");
+                    time_passed -= 1000.0; // Otherwise we will build up a backlog that we will never be able to catch up.
+                }
             } else {
                 // technically, we should pin the CPU, but we try to reduce the load a bit.
-                std::thread::sleep(std::time::Duration::from_millis(5));
+                std::thread::sleep(std::time::Duration::from_millis(10));
             }
 
             time_passed += start.elapsed().as_millis_f32(); // time we took to calculate or sleep
