@@ -1,10 +1,12 @@
 use crate::game::application::GameApplication;
+use crate::game::map_light_settings_provider::MapLightSettingsProvider;
 use crate::game::map_manager::MapManager;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::networking::utils::net_vector3d_to_glam;
 use crate::physics::physics_state::PhysicsState;
 use glam::Vec3A;
+use itertools::Itertools;
 use log::{debug, error};
 use std::io::Cursor;
 use std::ops::Deref;
@@ -17,6 +19,7 @@ use wow_world_messages::wrath::{Map, Vector3d};
 pub struct GameState {
     pub app: Weak<GameApplication>,
     pub map_manager: Arc<RwLock<MapManager>>,
+    pub map_light_settings_provider: MapLightSettingsProvider,
     // TODO: this is apparently in ADT space, this _has_ to be changed to blender space?
     pub player_location: RwLock<Vec3A>,
     pub player_orientation: RwLock<f32>,
@@ -28,6 +31,7 @@ impl GameState {
     pub fn new(app: Weak<GameApplication>, mpq_loader: Arc<MPQLoader>) -> Self {
         Self {
             map_manager: Arc::new(RwLock::new(MapManager::new(mpq_loader.clone()))),
+            map_light_settings_provider: MapLightSettingsProvider::build(mpq_loader.clone()),
             player_location: RwLock::new(Vec3A::new(0.0, 0.0, 0.0)),
             player_orientation: RwLock::new(0.0),
             physics_state: Arc::new(PhysicsState::new(app.clone())),
@@ -97,10 +101,20 @@ impl GameState {
             .write()
             .expect("Player Orientation write lock") = orientation;
 
-        self.map_manager.write().unwrap().preload_map(
-            map_row.directory.clone(),
-            net_vector3d_to_glam(position),
-            orientation,
-        );
+        let lights = self
+            .map_light_settings_provider
+            .get_settings_for_map(map_row.id.id);
+
+        {
+            let mut mm = self.map_manager.write().expect("Map Manager write lock");
+
+            mm.update_lights(lights);
+
+            mm.preload_map(
+                map_row.directory.clone(),
+                net_vector3d_to_glam(position),
+                orientation,
+            );
+        }
     }
 }

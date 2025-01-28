@@ -812,6 +812,26 @@ impl rend3_framework::App for RenderingApplication {
 
         context.window.unwrap().request_redraw();
 
+        let clear_color = {
+            self.app()
+                .game_state
+                .map_manager
+                .write()
+                .expect("Map Manager Write Lock")
+                .current_light_settings
+                .as_ref()
+                //.map(|settings| settings.clear.diffuse_color.data[0].as_color())
+                .map(|settings| {
+                    settings
+                        .clear
+                        .diffuse_color
+                        .get_tuple_for_time(0)
+                        .expect("Color to be there at least for 0")
+                        .as_color()
+                })
+        }
+        .unwrap_or(Vec4::new(0.10, 0.05, 0.10, 1.0)); // Nice scene-referred purple;
+
         // technically, we could also invert the view rotation (remember this is not the cams matrix, but the _view_ matrix, so how do you transform
         // the world to get to the screen (i.e. 0, 0). Hence we also need to invert the camera_location. Inverting the rotation isn't a deal though,
         // as we can just control the input angles.
@@ -883,7 +903,7 @@ impl rend3_framework::App for RenderingApplication {
             },
             rend3_routine::base::BaseRenderGraphSettings {
                 ambient_color: glam::Vec4::ZERO,
-                clear_color: glam::Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+                clear_color,
             },
             &terrain_routine,
             &units_routine,

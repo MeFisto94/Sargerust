@@ -10,11 +10,7 @@ use log::{error, info, trace, warn};
 use tokio::runtime::{Builder, Handle, Runtime};
 use tokio::task::JoinSet;
 
-use sargerust_files::adt::reader::ADTReader;
-use sargerust_files::adt::types::ADTAsset;
-use sargerust_files::wdt::reader::WDTReader;
-use sargerust_files::wdt::types::{MPHDChunk, SMMapObjDef, WDTAsset};
-
+use crate::game::map_light_settings_provider::{LightSettings, MapLightSettingsProvider};
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::m2_generator::M2Generator;
@@ -27,6 +23,10 @@ use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::rendering::utils::{transform_for_doodad_ref, transform_for_wmo_ref};
+use sargerust_files::adt::reader::ADTReader;
+use sargerust_files::adt::types::ADTAsset;
+use sargerust_files::wdt::reader::WDTReader;
+use sargerust_files::wdt::types::{MPHDChunk, SMMapObjDef, WDTAsset};
 
 pub struct MapManager {
     runtime: Runtime,
@@ -37,6 +37,10 @@ pub struct MapManager {
     pub tex_resolver: Arc<Resolver<M2Generator, RwLock<Option<IRTexture>>>>, /* failably */
     pub wmo_resolver: Arc<Resolver<M2Generator, WMONode>>,
     pub wmo_group_resolver: Arc<Resolver<M2Generator, WMOGroupNode>>,
+    map_light_settings: Vec<LightSettings>,
+    // TODO: We could probably have this in RenderingApp/fetch it every frame (or even have to at some point), but for
+    //  now, it works that way.
+    pub current_light_settings: Option<LightSettings>,
 }
 
 impl MapManager {
@@ -53,7 +57,15 @@ impl MapManager {
             runtime: Builder::new_multi_thread()
                 .build()
                 .expect("Tokio Runtime to be built"),
+            map_light_settings: vec![],
+            current_light_settings: None,
         }
+    }
+
+    pub fn update_lights(&mut self, lights: Vec<LightSettings>) {
+        // TODO: Should this be in a dedicated struct?
+        self.map_light_settings = lights;
+        self.current_light_settings = MapLightSettingsProvider::get_global_settings(&self.map_light_settings).cloned();
     }
 
     pub fn update_camera(&mut self, position: Vec3A) {
@@ -65,6 +77,8 @@ impl MapManager {
         if self.tile_graph.contains_key(&coords) {
             return;
         }
+
+        // TODO: This could also update LightSettings, but doing it every tick may be uselessly aggressive.
 
         // TODO: unloading and proper range based checks once the API around here stabilizesd
         self.try_load_chunk(&coords);

@@ -31,13 +31,19 @@ Things that still need to be implemented (loosely sorted by priority):
 
 - MPQ: Load order of interface MPQs
 - Third Person Camera Controller (and sending `MOVE_FACING` packets / reworking the movement tracker)
+- Instanced Rendering of M2s (UnitMaterial is currently created in-place, even if the same texture has already been
+  used.) It remains to be seen if that is enough for rend3 to auto instance, though.
+- Debug Shader Reloading
+- Lights Improvement (especially the SkyLight: Implement a game time that ticks, support ambient color)
+- Configuration
+- Cross Platform support (i.e. investigate MBP 2011 failure)
+- massive Map Manager rework
+- Portals, Water, and other less important render objects
+- Anisotropic Filtering, basically setting SamplerDesc#anisotropy_clamp > 1, POT, < 16 (based on the device limits)
 - hecs:
     - Add more components and unpack update messages further
     - Implement spline walking (NPCs have predefined splines)
     - Rendering thereof
-- Debug Shader Reloading
-- Configuration
-- Cross Platform support (i.e. investigate MBP 2011 failure)
 - Physics:
     - Interpolation of Player Position (otherwise stuttery feel)
     - Verify that the colliders are scaled in the right coordinate system (e.g. scaling along z does the right, expected
@@ -48,8 +54,6 @@ Things that still need to be implemented (loosely sorted by priority):
 - Reading of DBC files, especially in preparation for:
     - Game Logic. Casting spells and showing stats (mana, health) mainly.
     - Somehow handle locales. We get MPQs from one locale mostly and that locale is the only one filled in DBC strings
-- massive Map Manager rework
-- Portals, Water, and other less important render objects
 - Audio System, potentially leveraging HRTF and precise reflection and absorption (e.g. SteamAudio)
 - UI/Addon System: This will most likely be using mlua and if possible port
   the entirety of "`FrameXML`", so that the original UI code can be run, but for that
@@ -57,5 +61,4 @@ Things that still need to be implemented (loosely sorted by priority):
   needs to be handled from scratch.
 - Advanced game "logic" (e.g. chat, friend list, guilds, trading, auction house)
 - Advanced rendering techniques: AO, TAA, VXGI?
-- Anisotropic Filtering, basically setting SamplerDesc#anisotropy_clamp > 1, POT, < 16 (based on the device limits)
 - https://docs.rs/arc-swap/latest/arc_swap/

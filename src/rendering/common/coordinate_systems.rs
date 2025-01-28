@@ -58,6 +58,19 @@ pub fn adt_world_to_tiles(position: Vec3) -> (u8, u8) {
     (chunk_coords.x as u8, chunk_coords.y as u8)
 }
 
+#[inline]
+pub fn light_dbc_to_vec(position: [f32; 3]) -> Vec3 {
+    Vec3::new(
+        17066.666 - position[2] / 36.0,
+        17066.666 - position[0] / 36.0,
+        position[1] / 36.0,
+    )
+}
+#[inline]
+pub fn light_dbc_falloff(falloff: f32) -> f32 {
+    falloff / 36.0
+}
+
 const CHUNK_SIZE: f32 = 100.0 / 3.0;
 // 33.333 yards (100 feet)
 pub const GRID_SIZE: f32 = CHUNK_SIZE / 8.0;
