@@ -2,6 +2,7 @@
 name = "sargerust"
 version = "0.1.0"
 edition = "2021"
+description = "An open source MMORPG client"
 publish = false
 
 [workspace]
@@ -55,6 +56,9 @@ wow_dbc = { version = "0.3.0", features = ["wrath"] }
 
 # CLI
 clap = { version = "4.5.23", features = ["derive", "env"] }
+
+# Standalone: Set the current time
+chrono = "0.4.39"
 
 # For the Rendering/Game Engine
 # Linear algebra library

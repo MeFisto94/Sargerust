@@ -1,4 +1,5 @@
 use crate::game::application::GameApplication;
+use crate::game::game_time::GameTime;
 use crate::game::map_light_settings_provider::MapLightSettingsProvider;
 use crate::game::map_manager::MapManager;
 use crate::io::common::loader::RawAssetLoader;
@@ -6,7 +7,6 @@ use crate::io::mpq::loader::MPQLoader;
 use crate::networking::utils::net_vector3d_to_glam;
 use crate::physics::physics_state::PhysicsState;
 use glam::Vec3A;
-use itertools::Itertools;
 use log::{debug, error};
 use std::io::Cursor;
 use std::ops::Deref;
@@ -24,6 +24,7 @@ pub struct GameState {
     pub player_location: RwLock<Vec3A>,
     pub player_orientation: RwLock<f32>,
     pub physics_state: Arc<PhysicsState>,
+    pub game_time: GameTime,
     map_dbc: wow_dbc::wrath_tables::map::Map,
 }
 
@@ -35,6 +36,7 @@ impl GameState {
             player_location: RwLock::new(Vec3A::new(0.0, 0.0, 0.0)),
             player_orientation: RwLock::new(0.0),
             physics_state: Arc::new(PhysicsState::new(app.clone())),
+            game_time: GameTime::default(),
             app,
             map_dbc: Self::read_map(mpq_loader.deref()),
         }

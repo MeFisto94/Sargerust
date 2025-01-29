@@ -712,6 +712,8 @@ impl rend3_framework::App for RenderingApplication {
     }
 
     fn handle_redraw(&mut self, context: RedrawContext<'_, ()>) {
+        let app = self.app();
+
         let now = Instant::now();
         let delta_time = now - self.timestamp_last_frame;
         self.timestamp_last_frame = now;
@@ -785,8 +787,8 @@ impl rend3_framework::App for RenderingApplication {
             self.camera_yaw += yaw;
 
             // location: we will consider the delta for the physics movement and then mirror that to the cam
-            let gs = self.app().game_state.clone();
-            let mut player_wlock = gs
+            let mut player_wlock = app
+                .game_state
                 .player_orientation
                 .write()
                 .expect("Player orientation tainted");
@@ -813,22 +815,15 @@ impl rend3_framework::App for RenderingApplication {
         context.window.unwrap().request_redraw();
 
         let clear_color = {
-            self.app()
-                .game_state
+            let game_time = app.game_state.game_time.as_30s_ticks();
+
+            app.game_state
                 .map_manager
                 .write()
                 .expect("Map Manager Write Lock")
                 .current_light_settings
                 .as_ref()
-                //.map(|settings| settings.clear.diffuse_color.data[0].as_color())
-                .map(|settings| {
-                    settings
-                        .clear
-                        .diffuse_color
-                        .get_tuple_for_time(0)
-                        .expect("Color to be there at least for 0")
-                        .as_color()
-                })
+                .map(|settings| settings.clear.diffuse_color.interpolate_for_time(game_time))
         }
         .unwrap_or(Vec4::new(0.10, 0.05, 0.10, 1.0)); // Nice scene-referred purple;
 

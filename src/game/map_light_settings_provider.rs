@@ -3,7 +3,7 @@ use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::common::coordinate_systems;
 use glam::{Vec3, Vec4};
 use itertools::Itertools;
-use log::trace;
+use log::{trace, warn};
 use std::sync::Arc;
 use wow_dbc::wrath_tables::light::{Light, LightRow};
 use wow_dbc::wrath_tables::light_float_band::{LightFloatBand, LightFloatBandRow};
@@ -240,6 +240,55 @@ impl LightBandEntry<i32> {
                 .collect_vec(),
         }
     }
+
+    pub fn interpolate_for_time(&self, time: u16) -> Vec4 {
+        if self.data.is_empty() {
+            warn!("Trying to interpolate for an empty band");
+            return Vec4::new(1.0, 0.0, 0.0, 1.0);
+        }
+
+        let idx = self
+            .data
+            .iter()
+            .find_position(|tuple| tuple.time >= time as i32);
+
+        let (start, end) = if let Some((idx, band)) = idx {
+            if idx == 0 {
+                // need to wrap from the end
+                (
+                    self.data.iter().last().expect("non-empty band, see above"),
+                    self.data.first().expect("non-empty band, see above"),
+                )
+            } else {
+                (&self.data[idx - 1], band)
+            }
+        } else {
+            // need to wrap from the end
+            (
+                self.data.iter().last().expect("non-empty band, see above"),
+                self.data.first().expect("non-empty band, see above"),
+            )
+        };
+
+        let mut tuple_length = end.time - start.time;
+        if tuple_length < 0 {
+            tuple_length += 2880;
+        }
+
+        let mut tuple_position = time as i32 - start.time;
+        if tuple_position < 0 {
+            tuple_position += 2880;
+        }
+
+        let progress = tuple_position as f32 / tuple_length as f32;
+
+        if end.data < start.data {
+            // TODO: Does this if even make sense? Because we both invert the order of subtraction *and* the sign, doesn't it cancel out?
+            int_as_color((start.data as f32 - progress * (start.data - end.data) as f32) as i32)
+        } else {
+            int_as_color((start.data as f32 + progress * (end.data - start.data) as f32) as i32)
+        }
+    }
 }
 
 impl LightBandEntry<f32> {
@@ -265,14 +314,18 @@ pub struct LightBandTuple<T> {
     pub data: T,
 }
 
+fn int_as_color(data: i32) -> Vec4 {
+    Vec4::new(
+        ((data >> 16) & 0xFF) as f32 / 255.0,
+        ((data >> 8) & 0xFF) as f32 / 255.0,
+        (data & 0xFF) as f32 / 255.0,
+        1.0,
+    )
+}
+
 impl LightBandTuple<i32> {
     pub fn as_color(&self) -> Vec4 {
-        Vec4::new(
-            ((self.data >> 16) & 0xFF) as f32 / 255.0,
-            ((self.data >> 8) & 0xFF) as f32 / 255.0,
-            (self.data & 0xFF) as f32 / 255.0,
-            1.0,
-        )
+        int_as_color(self.data)
     }
 }
 
@@ -281,7 +334,7 @@ pub struct LightParameters {
     pub highlight_sky: bool,
     /// Path to the M2 file.
     pub light_skybox: Option<String>,
-    // pub cloud_type: u32, // TODO: where?
+    // pub cloud_type: u32, // TODO: where? Seems to be cata+ (or was it vanilla?)
     /// This controls how much Fog gets added to everything (!) and is used in some places to make them look extra bright
     pub glow: f32,
     /// Controls how transparent the water is for lakes & rivers.

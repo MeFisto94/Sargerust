@@ -64,6 +64,15 @@ impl PacketHandlers {
                         .entity_tracker
                         .destroy_object(obj.guid, obj.target_died);
                 }
+                ServerOpcodeMessage::SMSG_LOGIN_SETTIMESPEED(obj) => {
+                    let time = obj.datetime;
+                    let scale = obj.timescale;
+
+                    self.app()
+                        .game_state
+                        .game_time
+                        .update_time_and_speed(time, scale);
+                }
                 opcode => info!("Unhandled opcode: {}", opcode),
             }
         }

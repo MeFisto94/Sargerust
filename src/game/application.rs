@@ -6,6 +6,7 @@ use crate::networking::application::NetworkApplication;
 use crate::physics::physics_state::PhysicsState;
 use crate::rendering::application::RenderingApplication;
 use crate::settings::CliArgs;
+use chrono::{Local, Timelike};
 use log::debug;
 use rend3::Renderer;
 use std::sync::atomic::AtomicBool;
@@ -13,6 +14,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, OnceLock, Weak};
 use winit::dpi::LogicalSize;
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
+use wow_world_messages::{DateTime, Month, Weekday};
 
 pub enum GameOperationMode {
     Standalone,
@@ -87,6 +89,8 @@ impl GameApplication {
             .with_inner_size(LogicalSize::new(1024, 768));
         let render_app = RenderingApplication::new(self.weak_self.clone());
 
+        self.update_game_time();
+
         handles.push(PhysicsState::start(self.game_state.physics_state.clone()));
 
         rend3_framework::start(render_app, wnd); // This blocks until the window is closed
@@ -98,7 +102,24 @@ impl GameApplication {
         }
     }
 
+    fn update_game_time(&self) {
+        let time = Local::now().time();
+        let date_time = DateTime::new(
+            0,
+            Month::January,
+            0,
+            Weekday::Friday,
+            time.hour() as u8,
+            time.minute() as u8,
+        );
+
+        self.game_state
+            .game_time
+            .update_time_and_speed(date_time, 0.01666667);
+    }
+
     pub fn logic_update(&self, delta_time: f32) {
+        self.game_state.game_time.advance_time(delta_time);
         self.systems.update(self, delta_time);
     }
 }
