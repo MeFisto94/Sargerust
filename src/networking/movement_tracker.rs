@@ -48,7 +48,10 @@ impl MovementTracker {
             .upgrade()
             .expect("World Server to outlive Movement Tracker");
 
-        let player_guid = world.player_guid.get().expect("Player Guid is already set");
+        let Some(player_guid) = world.player_guid.get() else {
+            return; // The physics thread is started before we're even properly loaded and connected.
+        };
+
         let timestamp = world.get_timestamp();
 
         let info = Self::build_movement_info(delta_unrotated, absolute_position, orientation, timestamp);
