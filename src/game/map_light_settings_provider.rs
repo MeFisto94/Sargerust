@@ -1,4 +1,5 @@
 use crate::io::common::loader::RawAssetLoader;
+use crate::io::mpq::load_dbc;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::common::coordinate_systems;
 use glam::{Vec3, Vec4};
@@ -22,25 +23,17 @@ pub struct MapLightSettingsProvider {
 }
 
 impl MapLightSettingsProvider {
-    fn load_dbc<T: DbcTable>(mpq_loader: &MPQLoader, name: &str) -> T {
-        let buf = mpq_loader
-            .load_raw_owned(name)
-            .unwrap_or_else(|| panic!("Failed to load {}", name));
-        trace!("Loaded {} ({} bytes)", name, buf.len());
-        T::read(&mut buf.as_slice()).unwrap_or_else(|_| panic!("Failed to parse {}", name))
-    }
-
     // TODO: This loads DBC files which is a bit counter intuitive for constructors, but I guess the only way to prevent
     // useless Options. Unless we add a builder...
     pub fn build(mpq_loader: Arc<MPQLoader>) -> Self {
         // This holds ~1MiB of data, technically we could load it on demand (async), because we only need a fragment
         // of the data and that only on map changes (portals, teleports), but we're probably rather memory hungry anyway
         Self {
-            light: Self::load_dbc(&mpq_loader, "DBFilesClient\\Light.dbc"),
-            light_skybox: Self::load_dbc(&mpq_loader, "DBFilesClient\\LightSkybox.dbc"),
-            light_params: Self::load_dbc(&mpq_loader, "DBFilesClient\\LightParams.dbc"),
-            light_int_band: Self::load_dbc(&mpq_loader, "DBFilesClient\\LightIntBand.dbc"),
-            light_float_band: Self::load_dbc(&mpq_loader, "DBFilesClient\\LightFloatBand.dbc"),
+            light: load_dbc(&mpq_loader, "DBFilesClient\\Light.dbc"),
+            light_skybox: load_dbc(&mpq_loader, "DBFilesClient\\LightSkybox.dbc"),
+            light_params: load_dbc(&mpq_loader, "DBFilesClient\\LightParams.dbc"),
+            light_int_band: load_dbc(&mpq_loader, "DBFilesClient\\LightIntBand.dbc"),
+            light_float_band: load_dbc(&mpq_loader, "DBFilesClient\\LightFloatBand.dbc"),
         }
     }
 
