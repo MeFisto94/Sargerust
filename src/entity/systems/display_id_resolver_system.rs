@@ -2,46 +2,42 @@ use crate::entity::components::rendering::{Renderable, RenderableSource};
 use crate::entity::components::units::UnitDisplayId;
 use crate::game::application::GameApplication;
 use crate::io::common::loader::RawAssetLoader;
+use crate::io::mpq::load_dbc;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::m2_generator::M2Generator;
 use crate::rendering::asset_graph::nodes::adt_node::{IRTexture, M2Node};
 use crate::rendering::asset_graph::resolver::Resolver;
+use clap::builder::TypedValueParser;
 use hecs::Without;
 use itertools::Itertools;
-use log::warn;
+use log::{info, warn};
 use sargerust_files::m2::types::M2TextureType;
+use std::clone;
+use std::fmt::format;
 use std::io::Cursor;
 use std::sync::{Arc, RwLock};
+use wow_dbc::wrath_tables::char_sections::{CharSections, CharSectionsRow};
 use wow_dbc::wrath_tables::creature_display_info::CreatureDisplayInfo;
+use wow_dbc::wrath_tables::creature_display_info_extra::{CreatureDisplayInfoExtra, CreatureDisplayInfoExtraRow};
 use wow_dbc::wrath_tables::creature_model_data::CreatureModelData;
 use wow_dbc::{DbcTable, Indexable};
 
 pub struct DisplayIdResolverSystem {
     creature_display_info: CreatureDisplayInfo,
+    creature_display_info_extra: CreatureDisplayInfoExtra,
     creature_model_data: CreatureModelData,
+    char_sections: CharSections,
     m2_resolver: Resolver<M2Generator, M2Node>,
     tex_resolver: Resolver<M2Generator, RwLock<Option<IRTexture>>>,
 }
 
 impl DisplayIdResolverSystem {
     pub fn new(mpq_loader: Arc<MPQLoader>) -> Self {
-        let cdi_buf = mpq_loader
-            .load_raw_owned("DBFilesClient\\CreatureDisplayInfo.dbc")
-            .expect("Failed to load CreatureDisplayInfo.dbc");
-
-        let cmi_buf = mpq_loader
-            .load_raw_owned("DBFilesClient\\CreatureModelData.dbc")
-            .expect("Failed to load CreatureModelData.dbc");
-
-        let creature_display_info =
-            CreatureDisplayInfo::read(&mut Cursor::new(cdi_buf)).expect("Failed to parse Creature Display Info");
-
-        let creature_model_data =
-            CreatureModelData::read(&mut Cursor::new(cmi_buf)).expect("Failed to parse Creature Model Info");
-
         Self {
-            creature_display_info,
-            creature_model_data,
+            creature_display_info: load_dbc(&mpq_loader, "DBFilesClient\\CreatureDisplayInfo.dbc"),
+            creature_display_info_extra: load_dbc(&mpq_loader, "DBFilesClient\\CreatureDisplayInfoExtra.dbc"),
+            creature_model_data: load_dbc(&mpq_loader, "DBFilesClient\\CreatureModelData.dbc"),
+            char_sections: load_dbc(&mpq_loader, "DBFilesClient\\CharSections.dbc"),
             m2_resolver: Resolver::new(M2Generator::new(mpq_loader.clone())),
             tex_resolver: Resolver::new(M2Generator::new(mpq_loader.clone())),
         }
@@ -63,6 +59,10 @@ impl DisplayIdResolverSystem {
                 continue;
             };
 
+            let creature_display_info_extra_opt = self
+                .creature_display_info_extra
+                .get(creature_display_info.extended_display_info_id);
+
             let Some(creature_model_data) = self
                 .creature_model_data
                 .get(creature_display_info.model_id.id)
@@ -73,6 +73,10 @@ impl DisplayIdResolverSystem {
                 );
                 continue;
             };
+
+            const BASE_SECTION_FACE: i32 = 1;
+            const BASE_SECTION_FACIAL_HAIR: i32 = 2;
+            const BASE_SECTION_UNDERWEAR: i32 = 4;
 
             // fix name: currently it ends with .mdx, but we need .m2
             let name = creature_model_data
@@ -98,13 +102,42 @@ impl DisplayIdResolverSystem {
                         M2TextureType::TexComponentMonster1 => &creature_display_info.texture_variation[0],
                         M2TextureType::TexComponentMonster2 => &creature_display_info.texture_variation[1],
                         M2TextureType::TexComponentMonster3 => &creature_display_info.texture_variation[2],
+                        M2TextureType::TexComponentSkin => {
+                            let tex_opt = creature_display_info_extra_opt
+                                .and_then(|cdie| get_base_skin_section(cdie, &self.char_sections))
+                                .map(|section| &section.texture_name[0]);
+
+                            if let Some(tex) = tex_opt {
+                                tex
+                            } else {
+                                warn!("Failed to load texture type {:?}", reference.texture_type);
+                                return None;
+                            }
+                        }
+                        M2TextureType::TexComponentCharacterHair => {
+                            let tex_opt = creature_display_info_extra_opt
+                                .and_then(|cdie| get_hair_section(cdie, &self.char_sections))
+                                .map(|section| &section.texture_name[0]);
+
+                            if let Some(tex) = tex_opt {
+                                tex
+                            } else {
+                                warn!("Failed to load texture type {:?}", reference.texture_type);
+                                return None;
+                            }
+                        }
                         _ => {
                             warn!("Not supported texture type {:?}", reference.texture_type);
                             return None;
                         }
                     };
 
-                    let tex_name = format!("{}\\{}.blp", base_path, tex_file_name);
+                    // TODO: Is this just a hack and we should instead do this string format only for the monster tex types?
+                    let tex_name = if tex_file_name.ends_with(".blp") {
+                        tex_file_name.to_string()
+                    } else {
+                        format!("{}\\{}.blp", base_path, tex_file_name)
+                    };
 
                     Some((
                         reference.texture_type,
@@ -128,5 +161,60 @@ impl DisplayIdResolverSystem {
                 )
                 .expect("Insert Renderable");
         }
+    }
+}
+
+fn get_base_skin_section<'a>(
+    creature_display_info_extra: &CreatureDisplayInfoExtraRow,
+    char_sections: &'a CharSections,
+) -> Option<&'a CharSectionsRow> {
+    const BASE_SECTION_BASE_SKIN: i32 = 0;
+    let sections = char_sections
+        .rows()
+        .iter()
+        .filter(|section| {
+            section.race_id == creature_display_info_extra.display_race_id
+                && section.sex_id == creature_display_info_extra.display_sex_id
+                && section.base_section == BASE_SECTION_BASE_SKIN
+                && section.color_index == creature_display_info_extra.skin_id
+        })
+        .collect_vec();
+
+    if sections.len() > 1 {
+        warn!("CharacterSection was not unique ");
+        None
+    } else if sections.is_empty() {
+        warn!("Could not find any matching CharacterSection");
+        None
+    } else {
+        Some(sections[0])
+    }
+}
+
+fn get_hair_section<'a>(
+    creature_display_info_extra: &CreatureDisplayInfoExtraRow,
+    char_sections: &'a CharSections,
+) -> Option<&'a CharSectionsRow> {
+    const BASE_SECTION_HAIR: i32 = 3;
+    let sections = char_sections
+        .rows()
+        .iter()
+        .filter(|section| {
+            section.race_id == creature_display_info_extra.display_race_id
+                && section.sex_id == creature_display_info_extra.display_sex_id
+                && section.base_section == BASE_SECTION_HAIR
+                && section.variation_index == creature_display_info_extra.hair_style_id
+                && section.color_index == creature_display_info_extra.hair_color_id
+        })
+        .collect_vec();
+
+    if sections.len() > 1 {
+        warn!("CharacterSection was not unique ");
+        None
+    } else if sections.is_empty() {
+        warn!("Could not find any matching CharacterSection");
+        None
+    } else {
+        Some(sections[0])
     }
 }
