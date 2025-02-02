@@ -5,6 +5,15 @@ edition = "2021"
 description = "An open source MMORPG client"
 publish = false
 
+[lib]
+name = "sargerust_android"
+crate-type = ["cdylib"]
+path = "src/android.rs"
+
+[[bin]]
+name = "sargerust"
+path = "src/main.rs"
+
 [workspace]
 members = [
     "sargerust-files",
@@ -34,6 +43,14 @@ codegen-units = 1
 [build-dependencies]
 anyhow = "1.0.95"
 vergen-gitcl = { version = "1.0.2", features = [], default-features = false }
+
+# Android specific dependencies
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.14.1"
+winit = { version = "0.29", features = ["android-game-activity"] }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+winit = { version = "0.29", features = ["android-game-activity"] }
 
 [dependencies]
 # Logging, but getting rid of the regex feature/dependency for regex filters.
@@ -79,9 +96,6 @@ rust-embed = "8.1.0"
 rend3-framework = { git = "https://github.com/MeFisto94/rend3-hp/", branch = "feature/custom-materials" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.3"
-# windowing. TODO: Upgrade to 0.29 for new keyboard handling
-# https://github.com/BVE-Reborn/rend3/commit/d7869b838ff6b6283141203ec6b8bddffb3b8eea and following seem to fix examples for that.
-winit = "0.29"
 
 # collect_vec and other niceities
 itertools = "0.13.0"

@@ -37,9 +37,12 @@ use rend3_routine::base::{
 use rend3_routine::common::CameraSpecifier;
 use rend3_routine::forward::ForwardRoutineArgs;
 use rend3_routine::{clear, forward};
+use winit::error::EventLoopError;
 use sargerust_files::m2::types::{M2TextureFlags, M2TextureType};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::event_loop::EventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::window::{Window, WindowBuilder};
 
 // #[derive(Debug)] // TODO: Ensure Grabber implements Display
 pub struct RenderingApplication {
@@ -606,6 +609,11 @@ impl rend3_framework::App for RenderingApplication {
     fn register_logger(&mut self) {
         // intentionally no-opped.
     }
+
+    // On android, we need to somehow take the event loop we get from the entry point.
+    #[cfg(target_os = "android")]
+    fn create_window(&mut self, builder: WindowBuilder) -> Result<(EventLoop<()>, Window), EventLoopError> {}
+
 
     fn create_base_rendergraph(&mut self, renderer: &Arc<Renderer>, spp: &mut ShaderPreProcessor) -> BaseRenderGraph {
         let mut data_core = renderer.data_core.lock();

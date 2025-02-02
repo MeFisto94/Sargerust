@@ -12,6 +12,7 @@ use mpq::Archive;
 use std::sync::Arc;
 use wow_world_messages::wrath::Vector3d;
 
+mod android;
 pub mod entity;
 mod game;
 mod io;
