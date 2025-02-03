@@ -40,9 +40,13 @@ lto = "fat"
 debug = 1
 codegen-units = 1
 
+[features]
+tracy = ["tracy-client", "profiling/profile-with-tracy"]
+
 [build-dependencies]
 anyhow = "1.0.95"
 vergen-gitcl = { version = "1.0.2", features = [], default-features = false }
+cc = "1.0.88" # https://github.com/nagisa/rust_tracy_client/issues/133
 
 # Android specific dependencies
 [target.'cfg(target_os = "android")'.dependencies]
@@ -56,6 +60,11 @@ winit = { version = "0.29", features = ["android-game-activity"] }
 # Logging, but getting rid of the regex feature/dependency for regex filters.
 env_logger = { version = "0.11.3", default-features = false, features = ["auto-color", "humantime"] }
 log = "0.4.21"
+
+# Tracing / Profiling
+tracy-client = { version = "0.18.0", optional = true } # https://github.com/nagisa/rust_tracy_client/tree/main/tracy-client -> tracy client 0.11.1
+profiling = { version = "1.0.16", default-features = false }
+wgpu-profiler = { version = "0.17.0", features = ["tracy"] }
 
 # Error handling
 anyhow = "1.0.95"

@@ -720,105 +720,110 @@ impl rend3_framework::App for RenderingApplication {
     }
 
     fn handle_redraw(&mut self, context: RedrawContext<'_, ()>) {
+        profiling::scope!("RedrawRequested");
+
         let app = self.app();
 
-        let now = Instant::now();
-        let delta_time = now - self.timestamp_last_frame;
-        self.timestamp_last_frame = now;
+        {
+            profiling::scope!("Update Logic");
+            let now = Instant::now();
+            let delta_time = now - self.timestamp_last_frame;
+            self.timestamp_last_frame = now;
 
-        let rotation = if self.fly_cam {
-            glam::Mat3A::from_euler(
-                glam::EulerRot::XYZ,
-                -self.camera_pitch * PI,
-                0.0 /* roll */ * PI,
-                -self.camera_yaw,
-            )
-        } else {
-            // We don't want our forward movement to be dictated by the pitch, this is, at best, useful for the fly cam.
-            glam::Mat3A::from_euler(
-                glam::EulerRot::XYZ,
-                0.0, /* pitch */
-                0.0 /* roll */ * PI,
-                -self.camera_yaw,
-            )
-        };
+            let rotation = if self.fly_cam {
+                glam::Mat3A::from_euler(
+                    glam::EulerRot::XYZ,
+                    -self.camera_pitch * PI,
+                    0.0 /* roll */ * PI,
+                    -self.camera_yaw,
+                )
+            } else {
+                // We don't want our forward movement to be dictated by the pitch, this is, at best, useful for the fly cam.
+                glam::Mat3A::from_euler(
+                    glam::EulerRot::XYZ,
+                    0.0, /* pitch */
+                    0.0 /* roll */ * PI,
+                    -self.camera_yaw,
+                )
+            };
 
-        let forward: Vec3A = rotation.y_axis; // TODO: Only if fly cam do we want to use pitch. Probably we never want that at all?
-        let right: Vec3A = rotation.x_axis;
-        let up: Vec3A = rotation.z_axis;
+            let forward: Vec3A = rotation.y_axis; // TODO: Only if fly cam do we want to use pitch. Probably we never want that at all?
+            let right: Vec3A = rotation.x_axis;
+            let up: Vec3A = rotation.z_axis;
 
-        let fwd_speed = if self.fly_cam { 30.0 } else { 7.0 };
-        let strafe_speed = if self.fly_cam { 20.0 } else { 7.0 };
-        let back_speed = if self.fly_cam { 20.0 } else { 4.5 };
+            let fwd_speed = if self.fly_cam { 30.0 } else { 7.0 };
+            let strafe_speed = if self.fly_cam { 20.0 } else { 7.0 };
+            let back_speed = if self.fly_cam { 20.0 } else { 4.5 };
 
-        let mut delta: Vec3A = Vec3A::new(0.0, 0.0, 0.0);
-        let mut yaw = 0.0;
+            let mut delta: Vec3A = Vec3A::new(0.0, 0.0, 0.0);
+            let mut yaw = 0.0;
 
-        if button_pressed(&self.scancode_status, KeyCode::KeyW) {
-            delta += forward * fwd_speed * delta_time.as_secs_f32();
-        }
-        if button_pressed(&self.scancode_status, KeyCode::KeyS) {
-            delta -= forward * back_speed * delta_time.as_secs_f32();
-        }
-        if button_pressed(&self.scancode_status, KeyCode::KeyA) {
-            delta -= right * strafe_speed * delta_time.as_secs_f32();
-        }
-        if button_pressed(&self.scancode_status, KeyCode::KeyD) {
-            delta += right * strafe_speed * delta_time.as_secs_f32();
-        }
-        if button_pressed(&self.scancode_status, KeyCode::KeyF) {
-            self.fly_cam = !self.fly_cam;
-        }
-        if button_pressed(&self.scancode_status, KeyCode::ShiftLeft) {
-            delta += up * 10.0 * delta_time.as_secs_f32();
-        }
-        if button_pressed(&self.scancode_status, KeyCode::ControlLeft) {
-            delta -= up * 10.0 * delta_time.as_secs_f32();
-        }
-        if button_pressed(&self.scancode_status, KeyCode::ArrowRight) {
-            yaw += PI * delta_time.as_secs_f32();
-        }
-        if button_pressed(&self.scancode_status, KeyCode::ArrowLeft) {
-            yaw -= PI * delta_time.as_secs_f32();
-        }
-        if button_pressed(&self.scancode_status, KeyCode::ArrowUp) {
-            self.camera_pitch += 0.25 * delta_time.as_secs_f32();
-        }
-        if button_pressed(&self.scancode_status, KeyCode::ArrowDown) {
-            self.camera_pitch -= 0.25 * delta_time.as_secs_f32();
-        }
-
-        if self.fly_cam {
-            self.camera_location += delta;
-            self.camera_yaw += yaw;
-        } else {
-            self.camera_yaw += yaw;
-
-            // location: we will consider the delta for the physics movement and then mirror that to the cam
-            let mut player_wlock = app
-                .game_state
-                .player_orientation
-                .write()
-                .expect("Player orientation tainted");
-
-            let orientation = player_wlock.deref_mut();
-            *orientation -= yaw;
-
-            // fancy clamping from -PI to +PI.
-            while *orientation < -PI {
-                *orientation += 2.0 * PI;
+            if button_pressed(&self.scancode_status, KeyCode::KeyW) {
+                delta += forward * fwd_speed * delta_time.as_secs_f32();
+            }
+            if button_pressed(&self.scancode_status, KeyCode::KeyS) {
+                delta -= forward * back_speed * delta_time.as_secs_f32();
+            }
+            if button_pressed(&self.scancode_status, KeyCode::KeyA) {
+                delta -= right * strafe_speed * delta_time.as_secs_f32();
+            }
+            if button_pressed(&self.scancode_status, KeyCode::KeyD) {
+                delta += right * strafe_speed * delta_time.as_secs_f32();
+            }
+            if button_pressed(&self.scancode_status, KeyCode::KeyF) {
+                self.fly_cam = !self.fly_cam;
+            }
+            if button_pressed(&self.scancode_status, KeyCode::ShiftLeft) {
+                delta += up * 10.0 * delta_time.as_secs_f32();
+            }
+            if button_pressed(&self.scancode_status, KeyCode::ControlLeft) {
+                delta -= up * 10.0 * delta_time.as_secs_f32();
+            }
+            if button_pressed(&self.scancode_status, KeyCode::ArrowRight) {
+                yaw += PI * delta_time.as_secs_f32();
+            }
+            if button_pressed(&self.scancode_status, KeyCode::ArrowLeft) {
+                yaw -= PI * delta_time.as_secs_f32();
+            }
+            if button_pressed(&self.scancode_status, KeyCode::ArrowUp) {
+                self.camera_pitch += 0.25 * delta_time.as_secs_f32();
+            }
+            if button_pressed(&self.scancode_status, KeyCode::ArrowDown) {
+                self.camera_pitch -= 0.25 * delta_time.as_secs_f32();
             }
 
-            while *orientation > PI {
-                *orientation -= 2.0 * PI;
-            }
-        }
+            if self.fly_cam {
+                self.camera_location += delta;
+                self.camera_yaw += yaw;
+            } else {
+                self.camera_yaw += yaw;
 
-        self.run_updates(
-            context.renderer,
-            delta_time.as_secs_f32(),
-            if self.fly_cam { Vec3A::ZERO } else { delta },
-        );
+                // location: we will consider the delta for the physics movement and then mirror that to the cam
+                let mut player_wlock = app
+                    .game_state
+                    .player_orientation
+                    .write()
+                    .expect("Player orientation tainted");
+
+                let orientation = player_wlock.deref_mut();
+                *orientation -= yaw;
+
+                // fancy clamping from -PI to +PI.
+                while *orientation < -PI {
+                    *orientation += 2.0 * PI;
+                }
+
+                while *orientation > PI {
+                    *orientation -= 2.0 * PI;
+                }
+            }
+
+            self.run_updates(
+                context.renderer,
+                delta_time.as_secs_f32(),
+                if self.fly_cam { Vec3A::ZERO } else { delta },
+            );
+        }
 
         context.window.unwrap().request_redraw();
 
@@ -914,6 +919,8 @@ impl rend3_framework::App for RenderingApplication {
 
         // Dispatch a render using the built up rendergraph!
         graph.execute(context.renderer, &mut eval_output);
+
+        profiling::finish_frame!();
     }
 }
 

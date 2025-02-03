@@ -25,6 +25,9 @@ pub mod util;
 fn main() {
     env_logger::init();
 
+    #[cfg(feature = "tracy")]
+    let _client = tracy_client::Client::start();
+
     let args = CliArgs::parse();
     log::trace!("Starting with args: {:?}", args);
 
