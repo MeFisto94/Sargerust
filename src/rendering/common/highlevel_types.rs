@@ -7,4 +7,5 @@ use glam::Affine3A;
 pub struct PlaceableDoodad {
     pub transform: Affine3A,
     pub m2_ref: String,
+    pub set_name: String,
 }

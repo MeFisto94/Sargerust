@@ -22,7 +22,7 @@ impl WMOLoader {
 
         // TODO: doodad sets?
         let mut doodads = Vec::new();
-        for dad in WMOLoader::collect_dooads_for_wmo_root(&wmo) {
+        for dad in WMOLoader::collect_doodads_for_wmo_root(&wmo) {
             doodads.push(Arc::new(DoodadReference::new(
                 dad.transform.into(),
                 dad.m2_ref,
@@ -86,12 +86,12 @@ impl WMOLoader {
     }
 
     /// Extracts the doodads (i.e. M2 models that have been placed into the world at a specific position) that are defined in the WMO Root
-    pub fn collect_dooads_for_wmo_root(wmo: &WMORootAsset) -> Vec<PlaceableDoodad> {
+    pub fn collect_doodads_for_wmo_root(wmo: &WMORootAsset) -> Vec<PlaceableDoodad> {
         let mut render_list = Vec::new();
         for mods in &wmo.mods.doodadSetList {
             let start = mods.startIndex as usize;
             let end = (mods.startIndex + mods.count) as usize;
-            debug!("Doodad Set: {} from {} to {}", mods.name, start, end);
+            debug!("Doodad Set: {} from {} to {}", &mods.name, start, end);
             // TODO: at some point we need logic to selectively filter dooddad sets.
             for modd in &wmo.modd.doodadDefList[start..end] {
                 let idx = wmo.modn.doodadNameListLookup[&modd.nameIndex];
@@ -116,6 +116,7 @@ impl WMOLoader {
                 render_list.push(PlaceableDoodad {
                     transform,
                     m2_ref: name,
+                    set_name: mods.name.clone(),
                 });
             }
         }
