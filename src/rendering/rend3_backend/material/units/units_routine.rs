@@ -24,7 +24,7 @@ impl UnitsRoutine {
         // TODO: This is not really in-sync with how the other shaders do it, but:
         // TODO: Pull this out, somehow somewhere more central, otherwise we uselessly read and overwrite the entries.
         spp.add_shaders_embed::<SargerustShaderSources>("sargerust");
-        // profiling::scope!("UnitsRoutine::new");
+        profiling::scope!("UnitsRoutine::new");
 
         // This ensures the BGLs for the material are created
         data_core
