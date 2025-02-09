@@ -1,14 +1,23 @@
-use image_blp::BlpImage;
-use log::error;
-use rend3::types::{Texture, Texture2DHandle};
-use rend3_routine::pbr::{AlbedoComponent, PbrMaterial, Transparency};
-
+use crate::rendering::asset_graph::nodes::adt_node::{IRObject, IRObjectReference};
 use crate::rendering::common::types::TransparencyType::{Blend, Cutout, Opaque};
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, VertexBuffers};
+use crate::rendering::importer::m2_importer::M2Material;
 use crate::rendering::utils::create_texture_rgba8;
+use image_blp::BlpImage;
+use log::error;
+use rend3::types::{MaterialHandle, MeshHandle, Texture, Texture2DHandle};
+use rend3_routine::pbr::{AlbedoComponent, PbrMaterial, Transparency};
 
 pub mod gpu_loaders;
 pub mod material;
+
+pub type IRMaterial = IRObject<Material, MaterialHandle>;
+pub type IRM2Material = IRObject<M2Material, MaterialHandle>;
+pub type IRMesh = IRObject<Mesh, MeshHandle>;
+// TODO: Why are textures failable? Depending on the context that may not be a good idea. As is the file location for these.
+// Textures are failable
+pub type IRTextureReference = IRObjectReference<Option<IRTexture>>;
+pub type IRTexture = IRObject<BlpImage, Texture2DHandle>;
 
 pub struct Rend3BackendConverter {}
 

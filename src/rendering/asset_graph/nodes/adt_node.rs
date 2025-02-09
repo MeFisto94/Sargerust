@@ -1,9 +1,9 @@
 use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::common::types::{Material, Mesh};
 use crate::rendering::importer::m2_importer::M2Material;
+use crate::rendering::rend3_backend::{IRM2Material, IRMaterial, IRMesh, IRTextureReference};
 use glam::{Affine3A, Mat4, Vec3A};
-use image_blp::BlpImage;
-use rend3::types::{MaterialHandle, MeshHandle, ObjectHandle, Texture2DHandle};
+use rend3::types::{MaterialHandle, MeshHandle, ObjectHandle};
 use sargerust_files::m2::types::M2Texture;
 use sargerust_files::wdt::types::SMMapObjDef;
 use std::hash::{Hash, Hasher};
@@ -150,15 +150,6 @@ impl<T> PartialEq for NodeReference<T> {
 }
 
 impl<T> Eq for NodeReference<T> {}
-
-// TODO: the typedefs belong into rend3_backend, as they leak and wrap rend3 types
-pub type IRMaterial = IRObject<Material, MaterialHandle>;
-pub type IRM2Material = IRObject<M2Material, MaterialHandle>;
-pub type IRMesh = IRObject<Mesh, MeshHandle>;
-// TODO: Why are textures failable? Depending on the context that may not be a good idea. As is the file location for these.
-// Textures are failable
-pub type IRTextureReference = IRObjectReference<Option<IRTexture>>;
-pub type IRTexture = IRObject<BlpImage, Texture2DHandle>;
 
 // TODO: are IRObjectReferences still needed, considering we have almost similar NodeReference<T>?
 #[derive(Debug)]
