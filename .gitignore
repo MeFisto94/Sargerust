@@ -14,3 +14,7 @@ sargerust-files/test-data
 vtune/
 # listfiles of MPQs
 *.MPQ.txt
+
+# Both: NVidia NSight Profiling
+nsight/
+imgui.ini
