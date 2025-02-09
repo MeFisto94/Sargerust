@@ -34,10 +34,9 @@ impl WMOLoader {
         let mut tex_references = Vec::with_capacity(wmo.momt.materialList.len());
 
         for material in &wmo.momt.materialList {
-            // TODO: if a texture isn't used, it's name is `\0\0\0\0`
             // texture_1 defaults to "createcrappygreentexture.blp" in the original client
             let texname_1 = wmo.motx.textureNameList[wmo.motx.offsets[&material.texture_1]].clone();
-            let has_tex = !texname_1.is_empty();
+            let has_tex = !texname_1.trim_end_matches('\0').is_empty();
 
             // TODO: texture_2
             materials.push(RwLock::new(
