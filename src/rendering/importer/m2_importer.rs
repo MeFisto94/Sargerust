@@ -83,17 +83,6 @@ impl M2Importer {
             .collect_vec()
     }
 
-    pub fn create_material(blp_opt: &Option<BlpImage> /* TODO */) -> Material {
-        Material {
-            albedo: match blp_opt {
-                Some(texture_handle) => AlbedoType::Texture, /*(TODO)*/
-                None => AlbedoType::Value(Vec4::new(1.0, 0.0, 0.5, 1.0)),
-            },
-            is_unlit: true,
-            transparency: TransparencyType::Cutout { cutout: 0.1 },
-        }
-    }
-
     pub fn create_m2_material(m2: &M2Asset, batch: &M2Batch) -> M2Material {
         let tex_ids = &m2.textureCombos
             [batch.textureComboIndex as usize..batch.textureComboIndex as usize + batch.textureCount as usize];
