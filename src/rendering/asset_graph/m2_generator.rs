@@ -22,13 +22,14 @@ impl GraphNodeGenerator<M2Node> for M2Generator {
     fn generate(&self, name: &str) -> Arc<M2Node> {
         let m2 = M2Loader::load_no_lod_for_graph(&self.mpq_loader, name);
 
-        let meshes_and_materials: Vec<(RwLock<IRMesh>, RwLock<IRM2Material>)> = m2
+        let meshes_and_materials: Vec<(RwLock<IRMesh>, RwLock<IRM2Material>, u16)> = m2
             .mesh_and_material
             .into_iter()
             .map(|mesh_and_material| {
                 (
                     RwLock::new(mesh_and_material.mesh.into()),
                     RwLock::new(mesh_and_material.material.into()),
+                    mesh_and_material.geoset_index,
                 )
             })
             .collect_vec();

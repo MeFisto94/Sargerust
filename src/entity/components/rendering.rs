@@ -1,6 +1,7 @@
 use crate::rendering::asset_graph::nodes::adt_node::{IRTexture, M2Node};
 use rend3::types::ObjectHandle;
 use sargerust_files::m2::types::{M2TextureFlags, M2TextureType};
+use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
 #[derive(Default, Debug, Clone)]
@@ -14,6 +15,7 @@ pub enum RenderableSource {
             M2TextureFlags,
             Arc<RwLock<Option<IRTexture>>>,
         )>,
+        HashSet<u16>,
     ),
 }
 #[derive(Default, Debug, Clone)]

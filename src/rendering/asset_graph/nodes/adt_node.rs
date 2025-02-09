@@ -75,7 +75,7 @@ pub struct M2Node {
     pub dynamic_tex_references: Vec<M2Texture>,
 
     // Since we have multiple meshes, we need to link the materials to it.
-    pub meshes_and_materials: Vec<(RwLock<IRMesh>, RwLock<IRM2Material>)>,
+    pub meshes_and_materials: Vec<(RwLock<IRMesh>, RwLock<IRM2Material>, u16)>,
     // TODO: RWLock inside IRMaterial#handle instead? As no-one should modify the material contents
     //  and whenever a node has resolved it's reference, it has to be existent/loaded?
 }

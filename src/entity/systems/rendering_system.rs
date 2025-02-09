@@ -144,7 +144,7 @@ impl RenderingSystem {
 
                     // TODO: RenderingApplication:are_all_textures_loaded -> Also support gradually loading dynamic
                     //  entities. or at least not adding them until they are ready. Like just "continue".
-                    RenderableSource::M2(m2, dynamic_textures) => {
+                    RenderableSource::M2(m2, dynamic_textures, geoset_whitelist) => {
                         if !RenderingApplication::are_all_textures_loaded(&m2.tex_reference) {
                             continue; // Try the entity again later.
                         }
@@ -158,7 +158,14 @@ impl RenderingSystem {
 
                         m2.meshes_and_materials
                             .iter()
-                            .map(|(mesh, material)| {
+                            .filter(|(_, _, geoset_id)| {
+                                if geoset_whitelist.is_empty() {
+                                    true
+                                } else {
+                                    geoset_whitelist.contains(geoset_id)
+                                }
+                            })
+                            .map(|(mesh, material, _)| {
                                 // technically not the missing_material_handle, but if we had a missing texture, we
                                 // wouldn't even be here.
                                 let missing_tex_material_handle = self.debug_object(renderer).1.clone();

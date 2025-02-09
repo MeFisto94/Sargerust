@@ -228,7 +228,7 @@ impl ColliderFactory {
                 let meshes: Vec<Mesh> = dad
                     .meshes_and_materials
                     .iter()
-                    .map(|(mesh, _)| mesh.read().expect("Mesh Read Lock").data.clone())
+                    .map(|(mesh, _, _)| mesh.read().expect("Mesh Read Lock").data.clone())
                     .collect();
                 let mut mesh = MeshMerger::merge_meshes_vertices_only(&meshes);
 
@@ -270,7 +270,7 @@ impl From<&M2Node> for Collider {
         let meshes: Vec<Mesh> = value
             .meshes_and_materials
             .iter()
-            .map(|(mesh, _)| mesh.read().expect("Mesh Read Lock").data.clone())
+            .map(|(mesh, _, _)| mesh.read().expect("Mesh Read Lock").data.clone())
             .collect();
 
         (&MeshMerger::merge_meshes_vertices_only(&meshes)).into()

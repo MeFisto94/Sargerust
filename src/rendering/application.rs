@@ -458,7 +458,7 @@ impl RenderingApplication {
                     .clone()
             };
 
-            for (mesh, material) in m2.meshes_and_materials.iter() {
+            for (mesh, material, _) in m2.meshes_and_materials.iter() {
                 let material_handle = if all_tex_loaded {
                     let missing = self
                         .missing_texture_material
@@ -613,7 +613,6 @@ impl rend3_framework::App for RenderingApplication {
     // On android, we need to somehow take the event loop we get from the entry point.
     #[cfg(target_os = "android")]
     fn create_window(&mut self, builder: WindowBuilder) -> Result<(EventLoop<()>, Window), EventLoopError> {}
-
 
     fn create_base_rendergraph(&mut self, renderer: &Arc<Renderer>, spp: &mut ShaderPreProcessor) -> BaseRenderGraph {
         let mut data_core = renderer.data_core.lock();

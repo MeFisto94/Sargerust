@@ -24,6 +24,7 @@ pub struct LoadedM2 {
 pub struct M2MeshAndMaterial {
     pub mesh: Mesh,
     pub material: M2Material,
+    pub geoset_index: u16,
 }
 
 #[derive(Debug)]
@@ -71,8 +72,13 @@ impl M2Loader {
 
                 let mesh = M2Importer::create_mesh(&m2_asset, &skin, &sub_mesh);
                 let material = M2Importer::create_m2_material(&m2_asset, batch);
+                let geoset_index = sub_mesh.skinSectionId;
 
-                M2MeshAndMaterial { mesh, material }
+                M2MeshAndMaterial {
+                    mesh,
+                    material,
+                    geoset_index,
+                }
             })
             .collect_vec();
 
