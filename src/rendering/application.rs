@@ -37,8 +37,8 @@ use rend3_routine::base::{
 use rend3_routine::common::CameraSpecifier;
 use rend3_routine::forward::ForwardRoutineArgs;
 use rend3_routine::{clear, forward};
-use winit::error::EventLoopError;
 use sargerust_files::m2::types::{M2TextureFlags, M2TextureType};
+use winit::error::EventLoopError;
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
@@ -195,6 +195,7 @@ impl RenderingApplication {
         ))
     }
 
+    #[profiling::function]
     fn update_tile_graph(&self, renderer: &Arc<Renderer>, _tile_pos: (u8, u8), graph: &Arc<ADTNode>) {
         // TODO: All this doesn't have to happen on the render thread. It could even happen inside of
         //  map_manager with interior knowledge of what has changed. One could even chain the
@@ -209,6 +210,7 @@ impl RenderingApplication {
         self.update_tile_graph(renderer, tile_pos, graph);
     }
 
+    #[profiling::function]
     fn load_wmos(&self, renderer: &Arc<Renderer>, graph: &Arc<ADTNode>) {
         for wmo_ref in &graph.wmos {
             let wmo = {
@@ -326,6 +328,7 @@ impl RenderingApplication {
         }
     }
 
+    #[profiling::function]
     fn load_terrain_chunks(&self, renderer: &Arc<Renderer>, graph: &Arc<ADTNode>) {
         for tile in &graph.terrain {
             {
@@ -417,6 +420,7 @@ impl RenderingApplication {
         }
     }
 
+    #[profiling::function]
     fn load_doodads(
         &self,
         renderer: &Arc<Renderer>,

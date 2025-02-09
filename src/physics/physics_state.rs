@@ -76,6 +76,7 @@ impl PhysicsState {
         self.app.upgrade().expect("Weak Pointer expired")
     }
 
+    #[profiling::function]
     pub fn update_fixed(&self, movement_relative: Vec3) -> CharacterMovementInformation {
         let timestep = 1.0 / 60.0; // TODO: why does physics_simulator not have a timestep?
 
@@ -106,6 +107,7 @@ impl PhysicsState {
     // TODO: Implement notifications via https://docs.rs/tokio/latest/tokio/sync/broadcast/index.html
     // TODO: Collider with heightfield at low res or rather meshes? Mesh would have the benefit of
     //  already being in adt/whatever space. In the end, it should be a heightfield for performance reasons, though.
+    #[profiling::function]
     fn delta_map(&self) {
         // Find changed (i.e. added or removed) tiles. Currently, we don't go after interior changes.
         let app = self.app();
@@ -197,6 +199,7 @@ impl PhysicsState {
         })
     }
 
+    #[profiling::function]
     fn update_character(
         &self,
         collider: ColliderHandle,
