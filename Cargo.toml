@@ -35,10 +35,22 @@ codegen-units = 1
 opt-level = 3
 codegen-units = 1
 
-[profile.release]
+[profile.dist]
+inherits = "release"
 lto = "fat"
-debug = 1
+debug = 0
 codegen-units = 1
+
+[profile.dev-optimized]
+inherits = "dev"
+lto = "thin"
+opt-level = 1
+debug = 2
+
+[profile.release]
+lto = "thin"
+opt-level = 3
+debug = 2
 
 [features]
 tracy = ["tracy-client", "profiling/profile-with-tracy"]
