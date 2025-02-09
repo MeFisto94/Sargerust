@@ -952,21 +952,6 @@ fn base_rendergraph_add_to_graph<'node>(
     // Render all the shadows to the shadow map.
     state.pbr_shadow_rendering();
 
-    terrain_routine
-        .opaque_routine
-        .add_forward_to_graph(ForwardRoutineArgs {
-            graph: state.graph,
-            label: "Terrain Forward Pass",
-            camera: CameraSpecifier::Viewport,
-            binding_data: forward::ForwardRoutineBindingData {
-                whole_frame_uniform_bg: state.forward_uniform_bg,
-                per_material_bgl: &terrain_routine.per_material,
-                extra_bgs: None,
-            },
-            samples: state.inputs.target.samples,
-            renderpass: state.primary_renderpass.clone(),
-        });
-
     units_routine
         .opaque_routine
         .add_forward_to_graph(ForwardRoutineArgs {
@@ -976,6 +961,22 @@ fn base_rendergraph_add_to_graph<'node>(
             binding_data: forward::ForwardRoutineBindingData {
                 whole_frame_uniform_bg: state.forward_uniform_bg,
                 per_material_bgl: &units_routine.per_material,
+                extra_bgs: None,
+            },
+            samples: state.inputs.target.samples,
+            renderpass: state.primary_renderpass.clone(),
+        });
+
+    // Render after units, for less overdraw.
+    terrain_routine
+        .opaque_routine
+        .add_forward_to_graph(ForwardRoutineArgs {
+            graph: state.graph,
+            label: "Terrain Forward Pass",
+            camera: CameraSpecifier::Viewport,
+            binding_data: forward::ForwardRoutineBindingData {
+                whole_frame_uniform_bg: state.forward_uniform_bg,
+                per_material_bgl: &terrain_routine.per_material,
                 extra_bgs: None,
             },
             samples: state.inputs.target.samples,
