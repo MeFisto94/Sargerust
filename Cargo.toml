@@ -18,7 +18,8 @@ path = "src/main.rs"
 members = [
     "sargerust-files",
     "sargerust-files/sargerust-files-derive-parseable",
-    "mpq-rust"
+    "mpq-rust",
+    "framexml-parser",
 ]
 
 # Force release builds for rapier
