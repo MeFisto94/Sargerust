@@ -69,8 +69,7 @@ impl ColliderFactory {
     ) {
         // TODO: We should also use the WeakKeyDashMap for WMOs themselves.
         for wmo_ref in &adt.wmos {
-            let resolved_wmo = wmo_ref.reference.reference.read().expect("poisoned lock");
-            if let Some(wmo) = resolved_wmo.deref() {
+            if let Some(wmo) = wmo_ref.reference.reference.load().deref() {
                 let weak_wmo = Arc::downgrade(wmo);
 
                 if !wmo_colliders
@@ -102,8 +101,7 @@ impl ColliderFactory {
     ) {
         let (scale, rotation, translation) = wmo_ref.transform.to_scale_rotation_translation();
         for group_reference in groups {
-            let resolved_group = group_reference.reference.read().expect("poisoned lock");
-            if let Some(group) = resolved_group.deref() {
+            if let Some(group) = group_reference.reference.load().deref() {
                 let weak_grp = Arc::downgrade(group);
 
                 {
@@ -201,9 +199,7 @@ impl ColliderFactory {
     ) {
         // TODO: A lot of those doodads probably shouldn't be collidable (lilypad, jugs, wall shield)
         for doodad in doodads {
-            let resolved_doodad = doodad.reference.reference.read().expect("poisoned lock");
-
-            let Some(dad) = resolved_doodad.deref() else {
+            let Some(dad) = doodad.reference.reference.load_full() else {
                 continue;
             };
 

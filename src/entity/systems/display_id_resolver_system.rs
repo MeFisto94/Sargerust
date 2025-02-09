@@ -8,8 +8,8 @@ use crate::rendering::asset_graph::nodes::adt_node::M2Node;
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::rend3_backend::IRTexture;
 use hecs::Without;
-use itertools::{Itertools, enumerate};
-use log::{info, warn};
+use itertools::Itertools;
+use log::warn;
 use sargerust_files::m2::types::M2TextureType;
 use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
@@ -99,7 +99,7 @@ impl DisplayIdResolverSystem {
 
             for reference in &result.tex_reference {
                 let resolve = self.tex_resolver.resolve(reference.reference_str.clone());
-                *reference.reference.write().expect("Write Lock") = Some(resolve);
+                reference.reference.store(Some(resolve));
             }
 
             let base_skin_cdie_opt =

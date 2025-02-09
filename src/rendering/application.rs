@@ -1,3 +1,4 @@
+use arc_swap::ArcSwapOption;
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::hash::BuildHasher;
@@ -22,7 +23,7 @@ use crate::rendering::rend3_backend::{
 };
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
-use log::{debug, trace, warn};
+use log::{trace, warn};
 use rend3::graph::RenderGraph;
 use rend3::types::{
     Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Texture, Texture2DHandle,
@@ -38,11 +39,8 @@ use rend3_routine::common::CameraSpecifier;
 use rend3_routine::forward::ForwardRoutineArgs;
 use rend3_routine::{clear, forward};
 use sargerust_files::m2::types::{M2TextureFlags, M2TextureType};
-use winit::error::EventLoopError;
 use winit::event::{ElementState, KeyEvent, WindowEvent};
-use winit::event_loop::EventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{Window, WindowBuilder};
 
 // #[derive(Debug)] // TODO: Ensure Grabber implements Display
 pub struct RenderingApplication {
@@ -214,12 +212,12 @@ impl RenderingApplication {
     fn load_wmos(&self, renderer: &Arc<Renderer>, graph: &Arc<ADTNode>) {
         for wmo_ref in &graph.wmos {
             let wmo = {
-                let wmo_rlock = wmo_ref.reference.reference.read().expect("WMO Read Lock");
-                if wmo_rlock.is_none() {
-                    continue; // WMO is not loaded yet.
+                let wmo_arc = wmo_ref.reference.reference.load();
+                if wmo_arc.is_none() {
+                    continue; // WMO is not resolved yet.
                 }
 
-                wmo_rlock
+                wmo_arc
                     .as_ref()
                     .expect("WMO has to be loaded (see lines above)")
                     .clone()
@@ -268,14 +266,14 @@ impl RenderingApplication {
                 }
 
                 let subgroup = {
-                    let subgroup_rlock = subgroup_ref.reference.read().expect("Subgroup Read Lock");
+                    let subgroup_arc = subgroup_ref.reference.load();
 
-                    if subgroup_rlock.is_none() {
+                    if subgroup_arc.is_none() {
                         // not loaded yet
                         continue;
                     }
 
-                    subgroup_rlock
+                    subgroup_arc
                         .as_ref()
                         .expect("Subgroup has to be loaded (see lines above)")
                         .clone()
@@ -436,13 +434,16 @@ impl RenderingApplication {
 
             // TODO: technically we have a race condition here, while we load the stuff on the GPU, it may have changed loader side. In general we have no concept of updating yet.
             let m2 = {
-                // TODO: Async aware RwLock
-                let m2_rlock = doodad.reference.reference.read().expect("M2 Read Lock");
-                if m2_rlock.is_none() {
+                // TODO: This pattern is so common, but due to the continue I think we can't deduplicate this into a method
+                let doodad_arc = doodad.reference.reference.load();
+                if doodad_arc.is_none() {
                     continue;
                 }
 
-                m2_rlock.as_ref().expect("previous is_none check.").clone()
+                doodad_arc
+                    .as_ref()
+                    .expect("previous is_none check.")
+                    .clone()
             };
 
             //  TODO: This ignores dynamic textures, but I think they can't be supported here anyway.
@@ -502,12 +503,9 @@ impl RenderingApplication {
     }
 
     pub fn are_all_textures_loaded(tex_reference: &Vec<Arc<IRTextureReference>>) -> bool {
-        !tex_reference.iter().any(|tex| {
-            tex.reference
-                .read()
-                .expect("tex reference read lock")
-                .is_none()
-        })
+        !tex_reference
+            .iter()
+            .any(|tex| tex.reference.load().is_none())
     }
 
     pub fn load_material(
@@ -572,7 +570,7 @@ impl RenderingApplication {
                         .map(|(_, _, tex)| tex.clone())
                 }
             })
-            .map(|tex| gpu_loaders::gpu_load_texture(renderer, &RwLock::new(Some(tex))))
+            .map(|tex| gpu_loaders::gpu_load_texture(renderer, &ArcSwapOption::new(Some(tex))))
             .collect_vec();
 
         // TODO: There's still the edge-case where loading may have failed and it's thus declared as None. But that requires

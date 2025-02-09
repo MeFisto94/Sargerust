@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::io::Cursor;
-use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
@@ -243,14 +242,7 @@ impl MapManager {
 
         // TODO: Resolving should be a matter of the rendering app, not this code here? But then their code relies on things being preloaded?
         for wmo in &wmos {
-            if wmo
-                .reference
-                .reference
-                .read()
-                .expect("Reference ReadLock")
-                .as_ref()
-                .is_some()
-            {
+            if wmo.reference.reference.load().as_ref().is_some() {
                 // Apparently our reference was cloned and thus is pre-loaded.
                 continue;
             }
@@ -266,13 +258,7 @@ impl MapManager {
                 set.spawn_blocking_on(
                     move || {
                         let group_result = resolver.resolve(sub_group_cloned.reference_str.to_string());
-
-                        let mut write_lock_group = sub_group_cloned
-                            .reference
-                            .write()
-                            .expect("Write lock on sub group reference");
-
-                        *write_lock_group.deref_mut() = Some(group_result);
+                        sub_group_cloned.reference.store(Some(group_result));
                     },
                     self.runtime.handle(),
                 );
@@ -310,13 +296,7 @@ impl MapManager {
                 );
             }
 
-            let mut write_lock = wmo
-                .reference
-                .reference
-                .write()
-                .expect("Write lock on wmo reference");
-
-            *write_lock.deref_mut() = Some(result);
+            wmo.reference.reference.store(Some(result));
         }
 
         for dad in &direct_doodad_refs {
@@ -387,12 +367,7 @@ impl MapManager {
                 // TODO: With an async friendly RwLock, this could become regular async code, without spawn_blocking.
                 handle_clone
                     .spawn_blocking(move || {
-                        let mut write_lock = dad
-                            .reference
-                            .reference
-                            .write()
-                            .expect("Write lock on doodad reference");
-                        *write_lock.deref_mut() = Some(result);
+                        dad.reference.reference.store(Some(result));
                     })
                     .await
                     .unwrap();
@@ -416,13 +391,7 @@ impl MapManager {
             set.spawn_blocking_on(
                 move || {
                     let result_tex = resolver.resolve(tex_reference.reference_str.clone());
-
-                    let mut ref_wlock = tex_reference
-                        .reference
-                        .write()
-                        .expect("texture reference write lock");
-
-                    *ref_wlock.deref_mut() = Some(result_tex);
+                    tex_reference.reference.store(Some(result_tex));
                 },
                 handle,
             );

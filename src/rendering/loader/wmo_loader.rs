@@ -4,6 +4,7 @@ use crate::rendering::asset_graph::nodes::adt_node::{DoodadReference, NodeRefere
 use crate::rendering::common::highlevel_types::PlaceableDoodad;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
 use crate::rendering::rend3_backend::IRTextureReference;
+use arc_swap::ArcSwapOption;
 use glam::{Affine3A, Quat, Vec3, Vec4};
 use log::debug;
 use sargerust_files::wmo::reader::WMOReader;
@@ -61,7 +62,7 @@ impl WMOLoader {
                 //  is rather minor, just some locking and resolving.
                 tex_references.push(Arc::new(IRTextureReference {
                     reference_str: texname_1,
-                    reference: RwLock::new(None),
+                    reference: ArcSwapOption::empty(),
                 }))
             }
         }

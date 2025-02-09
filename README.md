@@ -33,8 +33,11 @@ Things that still need to be implemented (loosely sorted by priority):
 - Third Person Camera Controller (and sending `MOVE_FACING` packets / reworking the movement tracker)
 - Instanced Rendering of M2s (UnitMaterial is currently created in-place, even if the same texture has already been
   used.) It remains to be seen if that is enough for rend3 to auto instance, though.
+    - TODO: Does Rend3 even have instancing?
 - Debug Shader Reloading
 - Lights Improvement (especially the SkyLight: Implement a game time that ticks, support ambient color)
+- Move WMOs to "UnitsMaterial" (and probably rename/refactor it too.) This requires Unit to support more things (
+  transparency, albedo colors)
 - Configuration
 - Cross Platform support (i.e. investigate MBP 2011 failure)
 - massive Map Manager rework
@@ -61,4 +64,3 @@ Things that still need to be implemented (loosely sorted by priority):
   needs to be handled from scratch.
 - Advanced game "logic" (e.g. chat, friend list, guilds, trading, auction house)
 - Advanced rendering techniques: AO, TAA, VXGI?
-- https://docs.rs/arc-swap/latest/arc_swap/

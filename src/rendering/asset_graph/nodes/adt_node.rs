@@ -2,6 +2,7 @@ use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::common::types::{Material, Mesh};
 use crate::rendering::importer::m2_importer::M2Material;
 use crate::rendering::rend3_backend::{IRM2Material, IRMaterial, IRMesh, IRTextureReference};
+use arc_swap::ArcSwapOption;
 use glam::{Affine3A, Mat4, Vec3A};
 use rend3::types::{MaterialHandle, MeshHandle, ObjectHandle};
 use sargerust_files::m2::types::M2Texture;
@@ -125,14 +126,14 @@ pub struct WMOGroupNode {
 #[derive(Debug)]
 pub struct NodeReference<T> {
     pub reference_str: String,
-    pub reference: RwLock<Option<Arc<T>>>,
+    pub reference: ArcSwapOption<T>,
 }
 
 impl<T> NodeReference<T> {
     pub fn new(reference_str: String) -> Self {
         Self {
             reference_str,
-            reference: RwLock::new(None),
+            reference: ArcSwapOption::empty(),
         }
     }
 }
@@ -155,7 +156,7 @@ impl<T> Eq for NodeReference<T> {}
 #[derive(Debug)]
 pub struct IRObjectReference<T> {
     pub reference_str: String,
-    pub reference: RwLock<Option<Arc<RwLock<T>>>>, // the inner RwLock is to mutate the IRObject, most notably it's handle. Could be put into handle, but then perspectively data needs to be mutable as well.
+    pub reference: ArcSwapOption<RwLock<T>>, // the RwLock is to mutate the IRObject, most notably it's handle. Could be put into handle, but then perspectively data needs to be mutable as well.
 }
 
 #[derive(Debug)]
@@ -187,7 +188,7 @@ impl From<Material> for IRObject<Material, MaterialHandle> {
 impl From<M2Texture> for IRTextureReference {
     fn from(value: M2Texture) -> Self {
         Self {
-            reference: RwLock::new(None),
+            reference: ArcSwapOption::empty(),
             reference_str: value.filename,
         }
     }
@@ -196,7 +197,7 @@ impl From<M2Texture> for IRTextureReference {
 impl From<String> for IRTextureReference {
     fn from(value: String) -> Self {
         Self {
-            reference: RwLock::new(None),
+            reference: ArcSwapOption::empty(),
             reference_str: value,
         }
     }

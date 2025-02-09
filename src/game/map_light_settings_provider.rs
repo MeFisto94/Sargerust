@@ -1,10 +1,9 @@
-use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::load_dbc;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::common::coordinate_systems;
 use glam::{Vec3, Vec4};
 use itertools::Itertools;
-use log::{trace, warn};
+use log::warn;
 use std::sync::Arc;
 use wow_dbc::wrath_tables::light::{Light, LightRow};
 use wow_dbc::wrath_tables::light_float_band::{LightFloatBand, LightFloatBandRow};

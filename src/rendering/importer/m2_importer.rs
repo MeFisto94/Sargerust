@@ -1,6 +1,5 @@
-use crate::rendering::common::types::{AlbedoType, Material, Mesh, TransparencyType, VertexBuffers};
-use glam::{Vec2, Vec3, Vec4};
-use image_blp::BlpImage;
+use crate::rendering::common::types::{Mesh, VertexBuffers};
+use glam::{Vec2, Vec3};
 use itertools::Itertools;
 use sargerust_files::m2::types::{M2Asset, M2Batch, M2SkinProfile, M2SkinSection, M2Texture};
 
