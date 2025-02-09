@@ -15,13 +15,13 @@ use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::asset_graph::m2_generator::M2Generator;
 use crate::rendering::asset_graph::nodes::adt_node::{
-    ADTNode, DoodadReference, IRObject, IRTexture, IRTextureReference, M2Node, TerrainTile, WMOGroupNode, WMONode,
-    WMOReference,
+    ADTNode, DoodadReference, IRObject, M2Node, TerrainTile, WMOGroupNode, WMONode, WMOReference,
 };
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::importer::adt_importer::ADTImporter;
+use crate::rendering::rend3_backend::{IRTexture, IRTextureReference};
 use crate::rendering::utils::{transform_for_doodad_ref, transform_for_wmo_ref};
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::ADTAsset;

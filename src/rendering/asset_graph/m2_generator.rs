@@ -1,10 +1,11 @@
 use crate::io::mpq::loader::MPQLoader;
-use crate::rendering::asset_graph::nodes::adt_node::{IRM2Material, IRMesh, IRTexture, M2Node, WMOGroupNode, WMONode};
+use crate::rendering::asset_graph::nodes::adt_node::{M2Node, WMOGroupNode, WMONode};
 use crate::rendering::asset_graph::resolver::GraphNodeGenerator;
 use crate::rendering::importer::wmo_importer::WMOGroupImporter;
 use crate::rendering::loader::blp_loader::BLPLoader;
 use crate::rendering::loader::m2_loader::M2Loader;
 use crate::rendering::loader::wmo_loader::WMOLoader;
+use crate::rendering::rend3_backend::{IRM2Material, IRMesh, IRTexture};
 use itertools::Itertools;
 use std::sync::{Arc, RwLock};
 

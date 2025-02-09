@@ -9,9 +9,7 @@ use winit::event::Event;
 
 use crate::game::application::GameApplication;
 use crate::rendering::asset_graph::m2_generator::M2Generator;
-use crate::rendering::asset_graph::nodes::adt_node::{
-    ADTNode, DoodadReference, IRM2Material, IRMaterial, IRTexture, IRTextureReference,
-};
+use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference};
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
@@ -19,7 +17,9 @@ use crate::rendering::rend3_backend::material::terrain::terrain_material::Terrai
 use crate::rendering::rend3_backend::material::terrain::terrain_routine::TerrainRoutine;
 use crate::rendering::rend3_backend::material::units::units_material::UnitsMaterial;
 use crate::rendering::rend3_backend::material::units::units_routine::UnitsRoutine;
-use crate::rendering::rend3_backend::{Rend3BackendConverter, gpu_loaders};
+use crate::rendering::rend3_backend::{
+    IRM2Material, IRMaterial, IRTexture, IRTextureReference, Rend3BackendConverter, gpu_loaders,
+};
 use glam::{Mat4, UVec2, Vec3A, Vec4};
 use itertools::Itertools;
 use log::{debug, trace, warn};

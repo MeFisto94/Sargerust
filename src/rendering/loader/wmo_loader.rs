@@ -1,10 +1,9 @@
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
-use crate::rendering::asset_graph::nodes::adt_node::{
-    DoodadReference, IRTextureReference, NodeReference, WMOGroupNode, WMONode,
-};
+use crate::rendering::asset_graph::nodes::adt_node::{DoodadReference, NodeReference, WMOGroupNode, WMONode};
 use crate::rendering::common::highlevel_types::PlaceableDoodad;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
+use crate::rendering::rend3_backend::IRTextureReference;
 use glam::{Affine3A, Quat, Vec3, Vec4};
 use log::debug;
 use sargerust_files::wmo::reader::WMOReader;

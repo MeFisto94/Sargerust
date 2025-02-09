@@ -1,11 +1,12 @@
 use crate::physics::physics_simulator::PhysicsSimulator;
 use crate::physics::terrain_tile_colliders::TerrainTileColliders;
 use crate::rendering::asset_graph::nodes::adt_node::{
-    ADTNode, DoodadReference, IRMesh, M2Node, NodeReference, TerrainTile, WMOGroupNode, WMONode, WMOReference,
+    ADTNode, DoodadReference, M2Node, NodeReference, TerrainTile, WMOGroupNode, WMONode, WMOReference,
 };
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::mesh_merger::MeshMerger;
 use crate::rendering::common::types::Mesh;
+use crate::rendering::rend3_backend::IRMesh;
 use crate::util::weak_dashmap::WeakKeyDashMapPruneOnInsert;
 use glam::{Affine3A, Quat, Vec3};
 use itertools::Itertools;

@@ -1,4 +1,5 @@
-use crate::rendering::asset_graph::nodes::adt_node::{IRObject, IRTextureReference};
+use crate::rendering::asset_graph::nodes::adt_node::IRObject;
+use crate::rendering::rend3_backend::IRTextureReference;
 use rend3::types::Texture2DHandle;
 use std::sync::{Arc, RwLock};
 

@@ -1,4 +1,5 @@
-use crate::rendering::asset_graph::nodes::adt_node::{IRTexture, M2Node};
+use crate::rendering::asset_graph::nodes::adt_node::M2Node;
+use crate::rendering::rend3_backend::IRTexture;
 use rend3::types::ObjectHandle;
 use sargerust_files::m2::types::{M2TextureFlags, M2TextureType};
 use std::collections::HashSet;
