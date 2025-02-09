@@ -46,7 +46,9 @@ impl PacketHandlers {
                         .change_map(pkt.map, pkt.position, pkt.orientation);
                     // here, we would probably want to call into the GameApplication again.
                 }
-                ServerOpcodeMessage::SMSG_MONSTER_MOVE(_) => (),
+                ServerOpcodeMessage::SMSG_MONSTER_MOVE(monster) => {
+                    self.app().entity_tracker.move_monster(monster);
+                }
                 ServerOpcodeMessage::SMSG_MOTD(pkt) => {
                     for motd in &pkt.motds {
                         info!("MOTD: {}", motd)

@@ -9,7 +9,7 @@ use log::{debug, info, warn};
 use std::sync::RwLock;
 use wow_world_messages::Guid;
 use wow_world_messages::wrath::{
-    MovementBlock, MovementBlock_UpdateFlag_Living, Object, ObjectType, UpdateMask, Vector3d,
+    MovementBlock, MovementBlock_UpdateFlag_Living, Object, ObjectType, SMSG_MONSTER_MOVE, UpdateMask, Vector3d,
 };
 
 // TODO: remove at some point, when we know more about the packet values.
@@ -114,6 +114,7 @@ impl EntityTracker {
     }
 
     fn update_object_movement(&self, guid: &Guid, movement_block: &MovementBlock) {
+        // TODO: how does this differ from monster_move?
         let mut write = self.world.write().expect("World Write Lock");
         let entity = write
             .query_mut::<(&Guid, &mut TmpLocation, &mut TmpOrientation)>()
@@ -135,6 +136,33 @@ impl EntityTracker {
             location.0 = Vec3::new(position.x, position.y, position.z);
             orientation.0 = rotation;
         }
+    }
+
+    pub fn move_monster(&self, msg: &SMSG_MONSTER_MOVE) {
+        return; // TODO: Implement - better -
+
+        let mut write = self.world.write().expect("World Write Lock");
+        let entity = write
+            .query_mut::<(&Guid, &mut SplineWalker)>()
+            .into_iter()
+            .find(|(_, (&entity_guid, _))| entity_guid == msg.guid);
+
+        if let Some((_, (_, spline_walker))) = entity {
+            spline_walker.update_from(msg);
+        } else {
+            let query_result = write
+                .query_mut::<&Guid>()
+                .into_iter()
+                .find(|(_, &guid)| guid == msg.guid);
+
+            if let Some((entity, _)) = query_result {
+                write
+                    .insert_one(entity, SplineWalker::from(msg))
+                    .expect("Insert SplineWalker");
+            } else {
+                warn!("Couldn't find any entity with GUID {:?}", msg.guid);
+            }
+        };
     }
 
     fn update_object_values(&self, guid: &Guid, update_mask: &UpdateMask) {

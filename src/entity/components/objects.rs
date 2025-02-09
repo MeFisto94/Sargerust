@@ -1,5 +1,7 @@
 use glam::Vec3;
-use wow_world_messages::wrath::{MovementBlock_MovementFlags_SplineEnabled, MovementBlock_SplineFlag, Vector3d};
+use wow_world_messages::wrath::{
+    MovementBlock_MovementFlags_SplineEnabled, MovementBlock_SplineFlag, SMSG_MONSTER_MOVE, Vector3d,
+};
 
 pub struct TmpLocation(pub Vec3);
 pub struct TmpOrientation(pub f32);
@@ -24,5 +26,27 @@ impl From<&MovementBlock_MovementFlags_SplineEnabled> for SplineWalker {
             time_passed: value.time_passed as f32 / TICK_RATE,
             flags: value.spline_flags,
         }
+    }
+}
+
+impl From<&SMSG_MONSTER_MOVE> for SplineWalker {
+    fn from(value: &SMSG_MONSTER_MOVE) -> Self {
+        Self {
+            nodes: value.splines.clone(),
+            duration: value.duration as f32 / TICK_RATE,
+            time_passed: 0.0,
+            flags: MovementBlock_SplineFlag::default(),
+            // self.flags = msg.spline_flags; // TODO
+            // In theory, we need to calculate time_passed, so that we're at msg.spline_point.
+        }
+    }
+}
+
+impl SplineWalker {
+    pub fn update_from(&mut self, msg: &SMSG_MONSTER_MOVE) {
+        let new = SplineWalker::from(msg);
+        let old_flags = self.flags; // until they are supported...
+        *self = new;
+        self.flags = old_flags;
     }
 }
