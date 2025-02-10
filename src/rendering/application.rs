@@ -665,7 +665,7 @@ impl rend3_framework::App for RenderingApplication {
     }
 
     // TODO: Look at the lifecycles again, compare e.g. https://github.com/BVE-Reborn/rend3/blob/trunk/examples/scene-viewer/src/lib.rs#L572
-    fn handle_event(&mut self, context: EventContext<'_, ()>, event: Event<()>) {
+    fn handle_event(&mut self, context: EventContext<'_>, event: Event<()>) {
         match event {
             // Close button was clicked, we should close.
             Event::LoopExiting => {
@@ -720,7 +720,7 @@ impl rend3_framework::App for RenderingApplication {
         }
     }
 
-    fn handle_redraw(&mut self, context: RedrawContext<'_, ()>) {
+    fn handle_redraw(&mut self, context: RedrawContext<'_>) {
         profiling::scope!("RedrawRequested");
 
         let app = self.app();

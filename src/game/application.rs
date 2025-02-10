@@ -84,7 +84,7 @@ impl GameApplication {
             _ => vec![],
         };
 
-        let wnd = winit::window::WindowBuilder::new()
+        let wnd = winit::window::WindowAttributes::default()
             .with_title(WINDOW_TITLE)
             .with_inner_size(LogicalSize::new(1024, 768));
         let render_app = RenderingApplication::new(self.weak_self.clone());
