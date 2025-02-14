@@ -13,6 +13,7 @@ pub struct M2Material {
 impl M2Importer {
     pub fn create_mesh(asset: &M2Asset, skin: &M2SkinProfile, sub_mesh: &M2SkinSection) -> Mesh {
         let mut verts = Vec::<Vec3>::with_capacity(sub_mesh.vertexCount as usize);
+        let mut normals = Vec::<Vec3>::with_capacity(sub_mesh.vertexCount as usize);
         // TODO: does every m2 have UVs?
         let mut uv0 = Vec::<Vec2>::with_capacity(sub_mesh.vertexCount as usize);
         let mut uv1 = Vec::<Vec2>::with_capacity(sub_mesh.vertexCount as usize);
@@ -24,6 +25,7 @@ impl M2Importer {
             verts.push(Vec3::new(vert.pos.x, vert.pos.y, vert.pos.z));
             uv0.push(Vec2::new(vert.tex_coords[0].x, vert.tex_coords[0].y));
             uv1.push(Vec2::new(vert.tex_coords[1].x, vert.tex_coords[1].y));
+            normals.push(Vec3::new(vert.normal.x, vert.normal.y, vert.normal.z));
         }
 
         let mut indices = Vec::<u32>::with_capacity(sub_mesh.indexCount as usize);

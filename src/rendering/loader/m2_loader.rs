@@ -2,22 +2,12 @@ use std::sync::Arc;
 
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
-use crate::rendering::common::types::{Material, Mesh};
+use crate::rendering::common::types::Mesh;
 use crate::rendering::importer::m2_importer::{M2Importer, M2Material};
 use crate::rendering::rend3_backend::IRTextureReference;
-use image_blp::BlpImage;
 use itertools::Itertools;
 use sargerust_files::m2::reader::M2Reader;
 use sargerust_files::m2::types::{M2Texture, M2TextureType};
-
-#[derive(Debug, Clone)]
-pub struct LoadedM2 {
-    pub mesh: Mesh,
-    pub material: Material,
-
-    // TODO: The Material will probably contain texture reference, but at least texture paths, so they can be loaded independently.
-    pub blp_opt: Option<BlpImage>,
-}
 
 #[derive(Debug)]
 pub struct M2MeshAndMaterial {

@@ -4,4 +4,5 @@ pub mod common;
 pub mod importer;
 pub mod loader;
 pub mod rend3_backend;
+pub mod sky;
 pub mod utils;

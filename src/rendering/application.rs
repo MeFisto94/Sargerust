@@ -9,6 +9,7 @@ use std::time::Instant;
 use winit::event::Event;
 
 use crate::game::application::GameApplication;
+use crate::game::map_light_settings_provider::interpolate_color;
 use crate::rendering::asset_graph::m2_generator::M2Generator;
 use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference};
 use crate::rendering::asset_graph::resolver::Resolver;
@@ -21,7 +22,7 @@ use crate::rendering::rend3_backend::material::units::units_routine::UnitsRoutin
 use crate::rendering::rend3_backend::{
     IRM2Material, IRMaterial, IRTexture, IRTextureReference, Rend3BackendConverter, gpu_loaders,
 };
-use glam::{Mat4, UVec2, Vec3A, Vec4};
+use glam::{Mat4, UVec2, Vec3A, Vec4, Vec4Swizzles};
 use itertools::Itertools;
 use log::{trace, warn};
 use rend3::graph::RenderGraph;
@@ -828,18 +829,34 @@ impl rend3_framework::App for RenderingApplication {
 
         context.window.unwrap().request_redraw();
 
-        let clear_color = {
-            let game_time = app.game_state.game_time.as_30s_ticks();
-
-            app.game_state
+        let (clear_color, ambient_color) = {
+            let mut mm = app
+                .game_state
                 .map_manager
                 .write()
-                .expect("Map Manager Write Lock")
-                .current_light_settings
-                .as_ref()
-                .map(|settings| settings.clear.diffuse_color.interpolate_for_time(game_time))
+                .expect("Map Manager Write Lock");
+
+            let game_time = app.game_state.game_time.as_30s_ticks();
+
+            if let Some((ambient, diffuse)) = mm.current_light_settings.as_ref().map(|settings| {
+                (
+                    interpolate_color(&settings.clear.ambient_color.data, game_time),
+                    interpolate_color(&settings.clear.diffuse_color.data, game_time),
+                )
+            }) {
+                mm.sunlight
+                    .update(context.renderer, game_time, diffuse.xyz());
+                // ensure we don't go pitch black.
+                let base_ambient = Vec4::new(0.03, 0.03, 0.03, 1.0);
+                Some((diffuse, ambient.max(base_ambient)))
+            } else {
+                None
+            }
         }
-        .unwrap_or(Vec4::new(0.10, 0.05, 0.10, 1.0)); // Nice scene-referred purple;
+        .unwrap_or((
+            Vec4::new(0.10, 0.05, 0.10, 1.0), // Nice scene-referred purple
+            Vec4::new(0.25, 0.25, 0.25, 1.0),
+        ));
 
         // technically, we could also invert the view rotation (remember this is not the cams matrix, but the _view_ matrix, so how do you transform
         // the world to get to the screen (i.e. 0, 0). Hence we also need to invert the camera_location. Inverting the rotation isn't a deal though,
@@ -911,7 +928,7 @@ impl rend3_framework::App for RenderingApplication {
                 },
             },
             rend3_routine::base::BaseRenderGraphSettings {
-                ambient_color: glam::Vec4::ZERO,
+                ambient_color,
                 clear_color,
             },
             &terrain_routine,

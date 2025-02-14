@@ -66,7 +66,7 @@ impl Rend3BackendConverter {
         }
 
         let ret = PbrMaterial {
-            unlit: material.is_unlit,
+            unlit: material.is_unlit && false,
             albedo: match material.albedo {
                 AlbedoType::None => AlbedoComponent::None,
                 AlbedoType::Vertex { srgb } => AlbedoComponent::Vertex { srgb },

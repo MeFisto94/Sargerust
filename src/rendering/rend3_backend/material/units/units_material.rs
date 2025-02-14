@@ -1,6 +1,6 @@
 use encase::ShaderType;
 use rend3::types::{
-    Material, RawTexture2DHandle, Sorting, Texture2DHandle, VERTEX_ATTRIBUTE_POSITION,
+    Material, RawTexture2DHandle, Sorting, Texture2DHandle, VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION,
     VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0, VertexAttributeId,
 };
 use rend3_routine::pbr::TransparencyType;
@@ -19,7 +19,7 @@ impl Material for UnitsMaterial {
     type DataType = UnitsShaderMaterial;
     type TextureArrayType = [Option<RawTexture2DHandle>; 3];
     type RequiredAttributeArrayType = [&'static VertexAttributeId; 2];
-    type SupportedAttributeArrayType = [&'static VertexAttributeId; 2];
+    type SupportedAttributeArrayType = [&'static VertexAttributeId; 3];
 
     fn required_attributes() -> Self::RequiredAttributeArrayType {
         [
@@ -32,6 +32,7 @@ impl Material for UnitsMaterial {
         [
             &VERTEX_ATTRIBUTE_POSITION,
             &VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0,
+            &VERTEX_ATTRIBUTE_NORMAL,
         ]
     }
 

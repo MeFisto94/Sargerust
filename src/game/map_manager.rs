@@ -21,6 +21,7 @@ use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::rendering::rend3_backend::{IRTexture, IRTextureReference};
+use crate::rendering::sky::sunlight::Sunlight;
 use crate::rendering::utils::{transform_for_doodad_ref, transform_for_wmo_ref};
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::ADTAsset;
@@ -40,6 +41,7 @@ pub struct MapManager {
     // TODO: We could probably have this in RenderingApp/fetch it every frame (or even have to at some point), but for
     //  now, it works that way.
     pub current_light_settings: Option<LightSettings>,
+    pub sunlight: Sunlight,
 }
 
 impl MapManager {
@@ -58,6 +60,7 @@ impl MapManager {
                 .expect("Tokio Runtime to be built"),
             map_light_settings: vec![],
             current_light_settings: None,
+            sunlight: Sunlight::new(3.0),
         }
     }
 

@@ -34,7 +34,9 @@ Things that still need to be implemented (loosely sorted by priority):
 - Instanced Rendering of M2s (UnitMaterial is currently created in-place, even if the same texture has already been
   used.) It remains to be seen if that is enough for rend3 to auto instance, though.
     - TODO: Does Rend3 even have instancing?
-- Debug Shader Reloading
+- Fix Doodad Collisions
+- Debug Shader Reloading. NOTE: This requires extensive rend3 changes because we need to reset the ShaderPreProcessor
+  and rebuild the base_graph that is usually only build in async_start, once.
 - Lights Improvement (especially the SkyLight: Implement a game time that ticks, support ambient color)
 - Move WMOs to "UnitsMaterial" (and probably rename/refactor it too.) This requires Unit to support more things (
   transparency, albedo colors)

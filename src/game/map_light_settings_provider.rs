@@ -1,6 +1,7 @@
 use crate::io::mpq::load_dbc;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::common::coordinate_systems;
+use crate::util::int_as_color;
 use glam::{Vec3, Vec4};
 use itertools::Itertools;
 use log::warn;
@@ -217,6 +218,72 @@ impl<T> LightBandEntry<T> {
     }
 }
 
+// TODO: The generics here are borderline useless because float in and float out, *but* we can't have "as T". We also
+//  can't even have From<f32> for i32
+pub fn interpolate_for_time<T>(data: &[LightBandTuple<T>], time: u16) -> f32
+where
+    T: Default + std::fmt::Debug, // + From<f32>,
+    LightBandTuple<T>: AsFloat,
+{
+    if data.is_empty() {
+        warn!("Trying to interpolate for an empty band");
+        T::default();
+    }
+
+    let (start, end) = interpolate_find_points(&data, time);
+    let progress = interpolate_compute_progress(time, start, end);
+
+    (start.as_float() + progress * (end.as_float() - start.as_float())).into()
+}
+
+fn interpolate_compute_progress<T>(time: u16, start: &LightBandTuple<T>, end: &LightBandTuple<T>) -> f32 {
+    let mut tuple_length = end.time - start.time;
+    if tuple_length < 0 {
+        tuple_length += 2880;
+    }
+
+    let mut tuple_position = time as i32 - start.time;
+    if tuple_position < 0 {
+        tuple_position += 2880;
+    }
+
+    tuple_position as f32 / tuple_length as f32
+}
+
+fn interpolate_find_points<T>(data: &[LightBandTuple<T>], time: u16) -> (&LightBandTuple<T>, &LightBandTuple<T>) {
+    let idx = data.iter().find_position(|tuple| tuple.time >= time as i32);
+    let (start, end) = if let Some((idx, band)) = idx {
+        if idx == 0 {
+            // need to wrap from the end
+            (
+                data.iter().last().expect("non-empty band, see above"),
+                data.first().expect("non-empty band, see above"),
+            )
+        } else {
+            (&data[idx - 1], band)
+        }
+    } else {
+        // need to wrap from the end
+        (
+            data.iter().last().expect("non-empty band, see above"),
+            data.first().expect("non-empty band, see above"),
+        )
+    };
+    (start, end)
+}
+
+/// performs a component wise interpolation of the integer seen as a Vec4. This does not perform HSV space lerping.
+pub fn interpolate_color(data: &[LightBandTuple<i32>], time: u16) -> Vec4 {
+    if data.is_empty() {
+        warn!("Trying to interpolate for an empty band");
+        return Vec4::new(1.0, 0.0, 0.0, 1.0); // red
+    }
+
+    let (start, end) = interpolate_find_points(&data, time);
+    let progress = interpolate_compute_progress(time, start, end);
+    int_as_color(start.data).lerp(int_as_color(end.data), progress)
+}
+
 impl LightBandEntry<i32> {
     pub fn new(row: &LightIntBandRow) -> Self {
         Self {
@@ -230,55 +297,6 @@ impl LightBandEntry<i32> {
                     data: *data,
                 })
                 .collect_vec(),
-        }
-    }
-
-    pub fn interpolate_for_time(&self, time: u16) -> Vec4 {
-        if self.data.is_empty() {
-            warn!("Trying to interpolate for an empty band");
-            return Vec4::new(1.0, 0.0, 0.0, 1.0);
-        }
-
-        let idx = self
-            .data
-            .iter()
-            .find_position(|tuple| tuple.time >= time as i32);
-
-        let (start, end) = if let Some((idx, band)) = idx {
-            if idx == 0 {
-                // need to wrap from the end
-                (
-                    self.data.iter().last().expect("non-empty band, see above"),
-                    self.data.first().expect("non-empty band, see above"),
-                )
-            } else {
-                (&self.data[idx - 1], band)
-            }
-        } else {
-            // need to wrap from the end
-            (
-                self.data.iter().last().expect("non-empty band, see above"),
-                self.data.first().expect("non-empty band, see above"),
-            )
-        };
-
-        let mut tuple_length = end.time - start.time;
-        if tuple_length < 0 {
-            tuple_length += 2880;
-        }
-
-        let mut tuple_position = time as i32 - start.time;
-        if tuple_position < 0 {
-            tuple_position += 2880;
-        }
-
-        let progress = tuple_position as f32 / tuple_length as f32;
-
-        if end.data < start.data {
-            // TODO: Does this if even make sense? Because we both invert the order of subtraction *and* the sign, doesn't it cancel out?
-            int_as_color((start.data as f32 - progress * (start.data - end.data) as f32) as i32)
-        } else {
-            int_as_color((start.data as f32 + progress * (end.data - start.data) as f32) as i32)
         }
     }
 }
@@ -306,18 +324,36 @@ pub struct LightBandTuple<T> {
     pub data: T,
 }
 
-fn int_as_color(data: i32) -> Vec4 {
-    Vec4::new(
-        ((data >> 16) & 0xFF) as f32 / 255.0,
-        ((data >> 8) & 0xFF) as f32 / 255.0,
-        (data & 0xFF) as f32 / 255.0,
-        1.0,
-    )
+/// Required trait for the generic interpolation implementation that works soley on float values. We can't interpolate
+/// ints directly easily so we go T -> f32 -> T
+trait AsFloat {
+    fn as_float(&self) -> f32;
+}
+
+impl<T> From<(i32, T)> for LightBandTuple<T> {
+    fn from(value: (i32, T)) -> Self {
+        LightBandTuple::<T> {
+            time: value.0,
+            data: value.1,
+        }
+    }
 }
 
 impl LightBandTuple<i32> {
     pub fn as_color(&self) -> Vec4 {
         int_as_color(self.data)
+    }
+}
+
+impl AsFloat for LightBandTuple<f32> {
+    fn as_float(&self) -> f32 {
+        self.data
+    }
+}
+
+impl AsFloat for LightBandTuple<i32> {
+    fn as_float(&self) -> f32 {
+        self.data as f32
     }
 }
 
