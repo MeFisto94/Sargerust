@@ -1,4 +1,5 @@
 use crate::game::map_light_settings_provider::{LightBandTuple, interpolate_for_time};
+use crate::rendering::common::coordinate_systems::adt_to_blender_unaligned;
 use crate::util::spherical_to_cartesian;
 use rend3::Renderer;
 use rend3::types::{DirectionalLight, DirectionalLightChange, DirectionalLightHandle};
@@ -42,7 +43,7 @@ impl Sunlight {
         let phi = interpolate_for_time(&*PHI_TABLE, day_progression);
         let theta = interpolate_for_time(&*THETA_TABLE, day_progression);
 
-        spherical_to_cartesian(1.0, phi, theta)
+        adt_to_blender_unaligned(spherical_to_cartesian(1.0, phi, theta))
     }
 
     pub fn update(&mut self, renderer: &Arc<Renderer>, day_progression: u16, color: glam::Vec3) {
