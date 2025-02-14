@@ -3,7 +3,6 @@ use rend3::types::{
     Material, RawTexture2DHandle, Sorting, Texture2DHandle, VERTEX_ATTRIBUTE_NORMAL, VERTEX_ATTRIBUTE_POSITION,
     VERTEX_ATTRIBUTE_TEXTURE_COORDINATES_0, VertexAttributeId,
 };
-use rend3_routine::pbr::TransparencyType;
 
 #[derive(Debug, Clone)]
 pub enum UnitsAlbedo {
@@ -52,7 +51,11 @@ impl Material for UnitsMaterial {
     }
 
     fn key(&self) -> u64 {
-        TransparencyType::Opaque as u64
+        match self.alpha_cutout {
+            None => 0,
+            Some(_) => 1,
+        }
+        // TODO: We could also add a new key to select shadow casting or not
     }
 
     fn sorting(&self) -> Sorting {

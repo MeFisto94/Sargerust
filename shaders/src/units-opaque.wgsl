@@ -12,7 +12,7 @@ struct GpuUnitsData{
     // -- 16 --
     albedo_unicolor: vec4<f32>,
     // -- 16 --
-    alpha_cutout: f32,aw
+    alpha_cutout: f32,
     flags: u32,
 }
 

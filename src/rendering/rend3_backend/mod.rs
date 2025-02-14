@@ -1,5 +1,5 @@
 use crate::rendering::asset_graph::nodes::adt_node::{IRObject, IRObjectReference};
-use crate::rendering::common::types::TransparencyType::{Cutout, Opaque};
+use crate::rendering::common::types::TransparencyType::Cutout;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, VertexBuffers};
 use crate::rendering::importer::m2_importer::M2Material;
 use crate::rendering::rend3_backend::material::units::units_material::{UnitsAlbedo, UnitsMaterial};
@@ -7,7 +7,6 @@ use crate::rendering::utils::create_texture_rgba8;
 use image_blp::BlpImage;
 use log::error;
 use rend3::types::{MaterialHandle, MeshHandle, Texture, Texture2DHandle};
-use rend3_routine::pbr::{AlbedoComponent, PbrMaterial, Transparency};
 
 pub mod gpu_loaders;
 pub mod material;

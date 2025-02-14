@@ -25,12 +25,12 @@ use crate::rendering::rend3_backend::{
 use glam::{Mat4, UVec2, Vec3A, Vec4, Vec4Swizzles};
 use itertools::Itertools;
 use log::{trace, warn};
-use rend3::graph::RenderGraph;
+use rend3::graph::{RenderGraph, ViewportRect};
 use rend3::types::{
     Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Texture, Texture2DHandle,
 };
 use rend3::util::typedefs::FastHashMap;
-use rend3::{Renderer, ShaderPreProcessor};
+use rend3::{Renderer, ShaderPreProcessor, graph};
 use rend3_framework::{EventContext, Grabber, RedrawContext, SetupContext};
 use rend3_routine::base::{
     BaseRenderGraph, BaseRenderGraphInputs, BaseRenderGraphIntermediateState, BaseRenderGraphRoutines,
@@ -967,9 +967,43 @@ fn base_rendergraph_add_to_graph<'node>(
     // Render all the shadows to the shadow map.
     state.pbr_shadow_rendering();
 
-    units_routine
-        .opaque_routine
-        .add_forward_to_graph(ForwardRoutineArgs {
+    // Units Shadows
+    for (shadow_index, desc) in state.inputs.eval_output.shadows.iter().enumerate() {
+        let target = state.shadow.set_viewport(ViewportRect::new(
+            desc.map.offset,
+            UVec2::splat(desc.map.size),
+        ));
+        let renderpass = graph::RenderPassTargets {
+            targets: vec![],
+            depth_stencil: Some(graph::RenderPassDepthTarget {
+                target,
+                depth_clear: Some(0.0),
+                stencil_clear: None,
+            }),
+        };
+
+        let routines = [&units_routine.opaque_depth, &units_routine.cutout_depth];
+        for routine in routines {
+            routine.add_forward_to_graph(ForwardRoutineArgs {
+                graph: state.graph,
+                label: &format!("Units shadow renderering S{shadow_index}"),
+                camera: CameraSpecifier::Shadow(shadow_index as u32),
+                binding_data: forward::ForwardRoutineBindingData {
+                    whole_frame_uniform_bg: state.shadow_uniform_bg,
+                    per_material_bgl: &units_routine.per_material,
+                    extra_bgs: None,
+                },
+                samples: SampleCount::One,
+                renderpass: renderpass.clone(),
+            });
+        }
+    }
+
+    // TODO: Terrain Shadow Rendering?
+
+    let routines = [&units_routine.opaque_routine, &units_routine.cutout_routine];
+    for routine in routines {
+        routine.add_forward_to_graph(ForwardRoutineArgs {
             graph: state.graph,
             label: "Units Forward Pass",
             camera: CameraSpecifier::Viewport,
@@ -981,6 +1015,7 @@ fn base_rendergraph_add_to_graph<'node>(
             samples: state.inputs.target.samples,
             renderpass: state.primary_renderpass.clone(),
         });
+    }
 
     // Render after units, for less overdraw.
     terrain_routine

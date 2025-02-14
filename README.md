@@ -37,11 +37,13 @@ Things that still need to be implemented (loosely sorted by priority):
 - Fix Doodad Collisions
 - Debug Shader Reloading. NOTE: This requires extensive rend3 changes because we need to reset the ShaderPreProcessor
   and rebuild the base_graph that is usually only build in async_start, once.
+- M2: Properly derive whether Alpha Key (Cutoff) shall be used or not, allowing for less texture fetches in shadows
 - Configuration
 - Cross Platform support (i.e. investigate MBP 2011 failure)
 - massive Map Manager rework
 - Portals, Water, and other less important render objects
 - Anisotropic Filtering, basically setting SamplerDesc#anisotropy_clamp > 1, POT, < 16 (based on the device limits)
+- MipMaps
 - hecs:
     - Add more components and unpack update messages further
     - Implement spline walking (NPCs have predefined splines)
@@ -53,13 +55,20 @@ Things that still need to be implemented (loosely sorted by priority):
     - M2 Colliders could be derived from the full mesh instead of trying to merge it again
     - Character Controller has room for improvements (using the tangent instead of the normals)
     - WMO: BSP tree (MOBN, MOBR) for collision meshes instead of the render meshes.
-- Reading of DBC files, especially in preparation for:
-    - Game Logic. Casting spells and showing stats (mana, health) mainly.
-    - Somehow handle locales. We get MPQs from one locale mostly and that locale is the only one filled in DBC strings
+    - Terrain Holes such as Ironforge Entrance
+- Spell and Stats DBCs
 - Audio System, potentially leveraging HRTF and precise reflection and absorption (e.g. SteamAudio)
 - UI/Addon System: This will most likely be using mlua and if possible port
   the entirety of "`FrameXML`", so that the original UI code can be run, but for that
   a lot of API surface and especially the related event handling and layout management
   needs to be handled from scratch.
 - Advanced game "logic" (e.g. chat, friend list, guilds, trading, auction house)
-- Advanced rendering techniques: AO, TAA, VXGI?
+- Advanced rendering techniques: AO, FXAA+SMAA?, VXGI?
+
+### Rend3 Fork Ideas
+
+- SPP &mut (already done)
+- better panicking in ShaderVertexBufferHelper::generate_template, when VertexAttributes are missing
+- Anisotropy of Textures
+- Make Material#key() a u64 bitset and & with forward pipelines instead of equaling, which allows some (e.g. depth pre)
+  passes to render for all kind of material variants instead of requiring tens of pipelines for those.
