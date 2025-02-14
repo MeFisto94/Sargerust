@@ -39,22 +39,25 @@ impl WMOLoader {
             let has_tex = !texname_1.trim_end_matches('\0').is_empty();
 
             // TODO: texture_2
-            materials.push(RwLock::new(
-                Material {
-                    albedo: match has_tex {
-                        false => AlbedoType::Value(Vec4::new(
-                            material.diffColor.r as f32 / 255.0,
-                            material.diffColor.g as f32 / 255.0,
-                            material.diffColor.b as f32 / 255.0,
-                            material.diffColor.a as f32 / 255.0,
-                        )),
-                        true => AlbedoType::TextureWithName(texname_1.clone()),
-                    },
-                    is_unlit: true,
-                    transparency: TransparencyType::Opaque,
-                }
-                .into(),
-            ));
+
+            let mat = Material {
+                albedo: match has_tex {
+                    false => AlbedoType::Value(Vec4::new(
+                        material.diffColor.r as f32 / 255.0,
+                        material.diffColor.g as f32 / 255.0,
+                        material.diffColor.b as f32 / 255.0,
+                        material.diffColor.a as f32 / 255.0,
+                    )),
+                    true => AlbedoType::TextureWithName(texname_1.clone()),
+                },
+                transparency: match material.blendMode {
+                    0 => TransparencyType::Opaque,
+                    1 => TransparencyType::Cutout { cutout: 0.5 }, // 0.5 is just a random "guess"
+                    _ => TransparencyType::Opaque,
+                },
+            };
+
+            materials.push(RwLock::new(mat.into()));
 
             if has_tex {
                 // TODO: Since everything is behind RwLocks anyway, can we maybe construct TexReferences to be Arc?

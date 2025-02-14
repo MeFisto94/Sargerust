@@ -5,13 +5,28 @@ use rend3::types::{
 };
 use rend3_routine::pbr::TransparencyType;
 
+#[derive(Debug, Clone)]
+pub enum UnitsAlbedo {
+    Textures([Option<Texture2DHandle>; 3]),
+    Unicolor(glam::Vec4),
+}
+
+impl Default for UnitsAlbedo {
+    fn default() -> Self {
+        UnitsAlbedo::Unicolor(glam::Vec4::new(1.0, 0.0, 0.0, 1.0))
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct UnitsMaterial {
-    pub texture_layers: [Option<Texture2DHandle>; 3],
+    pub alpha_cutout: Option<f32>,
+    pub albedo: UnitsAlbedo,
 }
 
 #[derive(Debug, Default, Copy, Clone, ShaderType)]
 pub struct UnitsShaderMaterial {
+    pub albedo_unicolor: glam::Vec4,
+    pub alpha_cutout: f32,
     pub material_flag: u32,
 }
 
@@ -41,25 +56,29 @@ impl Material for UnitsMaterial {
     }
 
     fn sorting(&self) -> Sorting {
-        Sorting::OPAQUE
+        Sorting::OPAQUE // Cutout doesn't require sorting
     }
 
     fn to_textures(&self) -> Self::TextureArrayType {
-        [
-            self.texture_layers[0]
-                .as_ref()
-                .as_ref()
-                .map(|handle| handle.get_raw()),
-            self.texture_layers[1]
-                .as_ref()
-                .map(|handle| handle.get_raw()),
-            self.texture_layers[2]
-                .as_ref()
-                .map(|handle| handle.get_raw()),
-        ]
+        match &self.albedo {
+            UnitsAlbedo::Unicolor(_) => [None, None, None],
+            UnitsAlbedo::Textures(textures) => [
+                textures[0].as_ref().as_ref().map(|handle| handle.get_raw()),
+                textures[1].as_ref().map(|handle| handle.get_raw()),
+                textures[2].as_ref().map(|handle| handle.get_raw()),
+            ],
+        }
     }
 
     fn to_data(&self) -> Self::DataType {
-        UnitsShaderMaterial { material_flag: 0 }
+        UnitsShaderMaterial {
+            material_flag: 0,
+            alpha_cutout: self.alpha_cutout.unwrap_or(0.0),
+            albedo_unicolor: match self.albedo {
+                UnitsAlbedo::Unicolor(unicolor) => unicolor,
+                // signaling lime green
+                UnitsAlbedo::Textures(_) => glam::Vec4::new(0.22, 1.0, 0.0, 1.0),
+            },
+        }
     }
 }

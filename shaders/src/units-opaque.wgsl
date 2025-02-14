@@ -6,9 +6,13 @@
 {{include "rend3-routine/math/matrix.wgsl"}}
 {{include "rend3-routine/shadow/pcf.wgsl"}}
 
-// TODO: Why don't we required the 16 byte padding here?
 struct GpuUnitsData{
     texture_layers: array<u32, 3>,
+    padding_1: u32,
+    // -- 16 --
+    albedo_unicolor: vec4<f32>,
+    // -- 16 --
+    alpha_cutout: f32,aw
     flags: u32,
 }
 
@@ -90,11 +94,10 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
     let uvdx = dpdx(coords);
     let uvdy = dpdy(coords);
 
-    if (material.texture_layers[0] == 0) {
-        return vec4<f32>(0.22, 1.0, 0.0, 1.0); // lime green
-    }
-
     var albedo_sum = vec4(0.0);
+    if (material.texture_layers[0] == 0) {
+        albedo_sum = material.albedo_unicolor;
+    }
 
     for (var i = 0; i < 3; i++) {
         let tex_index = material.texture_layers[i];
@@ -106,7 +109,7 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
         albedo_sum = mix(albedo_sum, albedo, albedo.a);
     }
 
-    if (albedo_sum.a <= 0.1) {
+    if (albedo_sum.a < material.alpha_cutout) {
         discard;
     }
 

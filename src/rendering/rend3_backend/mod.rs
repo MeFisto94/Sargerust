@@ -1,7 +1,8 @@
 use crate::rendering::asset_graph::nodes::adt_node::{IRObject, IRObjectReference};
-use crate::rendering::common::types::TransparencyType::{Blend, Cutout, Opaque};
+use crate::rendering::common::types::TransparencyType::{Cutout, Opaque};
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, VertexBuffers};
 use crate::rendering::importer::m2_importer::M2Material;
+use crate::rendering::rend3_backend::material::units::units_material::{UnitsAlbedo, UnitsMaterial};
 use crate::rendering::utils::create_texture_rgba8;
 use image_blp::BlpImage;
 use log::error;
@@ -54,7 +55,7 @@ impl Rend3BackendConverter {
         Rend3BackendConverter::create_mesh_from_ir_internal(&mesh.vertex_buffers, &mesh.index_buffers[lod_level])
     }
 
-    pub fn create_material_from_ir(material: &Material, texture_handle: Option<Texture2DHandle>) -> PbrMaterial {
+    pub fn create_material_from_ir(material: &Material, texture_handle: Option<Texture2DHandle>) -> UnitsMaterial {
         if texture_handle.is_none() {
             // TODO: fail-safe somehow setting the material type differently.
             if let AlbedoType::Texture = material.albedo {
@@ -65,22 +66,16 @@ impl Rend3BackendConverter {
             }
         }
 
-        let ret = PbrMaterial {
-            unlit: material.is_unlit && false,
+        let ret = UnitsMaterial {
             albedo: match material.albedo {
-                AlbedoType::None => AlbedoComponent::None,
-                AlbedoType::Vertex { srgb } => AlbedoComponent::Vertex { srgb },
-                AlbedoType::Texture => AlbedoComponent::Texture(texture_handle.unwrap()),
-                AlbedoType::TextureWithName(_) => AlbedoComponent::Texture(texture_handle.unwrap()),
-                AlbedoType::Value(rgba) => AlbedoComponent::Value(rgba),
-                AlbedoType::ValueVertex { value, srgb } => AlbedoComponent::ValueVertex { value, srgb },
+                AlbedoType::Value(rgba) => UnitsAlbedo::Unicolor(rgba),
+                _ => UnitsAlbedo::Textures([texture_handle, None, None]),
             },
-            transparency: match material.transparency {
-                Cutout { cutout } => Transparency::Cutout { cutout },
-                Opaque => Transparency::Opaque,
-                Blend => Transparency::Blend,
+            alpha_cutout: match material.transparency {
+                Cutout { cutout } => Some(cutout),
+                _ => None,
             },
-            ..PbrMaterial::default()
+            ..UnitsMaterial::default()
         };
         ret
     }

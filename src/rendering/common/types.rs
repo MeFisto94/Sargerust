@@ -59,24 +59,13 @@ pub struct MeshWithLod {
 /// quite often. This is especially true for the material, that has a complex structure.
 #[derive(Clone, Debug)]
 pub struct Material {
-    pub is_unlit: bool,
     pub albedo: AlbedoType,
     pub transparency: TransparencyType,
 }
 
 #[derive(Clone, Debug)]
 pub enum AlbedoType {
-    None,
-    Vertex {
-        srgb: bool,
-    },
     Value(Vec4),
-    ValueVertex {
-        value: Vec4,
-        /// Vertex should be converted from srgb -> linear before
-        /// multiplication.
-        srgb: bool,
-    },
     Texture, // TODO
     TextureWithName(String),
 }
@@ -87,6 +76,4 @@ pub enum TransparencyType {
     Opaque,
     /// Pixels with alpha less than `cutout` is discorded.
     Cutout { cutout: f32 },
-    /// Alpha is blended.
-    Blend,
 }

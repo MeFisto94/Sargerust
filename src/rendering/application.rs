@@ -17,7 +17,7 @@ use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
 use crate::rendering::rend3_backend::material::terrain::terrain_material::TerrainMaterial;
 use crate::rendering::rend3_backend::material::terrain::terrain_routine::TerrainRoutine;
-use crate::rendering::rend3_backend::material::units::units_material::UnitsMaterial;
+use crate::rendering::rend3_backend::material::units::units_material::{UnitsAlbedo, UnitsMaterial};
 use crate::rendering::rend3_backend::material::units::units_routine::UnitsRoutine;
 use crate::rendering::rend3_backend::{
     IRM2Material, IRMaterial, IRTexture, IRTextureReference, Rend3BackendConverter, gpu_loaders,
@@ -175,7 +175,6 @@ impl RenderingApplication {
 
     fn init_missing_texture_material(&mut self, renderer: &Arc<Renderer>) {
         let mat = Material {
-            is_unlit: true,
             albedo: AlbedoType::Value(Vec4::new(0.22, 1.0, 0.0, 1.0)), // neon/lime green
             transparency: TransparencyType::Opaque,
         };
@@ -184,7 +183,6 @@ impl RenderingApplication {
         self.missing_texture_material = Some(renderer.add_material(render_mat));
 
         let mat_loading = Material {
-            is_unlit: true,
             albedo: AlbedoType::Value(Vec4::new(0.4, 0.4, 0.4, 1.0)),
             transparency: TransparencyType::Opaque,
         };
@@ -586,14 +584,16 @@ impl RenderingApplication {
             warn!("UnitsMaterial is currently not supporting more than 3 textures");
         }
 
-        // TODO: Could/should we use PBR, especially considering we may not even have much layering? But then we also
-        //  have no AOMR textures etc.
         let mut rend_material = UnitsMaterial {
-            texture_layers: [const { None }; 3],
+            albedo: UnitsAlbedo::Textures([const { None }; 3]),
+            alpha_cutout: Some(0.5), // TODO: Derive from M2Material that we haven't even implemented.
         };
 
         for (idx, tex) in textures.into_iter().enumerate() {
-            rend_material.texture_layers[idx] = tex;
+            match &mut rend_material.albedo {
+                UnitsAlbedo::Textures(texture_layers) => texture_layers[idx] = tex,
+                _ => (),
+            }
         }
 
         let handle = renderer.add_material(rend_material);

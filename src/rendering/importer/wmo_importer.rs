@@ -59,6 +59,7 @@ impl WMOGroupImporter {
 
     // MPQLoader: we dynamically load the WMO Groups based upon WMORootAsset. Could change that but this yields error potential.
     // TODO: Still do it, to separate loading/parsing from importing (which is asset -> IR)
+    #[deprecated(note = "For some reason this isn't called anywhere anymore which is confusing")]
     pub fn load_wmo_groups(loader: &MPQLoader, wmo: &WMORootAsset, path: &str) -> Vec<(MeshWithLod, Vec<Material>)> {
         // just for debug???
         for group in &wmo.mogi.groupInfoList {
@@ -110,22 +111,30 @@ impl WMOGroupImporter {
                             wmo.motx.textureNameList[offset].clone()
                         });
 
-                        Material {
-                            albedo: match first_material {
-                                Some(_mat) => match txname_opt {
-                                    Some(texture_handle) => AlbedoType::TextureWithName(texture_handle),
-                                    None => AlbedoType::Value(Vec4::new(
-                                        _mat.diffColor.r as f32 / 255.0,
-                                        _mat.diffColor.g as f32 / 255.0,
-                                        _mat.diffColor.b as f32 / 255.0,
-                                        _mat.diffColor.a as f32 / 255.0,
-                                    )),
-                                },
-                                None => AlbedoType::Value(Vec4::new(0.6, 0.6, 0.6, 1.0)),
-                            },
-                            is_unlit: true,
+                        let mut mat = Material {
+                            albedo: AlbedoType::Value(Vec4::new(0.6, 0.6, 0.6, 1.0)),
                             transparency: TransparencyType::Opaque,
+                        };
+
+                        if let Some(_mat) = first_material {
+                            mat.albedo = match txname_opt {
+                                Some(texture_handle) => AlbedoType::TextureWithName(texture_handle),
+                                None => AlbedoType::Value(Vec4::new(
+                                    _mat.diffColor.r as f32 / 255.0,
+                                    _mat.diffColor.g as f32 / 255.0,
+                                    _mat.diffColor.b as f32 / 255.0,
+                                    _mat.diffColor.a as f32 / 255.0,
+                                )),
+                            };
+
+                            mat.transparency = match _mat.blendMode {
+                                0 => TransparencyType::Opaque,
+                                1 => TransparencyType::Cutout { cutout: 0.5 },
+                                _ => TransparencyType::Opaque,
+                            }
                         }
+
+                        mat
                     })
                     .collect_vec();
                 (
