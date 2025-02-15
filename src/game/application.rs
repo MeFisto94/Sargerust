@@ -9,6 +9,7 @@ use crate::settings::CliArgs;
 use chrono::{Local, Timelike};
 use log::debug;
 use rend3::Renderer;
+use rend3::types::SampleCount;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, OnceLock, Weak};
@@ -87,7 +88,7 @@ impl GameApplication {
         let wnd = winit::window::WindowAttributes::default()
             .with_title(WINDOW_TITLE)
             .with_inner_size(LogicalSize::new(1024, 768));
-        let render_app = RenderingApplication::new(self.weak_self.clone());
+        let render_app = RenderingApplication::new(self.weak_self.clone(), SampleCount::Four);
 
         self.update_game_time();
 

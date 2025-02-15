@@ -72,3 +72,4 @@ Things that still need to be implemented (loosely sorted by priority):
 - Anisotropy of Textures
 - Make Material#key() a u64 bitset and & with forward pipelines instead of equaling, which allows some (e.g. depth pre)
   passes to render for all kind of material variants instead of requiring tens of pipelines for those.
+- Maybe a way to disable sorting when a depth prepass is done anyway

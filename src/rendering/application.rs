@@ -63,10 +63,11 @@ pub struct RenderingApplication {
 
     terrain_routine: Option<Mutex<TerrainRoutine>>,
     units_routine: Option<Mutex<UnitsRoutine>>,
+    sample_count: SampleCount,
 }
 
 impl RenderingApplication {
-    pub fn new(app: Weak<GameApplication>) -> Self {
+    pub fn new(app: Weak<GameApplication>, sample_count: SampleCount) -> Self {
         Self {
             app,
             scancode_status: FastHashMap::default(),
@@ -82,6 +83,7 @@ impl RenderingApplication {
             fly_cam: false,
             terrain_routine: None,
             units_routine: None,
+            sample_count,
         }
     }
 
@@ -640,7 +642,7 @@ impl rend3_framework::App for RenderingApplication {
     }
 
     fn sample_count(&self) -> SampleCount {
-        SampleCount::One // No MSAA yet
+        self.sample_count
     }
 
     fn present_mode(&self) -> PresentMode {
@@ -924,7 +926,7 @@ impl rend3_framework::App for RenderingApplication {
                 target: OutputRenderTarget {
                     handle: frame_handle,
                     resolution: context.resolution,
-                    samples: SampleCount::One,
+                    samples: self.sample_count,
                 },
             },
             rend3_routine::base::BaseRenderGraphSettings {
@@ -998,7 +1000,6 @@ fn base_rendergraph_add_to_graph<'node>(
             });
         }
     }
-
     // TODO: Terrain Shadow Rendering?
 
     let routines = [&units_routine.opaque_routine, &units_routine.cutout_routine];
