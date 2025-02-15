@@ -341,8 +341,12 @@ impl RenderingApplication {
                 .texture_layers
                 .iter()
                 .map(|layer| {
-                    let base_layer =
-                        gpu_loaders::gpu_load_texture(renderer, &layer.base_texture_ref.reference).unwrap();
+                    let base_layer = gpu_loaders::gpu_load_texture(
+                        renderer,
+                        &layer.base_texture_ref.reference,
+                        Some(&layer.base_texture_ref.reference_str),
+                    )
+                    .unwrap();
 
                     let alpha_layer = layer.alpha_map_ref.as_ref().map(|alpha_ref| {
                         // TODO: Since this code is completely ugly anyway, we can also right away take the write lock instead of checking for previous success.
@@ -529,7 +533,9 @@ impl RenderingApplication {
             Some(tex_name) => tex_references
                 .iter()
                 .find(|tex_ref| tex_name.eq(&tex_ref.reference_str))
-                .and_then(|tex_ref| gpu_loaders::gpu_load_texture(renderer, &tex_ref.reference)),
+                .and_then(|tex_ref| {
+                    gpu_loaders::gpu_load_texture(renderer, &tex_ref.reference, Some(&tex_ref.reference_str))
+                }),
             _ => None,
         };
 
@@ -562,16 +568,19 @@ impl RenderingApplication {
             .iter()
             .filter_map(|tex| {
                 if tex.texture_type == M2TextureType::None {
-                    Some(tex_resolver.resolve(tex.filename.clone()))
+                    Some((
+                        tex_resolver.resolve(tex.filename.clone()),
+                        tex.filename.as_str(),
+                    ))
                 } else {
                     // The assumption here is that texture types are unique
                     dynamic_textures
                         .iter()
                         .find(|(dyn_tex_type, _, _)| *dyn_tex_type == tex.texture_type)
-                        .map(|(_, _, tex)| tex.clone())
+                        .map(|(_, _, tex)| (tex.clone(), "M2 Dynamic Texture"))
                 }
             })
-            .map(|tex| gpu_loaders::gpu_load_texture(renderer, &ArcSwapOption::new(Some(tex))))
+            .map(|(tex, label)| gpu_loaders::gpu_load_texture(renderer, &ArcSwapOption::new(Some(tex)), Some(label)))
             .collect_vec();
 
         // TODO: There's still the edge-case where loading may have failed and it's thus declared as None. But that requires

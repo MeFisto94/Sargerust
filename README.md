@@ -43,7 +43,7 @@ Things that still need to be implemented (loosely sorted by priority):
 - massive Map Manager rework
 - Portals, Water, and other less important render objects
 - Anisotropic Filtering, basically setting SamplerDesc#anisotropy_clamp > 1, POT, < 16 (based on the device limits)
-- MipMaps
+- Properly Kill tracy
 - hecs:
     - Add more components and unpack update messages further
     - Implement spline walking (NPCs have predefined splines)
@@ -73,3 +73,4 @@ Things that still need to be implemented (loosely sorted by priority):
 - Make Material#key() a u64 bitset and & with forward pipelines instead of equaling, which allows some (e.g. depth pre)
   passes to render for all kind of material variants instead of requiring tens of pipelines for those.
 - Maybe a way to disable sorting when a depth prepass is done anyway
+- Pass label to Texture Descriptor

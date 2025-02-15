@@ -1,24 +1,7 @@
 use crate::rendering::common::coordinate_systems::TILE_SIZE;
 use glam::{Affine3A, EulerRot, Quat, Vec3};
-use image_blp::BlpImage;
-use image_blp::convert::blp_to_image;
 use sargerust_files::adt::types::SMDoodadDef;
 use sargerust_files::wdt::types::SMMapObjDef;
-
-pub fn create_texture_rgba8(blp: &BlpImage, mipmap_level: usize) -> rend3::types::Texture {
-    let image = blp_to_image(blp, mipmap_level).expect("decode");
-    let image_dims = glam::UVec2::new(image.width(), image.height());
-    let image_data = image.into_rgba8();
-
-    rend3::types::Texture {
-        label: None,
-        data: image_data.into_raw(),
-        format: rend3::types::TextureFormat::Rgba8UnormSrgb,
-        size: image_dims,
-        mip_count: rend3::types::MipmapCount::ONE,
-        mip_source: rend3::types::MipmapSource::Uploaded,
-    }
-}
 
 // TODO: this is probably even too specific for here and belongs somewhere in loaders/graph modules.
 pub fn transform_for_doodad_ref(dad_ref: &SMDoodadDef) -> Affine3A {

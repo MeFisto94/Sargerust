@@ -1,5 +1,6 @@
 use crate::rendering::rend3_backend::{IRMaterial, IRMesh, IRTexture, Rend3BackendConverter};
 use arc_swap::ArcSwapOption;
+use image_blp::BlpContent;
 use rend3::Renderer;
 use rend3::types::{MaterialHandle, MeshHandle, Texture2DHandle};
 use std::ops::DerefMut;
@@ -41,6 +42,7 @@ pub fn gpu_load_material(
 pub fn gpu_load_texture(
     renderer: &Arc<Renderer>,
     texture_reference: &ArcSwapOption<RwLock<Option<IRTexture>>>,
+    label: Option<&str>,
 ) -> Option<Texture2DHandle> {
     let Some(opt_handle) = texture_reference.load_full() else {
         // Texture (reference?) not loaded yet.
@@ -65,8 +67,19 @@ pub fn gpu_load_texture(
     {
         let mut tex_iwlock = opt_handle.write().expect("Texture internal write lock");
         let tex = tex_iwlock.as_mut().expect("unreachable!");
-        // TODO: What do we do with the mipmap level? From 0 to tex.data.image_count() as u8 - 1
-        let texture = Rend3BackendConverter::create_texture_from_ir(&tex.data, 0);
+
+        let texture = match &tex.data.content {
+            BlpContent::Dxt1(dxtn) | BlpContent::Dxt3(dxtn) | BlpContent::Dxt5(dxtn) => {
+                Rend3BackendConverter::create_texture_from_ir_dxtn(
+                    &dxtn,
+                    label,
+                    (tex.data.header.width, tex.data.header.height),
+                )
+            }
+            // TODO: technically even RAW1/RAW3 can have mipmaps
+            _ => Rend3BackendConverter::create_texture_from_ir(&tex.data, label, 0),
+        };
+
         let texture_handle = renderer
             .add_texture_2d(texture)
             .expect("Texture creation successful");
