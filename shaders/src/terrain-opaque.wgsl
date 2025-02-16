@@ -106,9 +106,9 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
 
     // Since wgsl doesn't like "var" textures and others, we duplicate the code a bit, but it doesn't hurt readability here anyway.
     let base_tex = textures[material.base_texture - 1u];
-    let tex_x = textureSample(base_tex, nearest_sampler, vs_out.vertex_relative.zy * tex_scale);
-    let tex_y = textureSample(base_tex, nearest_sampler, vs_out.vertex_relative.zx * tex_scale);
-    let tex_z = textureSample(base_tex, nearest_sampler, vs_out.vertex_relative.xy * tex_scale);
+    let tex_x = textureSample(base_tex, primary_sampler, vs_out.vertex_relative.zy * tex_scale);
+    let tex_y = textureSample(base_tex, primary_sampler, vs_out.vertex_relative.zx * tex_scale);
+    let tex_z = textureSample(base_tex, primary_sampler, vs_out.vertex_relative.xy * tex_scale);
     var albedo_sum = tex_x * blend_weights.x + tex_y * blend_weights.y + tex_z * blend_weights.z;
 
     for (var i = 0; i < 3; i++) {
@@ -126,9 +126,9 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
         let albedo_tex = textures[tex_index - 1u];
         let alpha_tex = textures[alpha_index - 1u];
 
-        let tex_x = textureSample(albedo_tex, nearest_sampler, vs_out.vertex_relative.zy * tex_scale);
-        let tex_y = textureSample(albedo_tex, nearest_sampler, vs_out.vertex_relative.zx * tex_scale);
-        let tex_z = textureSample(albedo_tex, nearest_sampler, vs_out.vertex_relative.xy * tex_scale);
+        let tex_x = textureSample(albedo_tex, primary_sampler, vs_out.vertex_relative.zy * tex_scale);
+        let tex_y = textureSample(albedo_tex, primary_sampler, vs_out.vertex_relative.zx * tex_scale);
+        let tex_z = textureSample(albedo_tex, primary_sampler, vs_out.vertex_relative.xy * tex_scale);
         let albedo = tex_x * blend_weights.x + tex_y * blend_weights.y + tex_z * blend_weights.z;
 
         let alpha = textureSample(alpha_tex, primary_sampler, vs_out.vertex_relative.zx).r;
