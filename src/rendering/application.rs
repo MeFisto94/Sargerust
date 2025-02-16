@@ -569,7 +569,7 @@ impl RenderingApplication {
             .filter_map(|tex| {
                 if tex.texture_type == M2TextureType::None {
                     Some((
-                        tex_resolver.resolve(tex.filename.clone()),
+                        tex_resolver.resolve(tex.filename.as_str()),
                         tex.filename.as_str(),
                     ))
                 } else {

@@ -101,7 +101,7 @@ impl WMOLoader {
                 let name = wmo.modn.doodadNameList[idx].as_str();
 
                 // fix name: currently it ends with .mdx, but we need .m2
-                let name = name.replace(".MDX", ".m2").replace(".MDL", ".m2");
+                let name = name.replace(".MDX", ".M2").replace(".MDL", ".M2");
                 if name.to_lowercase().contains("emitter") {
                     continue;
                 }

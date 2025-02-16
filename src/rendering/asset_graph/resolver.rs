@@ -22,12 +22,9 @@ impl<G: GraphNodeGenerator<T>, T> Resolver<G, T> {
         }
     }
 
-    // TODO: maybe take name by reference and only own it when inserting.
-    //  also canonicalize paths: uppercase and forward slashes as in MPQ?
-    //  -> Those two requirements do conflict, though.
-    pub fn resolve(&self, name: String) -> Arc<T> {
-        // optimistic path
-        // can be removed without impacting correctness
+    pub fn resolve(&self, key: &str) -> Arc<T> {
+        let name = key.to_ascii_uppercase(); // TODO: Canonicalize (i.e. forward slashes?)
+        // optimistic path, can be removed without impacting correctness
         if let Some(existing) = self.ref_cache.get(&name).and_then(|x| x.upgrade()) {
             return existing;
         }
@@ -38,13 +35,12 @@ impl<G: GraphNodeGenerator<T>, T> Resolver<G, T> {
         // benefit: we can call `generate` outside of the critical section
         // drawback: if we're wrong, `generate` gets called more than once
         // let new = self.generator.generate(&name);
+        // Then, we can also move in name instead of cloning it
 
-        // clone can be removed, when generating outside the critical section
         match self.ref_cache.entry(name.clone()) {
             Entry::Occupied(mut o) => {
                 if let Some(existing) = o.get().upgrade() {
-                    // the optimistic path failed earlier,
-                    // but someone slipped an entry in since then
+                    // the optimistic path failed earlier,  but someone slipped an entry in since then
                     existing
                 } else {
                     // there was already an entry, but it died

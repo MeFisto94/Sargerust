@@ -35,7 +35,7 @@ impl M2Loader {
         // In theory, we could investigate the number of LoD Levels, but we will just use "0"
         let mut skin_file = std::io::Cursor::new(
             loader
-                .load_raw_owned(&name.replace(".m2", "00.skin"))
+                .load_raw_owned(&name.replace(".M2", "00.skin"))
                 .unwrap(),
         );
 

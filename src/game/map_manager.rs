@@ -252,7 +252,7 @@ impl MapManager {
 
             let result = self
                 .wmo_resolver
-                .resolve(wmo.reference.reference_str.clone());
+                .resolve(wmo.reference.reference_str.as_str());
 
             // TODO: should we resolve WMO Groups right here or rather after all WMOs are resolved? Technically groups could even be lazily resolved?
             for sub_group in &result.subgroups {
@@ -260,7 +260,7 @@ impl MapManager {
                 let sub_group_cloned = sub_group.clone();
                 set.spawn_blocking_on(
                     move || {
-                        let group_result = resolver.resolve(sub_group_cloned.reference_str.to_string());
+                        let group_result = resolver.resolve(sub_group_cloned.reference_str.as_str());
                         sub_group_cloned.reference.store(Some(group_result));
                     },
                     self.runtime.handle(),
@@ -354,7 +354,7 @@ impl MapManager {
                 let result = handle_clone
                     .spawn_blocking(move || {
                         // TODO: PERF: get rid of duplicated references here, make DoodadReference#reference an Arc and cache them at least adt wide.
-                        m2_resolver.resolve(reference_str)
+                        m2_resolver.resolve(reference_str.as_str())
                     })
                     .await
                     .unwrap();
@@ -393,7 +393,7 @@ impl MapManager {
             let resolver = tex_resolver.clone();
             set.spawn_blocking_on(
                 move || {
-                    let result_tex = resolver.resolve(tex_reference.reference_str.clone());
+                    let result_tex = resolver.resolve(tex_reference.reference_str.as_str());
                     tex_reference.reference.store(Some(result_tex));
                 },
                 handle,

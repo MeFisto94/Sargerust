@@ -95,10 +95,10 @@ impl DisplayIdResolverSystem {
 
             let base_path = name.split_at(name.rfind('\\').expect("No \\ in name")).0;
 
-            let result = self.m2_resolver.resolve(name.clone());
+            let result = self.m2_resolver.resolve(name.as_str());
 
             for reference in &result.tex_reference {
-                let resolve = self.tex_resolver.resolve(reference.reference_str.clone());
+                let resolve = self.tex_resolver.resolve(reference.reference_str.as_str());
                 reference.reference.store(Some(resolve));
             }
 
@@ -183,7 +183,7 @@ impl DisplayIdResolverSystem {
                     Some((
                         reference.texture_type,
                         reference.texture_flags,
-                        self.tex_resolver.resolve(tex_name.clone()),
+                        self.tex_resolver.resolve(tex_name.as_str()),
                     ))
                 })
                 .collect_vec();
