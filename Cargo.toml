@@ -55,6 +55,7 @@ debug = 2
 
 [features]
 tracy = ["tracy-client", "profiling/profile-with-tracy"]
+tracy-memory = []
 
 [build-dependencies]
 anyhow = "1.0.95"

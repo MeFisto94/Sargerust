@@ -22,6 +22,11 @@ mod rendering;
 mod settings;
 pub mod util;
 
+#[cfg(feature = "tracy-memory")]
+#[global_allocator]
+static GLOBAL: profiling::tracy_client::ProfiledAllocator<std::alloc::System> =
+    profiling::tracy_client::ProfiledAllocator::new(std::alloc::System, 100);
+
 fn main() {
     env_logger::init();
 
