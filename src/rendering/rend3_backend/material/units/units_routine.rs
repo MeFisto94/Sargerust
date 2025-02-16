@@ -147,9 +147,9 @@ impl UnitsRoutine {
     }
 }
 
-fn sm_to_routine(
+pub fn sm_to_routine<T: rend3::types::Material>(
     name: &str,
-    per_material: &PerMaterialArchetypeInterface<UnitsMaterial>,
+    per_material: &PerMaterialArchetypeInterface<T>,
     material_key: u64,
     routine_type: RoutineType,
     shader_module: &ShaderModule,
@@ -157,7 +157,7 @@ fn sm_to_routine(
     data_core: &mut RendererDataCore,
     spp: &mut ShaderPreProcessor,
     interfaces: &WholeFrameInterfaces,
-) -> ForwardRoutine<UnitsMaterial> {
+) -> ForwardRoutine<T> {
     ForwardRoutine::new(ForwardRoutineCreateArgs {
         name,
         renderer,
