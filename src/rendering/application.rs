@@ -979,6 +979,66 @@ fn base_rendergraph_add_to_graph<'node>(
     state.pbr_shadow_rendering();
 
     // Units Shadows
+    units_shadows(&units_routine, &mut state);
+    // TODO: Terrain Shadow Rendering?
+
+    units_forward(&units_routine, &mut state);
+
+    // Render after units, for less overdraw.
+    terrain_forward(&terrain_routine, &mut state);
+
+    // Do the first pass, rendering the predicted triangles from last frame.
+    state.pbr_render();
+
+    // Render the skybox.
+    state.skybox();
+
+    // Render all transparent objects.
+    //
+    // This _must_ happen after culling, as all transparent objects are
+    // considered "residual".
+    state.pbr_forward_rendering_transparent();
+
+    // Tonemap the HDR inner buffer to the output buffer.
+    state.tonemapping();
+}
+
+fn terrain_forward(terrain_routine: &&TerrainRoutine, mut state: &mut BaseRenderGraphIntermediateState) {
+    terrain_routine
+        .opaque_routine
+        .add_forward_to_graph(ForwardRoutineArgs {
+            graph: state.graph,
+            label: "Terrain Forward Pass",
+            camera: CameraSpecifier::Viewport,
+            binding_data: forward::ForwardRoutineBindingData {
+                whole_frame_uniform_bg: state.forward_uniform_bg,
+                per_material_bgl: &terrain_routine.per_material,
+                extra_bgs: None,
+            },
+            samples: state.inputs.target.samples,
+            renderpass: state.primary_renderpass.clone(),
+        });
+}
+
+fn units_forward(units_routine: &&UnitsRoutine, mut state: &mut BaseRenderGraphIntermediateState) {
+    let routines = [&units_routine.opaque_routine, &units_routine.cutout_routine];
+    for routine in routines {
+        routine.add_forward_to_graph(ForwardRoutineArgs {
+            graph: state.graph,
+            label: "Units Forward Pass",
+            camera: CameraSpecifier::Viewport,
+            binding_data: forward::ForwardRoutineBindingData {
+                whole_frame_uniform_bg: state.forward_uniform_bg,
+                per_material_bgl: &units_routine.per_material,
+                extra_bgs: None,
+            },
+            samples: state.inputs.target.samples,
+            renderpass: state.primary_renderpass.clone(),
+        });
+    }
+}
+
+fn units_shadows(units_routine: &&UnitsRoutine, mut state: &mut BaseRenderGraphIntermediateState) {
     for (shadow_index, desc) in state.inputs.eval_output.shadows.iter().enumerate() {
         let target = state.shadow.set_viewport(ViewportRect::new(
             desc.map.offset,
@@ -1009,52 +1069,4 @@ fn base_rendergraph_add_to_graph<'node>(
             });
         }
     }
-    // TODO: Terrain Shadow Rendering?
-
-    let routines = [&units_routine.opaque_routine, &units_routine.cutout_routine];
-    for routine in routines {
-        routine.add_forward_to_graph(ForwardRoutineArgs {
-            graph: state.graph,
-            label: "Units Forward Pass",
-            camera: CameraSpecifier::Viewport,
-            binding_data: forward::ForwardRoutineBindingData {
-                whole_frame_uniform_bg: state.forward_uniform_bg,
-                per_material_bgl: &units_routine.per_material,
-                extra_bgs: None,
-            },
-            samples: state.inputs.target.samples,
-            renderpass: state.primary_renderpass.clone(),
-        });
-    }
-
-    // Render after units, for less overdraw.
-    terrain_routine
-        .opaque_routine
-        .add_forward_to_graph(ForwardRoutineArgs {
-            graph: state.graph,
-            label: "Terrain Forward Pass",
-            camera: CameraSpecifier::Viewport,
-            binding_data: forward::ForwardRoutineBindingData {
-                whole_frame_uniform_bg: state.forward_uniform_bg,
-                per_material_bgl: &terrain_routine.per_material,
-                extra_bgs: None,
-            },
-            samples: state.inputs.target.samples,
-            renderpass: state.primary_renderpass.clone(),
-        });
-
-    // Do the first pass, rendering the predicted triangles from last frame.
-    state.pbr_render();
-
-    // Render the skybox.
-    state.skybox();
-
-    // Render all transparent objects.
-    //
-    // This _must_ happen after culling, as all transparent objects are
-    // considered "residual".
-    state.pbr_forward_rendering_transparent();
-
-    // Tonemap the HDR inner buffer to the output buffer.
-    state.tonemapping();
 }
