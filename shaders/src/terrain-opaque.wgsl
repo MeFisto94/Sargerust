@@ -81,7 +81,7 @@ fn vs_main(@builtin(instance_index) instance_index: u32, @builtin(vertex_index) 
     let z = (vs_in.position.z / GRID_SIZE_ADJUSTED) * 0.5 + 0.5; // unlike the grid vertices, height goes from -n..n
 
     // Note: Normals want "up" to be y, also note that x and y will be negative (due to the vertices being 0..8*GRID_SIZE)
-    vs_out.vertex_relative = vec3(xy.x, z, xy.y);
+    vs_out.vertex_relative = vec3(xy.x, xy.y, z);
 
     vs_out.material = data.material_index;
     vs_out.world_space_normal = normalize(vs_in.normal);
@@ -102,13 +102,13 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
     let blend_sharpness = 25.0;
     var blend_weights = pow(abs(vs_out.world_space_normal), vec3(blend_sharpness));
     blend_weights /= blend_weights.x + blend_weights.y + blend_weights.z;
-    // blend_weights = vec3(0.0, 1.0, 0.0); // TODO: Use this to disable triplanar mapping, I have yet to encounter a mountain where it improves visuals...
+    // blend_weights = vec3(0.0, 0.0, 1.0); // TODO: Use this to disable triplanar mapping, I have yet to encounter a mountain where it improves visuals...
 
     // Since wgsl doesn't like "var" textures and others, we duplicate the code a bit, but it doesn't hurt readability here anyway.
     let base_tex = textures[material.base_texture - 1u];
-    let tex_x = textureSample(base_tex, primary_sampler, vs_out.vertex_relative.zy * tex_scale);
-    let tex_y = textureSample(base_tex, primary_sampler, vs_out.vertex_relative.zx * tex_scale);
-    let tex_z = textureSample(base_tex, primary_sampler, vs_out.vertex_relative.xy * tex_scale);
+    let tex_x = textureSample(base_tex, primary_sampler, vs_out.vertex_relative.yz * tex_scale);
+    let tex_y = textureSample(base_tex, primary_sampler, vs_out.vertex_relative.xz * tex_scale);
+    let tex_z = textureSample(base_tex, primary_sampler, vs_out.vertex_relative.yx * tex_scale);
     var albedo_sum = tex_x * blend_weights.x + tex_y * blend_weights.y + tex_z * blend_weights.z;
 
     for (var i = 0; i < 3; i++) {
@@ -126,12 +126,12 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
         let albedo_tex = textures[tex_index - 1u];
         let alpha_tex = textures[alpha_index - 1u];
 
-        let tex_x = textureSample(albedo_tex, primary_sampler, vs_out.vertex_relative.zy * tex_scale);
-        let tex_y = textureSample(albedo_tex, primary_sampler, vs_out.vertex_relative.zx * tex_scale);
-        let tex_z = textureSample(albedo_tex, primary_sampler, vs_out.vertex_relative.xy * tex_scale);
+        let tex_x = textureSample(albedo_tex, primary_sampler, vs_out.vertex_relative.yz * tex_scale);
+        let tex_y = textureSample(albedo_tex, primary_sampler, vs_out.vertex_relative.xz * tex_scale);
+        let tex_z = textureSample(albedo_tex, primary_sampler, vs_out.vertex_relative.yx * tex_scale);
         let albedo = tex_x * blend_weights.x + tex_y * blend_weights.y + tex_z * blend_weights.z;
 
-        let alpha = textureSample(alpha_tex, primary_sampler, vs_out.vertex_relative.zx).r;
+        let alpha = textureSample(alpha_tex, primary_sampler, vs_out.vertex_relative.yx).r;
         albedo_sum = mix(albedo_sum, albedo, alpha);
     }
 

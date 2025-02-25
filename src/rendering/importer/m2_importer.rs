@@ -1,3 +1,4 @@
+use crate::rendering::common::coordinate_systems::adt_to_blender_unaligned;
 use crate::rendering::common::types::{Mesh, VertexBuffers};
 use glam::{Vec2, Vec3};
 use itertools::Itertools;
@@ -25,7 +26,12 @@ impl M2Importer {
             verts.push(Vec3::new(vert.pos.x, vert.pos.y, vert.pos.z));
             uv0.push(Vec2::new(vert.tex_coords[0].x, vert.tex_coords[0].y));
             uv1.push(Vec2::new(vert.tex_coords[1].x, vert.tex_coords[1].y));
-            normals.push(Vec3::new(vert.normal.x, vert.normal.y, vert.normal.z));
+            // We do that here, because verts we can handle with the transform, but apparently not the normals
+            normals.push(adt_to_blender_unaligned(Vec3::new(
+                vert.normal.x,
+                vert.normal.y,
+                vert.normal.z,
+            )));
         }
 
         let mut indices = Vec::<u32>::with_capacity(sub_mesh.indexCount as usize);
@@ -43,7 +49,7 @@ impl M2Importer {
             index_buffer: indices,
             vertex_buffers: VertexBuffers {
                 position_buffer: verts,
-                normals_buffer: vec![],
+                normals_buffer: normals,
                 tangents_buffer: vec![],
                 texcoord_buffer_0: uv0,
                 texcoord_buffer_1: uv1,

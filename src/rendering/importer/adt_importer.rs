@@ -159,7 +159,7 @@ impl ADTImporter {
                 vertex_color_0.push([color.r, color.g, color.b, color.a]); // TODO: Where is the format defined?
 
                 if let Some(normal) = mcnr.as_ref().map(|x| calculate_normal(&x[low as usize])) {
-                    normals_buffer.push(normal);
+                    normals_buffer.push(Self::fixup_normal(normal));
                 }
             }
 
@@ -185,7 +185,7 @@ impl ADTImporter {
                 vertex_color_0.push([color.r, color.g, color.b, color.a]); // TODO: Where is the format defined?
 
                 if let Some(normal) = mcnr.as_ref().map(|x| calculate_normal(&x[high as usize])) {
-                    normals_buffer.push(normal);
+                    normals_buffer.push(Self::fixup_normal(normal));
                 }
             }
         }
@@ -258,5 +258,10 @@ impl ADTImporter {
         );
 
         Ok((pos, mesh, texture_references))
+    }
+
+    #[inline]
+    fn fixup_normal(normal: Vec3) -> Vec3 {
+        Vec3::new(normal.x, normal.z, normal.y)
     }
 }
