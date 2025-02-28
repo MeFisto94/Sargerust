@@ -2,13 +2,13 @@ use crate::rendering::rend3_backend::material::SargerustShaderSources;
 use crate::rendering::rend3_backend::material::terrain::terrain_material::TerrainMaterial;
 use crate::rendering::rend3_backend::material::units::units_routine;
 use rend3::RendererProfile::GpuDriven;
+use rend3::util::bind_merge::BindGroupLayoutBuilder;
 use rend3::{Renderer, RendererDataCore, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
 use rend3_routine::common::{PerMaterialArchetypeInterface, WholeFrameInterfaces};
-use rend3_routine::forward::{ForwardRoutine, ForwardRoutineCreateArgs, RoutineType, ShaderModulePair};
-use rend3_routine::pbr::TransparencyType;
+use rend3_routine::forward::{ForwardRoutine, RoutineType};
 use std::borrow::Cow;
 use std::sync::Arc;
-use wgpu::{BlendState, ShaderModuleDescriptor, ShaderSource};
+use wgpu::{BindingType, ShaderModuleDescriptor, ShaderSource, ShaderStages, TextureSampleType};
 
 pub struct TerrainRoutine {
     pub opaque_routine: ForwardRoutine<TerrainMaterial>,
@@ -33,6 +33,18 @@ impl TerrainRoutine {
             .ensure_archetype::<TerrainMaterial>(&renderer.device, renderer.profile);
 
         let per_material = PerMaterialArchetypeInterface::<TerrainMaterial>::new(&renderer.device);
+
+        let ssao_bgl = BindGroupLayoutBuilder::new()
+            .append(
+                ShaderStages::FRAGMENT,
+                BindingType::Texture {
+                    sample_type: TextureSampleType::Float { filterable: false },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                None,
+            )
+            .build(&renderer.device, Some("SSAO Textures"));
 
         let sm_opaque = renderer
             .device
@@ -83,6 +95,7 @@ impl TerrainRoutine {
                 data_core,
                 spp,
                 interfaces,
+                &[&ssao_bgl],
             ),
             depth_routine: units_routine::sm_to_routine(
                 "Terrain Depth",
@@ -94,6 +107,7 @@ impl TerrainRoutine {
                 data_core,
                 spp,
                 interfaces,
+                &[],
             ),
             per_material,
         }

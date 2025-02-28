@@ -1,13 +1,17 @@
 use crate::rendering::rend3_backend::material::SargerustShaderSources;
 use crate::rendering::rend3_backend::material::units::units_material::UnitsMaterial;
 use rend3::RendererProfile::GpuDriven;
+use rend3::util::bind_merge::BindGroupLayoutBuilder;
 use rend3::{Renderer, RendererDataCore, RendererProfile, ShaderConfig, ShaderPreProcessor, ShaderVertexBufferConfig};
 use rend3_routine::common::{PerMaterialArchetypeInterface, WholeFrameInterfaces};
 use rend3_routine::forward::{ForwardRoutine, ForwardRoutineCreateArgs, RoutineType, ShaderModulePair};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::sync::Arc;
-use wgpu::{ShaderModule, ShaderModuleDescriptor, ShaderSource};
+use wgpu::{
+    BindGroupLayout, BindingType, ColorTargetState, ShaderModule, ShaderModuleDescriptor, ShaderSource, ShaderStages,
+    TextureFormat, TextureSampleType,
+};
 
 #[derive(Debug, Default, Serialize)]
 struct UnitsDepthConfig {
@@ -22,6 +26,7 @@ pub struct UnitsRoutine {
     pub opaque_depth: ForwardRoutine<UnitsMaterial>,
     pub cutout_depth: ForwardRoutine<UnitsMaterial>,
     pub per_material: PerMaterialArchetypeInterface<UnitsMaterial>,
+    pub ssao_bgl: BindGroupLayout,
 }
 
 impl UnitsRoutine {
@@ -97,6 +102,18 @@ impl UnitsRoutine {
                 )),
             });
 
+        let ssao_bgl = BindGroupLayoutBuilder::new()
+            .append(
+                ShaderStages::FRAGMENT,
+                BindingType::Texture {
+                    sample_type: TextureSampleType::Float { filterable: false },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                None,
+            )
+            .build(&renderer.device, Some("SSAO Textures"));
+
         Self {
             opaque_routine: sm_to_routine(
                 "Units Forward Opaque",
@@ -108,6 +125,7 @@ impl UnitsRoutine {
                 data_core,
                 spp,
                 interfaces,
+                &[&ssao_bgl],
             ),
             cutout_routine: sm_to_routine(
                 "Units Forward Cutout",
@@ -119,6 +137,7 @@ impl UnitsRoutine {
                 data_core,
                 spp,
                 interfaces,
+                &[&ssao_bgl],
             ),
             opaque_depth: sm_to_routine(
                 "Units Depth Opaque",
@@ -130,6 +149,7 @@ impl UnitsRoutine {
                 data_core,
                 spp,
                 interfaces,
+                &[],
             ),
             cutout_depth: sm_to_routine(
                 "Units Depth Cutout",
@@ -141,8 +161,10 @@ impl UnitsRoutine {
                 data_core,
                 spp,
                 interfaces,
+                &[],
             ),
             per_material,
+            ssao_bgl,
         }
     }
 }
@@ -157,6 +179,7 @@ pub fn sm_to_routine<T: rend3::types::Material>(
     data_core: &mut RendererDataCore,
     spp: &mut ShaderPreProcessor,
     interfaces: &WholeFrameInterfaces,
+    extra_bgls: &[&BindGroupLayout],
 ) -> ForwardRoutine<T> {
     ForwardRoutine::new(ForwardRoutineCreateArgs {
         name,
@@ -173,7 +196,17 @@ pub fn sm_to_routine<T: rend3::types::Material>(
             fs_entry: "fs_main",
             fs_module: &shader_module,
         },
-        extra_bgls: &[],
-        descriptor_callback: Some(&|_desc, _targets| {}),
+        extra_bgls,
+        descriptor_callback: Some(&|_desc, _targets| {
+            if matches!(routine_type, RoutineType::Depth) {
+                if let Some(target) = _targets.get_mut(0) {
+                    *target = Some(ColorTargetState {
+                        format: TextureFormat::Rgb10a2Unorm,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::COLOR,
+                    });
+                }
+            }
+        }),
     })
 }

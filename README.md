@@ -19,6 +19,8 @@ Now due to the learning nature of the project, feel free to hit me up with sugge
 reviewing my code to suggest more idiomatic rust approaches as well as filling the gaps (I leave
 a lot of `// TODO:` comments everywhere I have an idea while coding).
 
+TODO: Watch https://www.youtube.com/watch?v=uEtI7JRBVXk 1h+
+
 ## Getting Started
 
 When running the code (through `cargo run`), you have to specify a few options, especially if the defaults don't fit.
@@ -31,24 +33,24 @@ Things that still need to be implemented (loosely sorted by priority):
 
 - MPQ: Load order of interface MPQs
 - Third Person Camera Controller (and sending `MOVE_FACING` packets / reworking the movement tracker)
-- Instanced Rendering of M2s (UnitMaterial is currently created in-place, even if the same texture has already been
-  used.) It remains to be seen if that is enough for rend3 to auto instance, though.
-    - TODO: Does Rend3 even have instancing?
-- Fix Doodad Collisions
 - Debug Shader Reloading. NOTE: This requires extensive rend3 changes because we need to reset the ShaderPreProcessor
   and rebuild the base_graph that is usually only build in async_start, once.
 - M2: Properly derive whether Alpha Key (Cutoff) shall be used or not, allowing for less texture fetches in shadows
+- M2: Cull Modes (Northshire cypress trees), there we'd need to disable culling / duplicate indices.
 - Configuration
-- Cross Platform support (i.e. investigate MBP 2011 failure)
+- CpuDriven support for shaders: That makes it work in non-bindless (binding) mode on old devices
 - massive Map Manager rework
+- Instanced Rendering of M2s (UnitMaterial is currently created in-place, even if the same texture has already been
+  used.) It remains to be seen if that is enough for rend3 to auto instance, though.
+    - TODO: Does Rend3 even have instancing?
 - Portals, Water, and other less important render objects
-- Anisotropic Filtering, basically setting SamplerDesc#anisotropy_clamp > 1, POT, < 16 (based on the device limits)
 - Properly Kill tracy
 - hecs:
     - Add more components and unpack update messages further
     - Implement spline walking (NPCs have predefined splines)
     - Rendering thereof
 - Physics:
+    - Fix Doodad Collisions
     - Interpolation of Player Position (otherwise stuttery feel)
     - Verify that the colliders are scaled in the right coordinate system (e.g. scaling along z does the right, expected
       thing)
@@ -63,7 +65,16 @@ Things that still need to be implemented (loosely sorted by priority):
   a lot of API surface and especially the related event handling and layout management
   needs to be handled from scratch.
 - Advanced game "logic" (e.g. chat, friend list, guilds, trading, auction house)
-- Advanced rendering techniques: AO, FXAA+SMAA?, VXGI?
+- Advanced rendering techniques: FXAA+SMAA?, VXGI?
+    - HBAO:
+        - https://developer.download.nvidia.com/presentations/2008/SIGGRAPH/HBAO_SIG08b.pdf
+        - https://developer.download.nvidia.com/assets/gamedev/files/sdk/11/SSAO11.pdf https://github.com/NVIDIAGameWorks/HBAOPlus
+        - Visbility Bitmasks as extension (VBAO)
+    - MSAA should have alpha-to-coverage
+    - Cascaded Shadow Mapping
+    - Clustered Forward Rendering
+    - GPU Culling?
+    - Meshlet?
 
 ### Rend3 Fork Ideas
 
@@ -73,4 +84,7 @@ Things that still need to be implemented (loosely sorted by priority):
 - Make Material#key() a u64 bitset and & with forward pipelines instead of equaling, which allows some (e.g. depth pre)
   passes to render for all kind of material variants instead of requiring tens of pipelines for those.
 - Maybe a way to disable sorting when a depth prepass is done anyway
-- Pass label to Texture Descriptor
+- Auto Instancing
+- Pass label to Texture Descriptor. Hint: Currently not possible without leaking as the InternalTexture requires 'static
+  bounds
+- Compute Pass Merging in Render Graph

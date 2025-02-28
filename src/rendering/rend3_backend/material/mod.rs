@@ -1,5 +1,6 @@
 use rust_embed::RustEmbed;
 
+pub mod ssao;
 pub mod terrain;
 pub mod units;
 

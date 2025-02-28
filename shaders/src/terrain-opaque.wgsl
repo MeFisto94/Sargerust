@@ -43,6 +43,9 @@ var<storage> materials: array<GpuTerrainData>;
 @group(2) @binding(0)
 var textures: binding_array<texture_2d<f32>>;
 
+@group(3) @binding(0)
+var ssao_texture: texture_2d<f32>;
+
 {{
     vertex_fetch
     object_buffer
@@ -140,6 +143,8 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
     // Diffuse color / albedo has been determined, now it's time to apply directional light and shadows.
     var color = vec3(0.0);
 
+    let ssao = textureSample(ssao_texture, nearest_sampler, vs_out.position.xy / vec2<f32>(textureDimensions(ssao_texture))).r;
+
     // View vector
     let v = -normalize(vs_out.view_position.xyz);
     // Transform vectors into view space
@@ -177,16 +182,17 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
 
         // Calculate light source vector
         let l = normalize(view_mat3 * -light.direction);
-        color += surface_shading(l, light.color, v, shadow_value, combined_albedo.xyz, vs_out.normal);
+        color += surface_shading(l, light.color, v, shadow_value * ssao, combined_albedo.xyz, vs_out.normal);
     }
 
-    return clamp_ambient_color(combined_albedo, color);
+    return clamp_ambient_color(combined_albedo, color, ssao);
 }
 
-fn clamp_ambient_color(albedo: vec4<f32>, shaded_color: vec3<f32>) -> vec4<f32> {
-    let ambient = uniforms.ambient * albedo;
+fn clamp_ambient_color(albedo: vec4<f32>, shaded_color: vec3<f32>, ssao: f32) -> vec4<f32> {
+    let ambient = uniforms.ambient * albedo * ssao;
     let shaded = vec4<f32>(shaded_color, albedo.a); // TODO: Understand why the shaded color isn't already alphaed
-    return max(ambient, shaded);
+    // return max(ambient, shaded);
+    return ambient + shaded;
 }
 
 // We don't use PBR here

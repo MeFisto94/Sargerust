@@ -1,8 +1,11 @@
 use arc_swap::ArcSwapOption;
+use encase::{ShaderSize, StorageBuffer, UniformBuffer};
 use std::collections::HashMap;
 use std::f32::consts::PI;
+use std::future::Future;
 use std::hash::BuildHasher;
 use std::ops::DerefMut;
+use std::pin::Pin;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, RwLock, Weak};
 use std::time::Instant;
@@ -15,6 +18,7 @@ use crate::rendering::asset_graph::nodes::adt_node::{ADTNode, DoodadReference};
 use crate::rendering::asset_graph::resolver::Resolver;
 use crate::rendering::common::coordinate_systems;
 use crate::rendering::common::types::{AlbedoType, Material, TransparencyType};
+use crate::rendering::rend3_backend::material::ssao::{SAMPLE_SIZE, SSAORoutines};
 use crate::rendering::rend3_backend::material::terrain::terrain_material::TerrainMaterial;
 use crate::rendering::rend3_backend::material::terrain::terrain_routine::TerrainRoutine;
 use crate::rendering::rend3_backend::material::units::units_material::{UnitsAlbedo, UnitsMaterial};
@@ -25,21 +29,28 @@ use crate::rendering::rend3_backend::{
 use glam::{Mat4, UVec2, Vec3A, Vec4, Vec4Swizzles};
 use itertools::Itertools;
 use log::{trace, warn};
-use rend3::graph::{RenderGraph, ViewportRect};
+use rend3::graph::{
+    NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetDescriptor, ViewportRect,
+};
 use rend3::types::{
     Camera, CameraProjection, Handedness, MaterialHandle, PresentMode, SampleCount, Texture, Texture2DHandle,
 };
+use rend3::util::bind_merge::BindGroupBuilder;
+use rend3::util::math::div_round_up;
 use rend3::util::typedefs::FastHashMap;
-use rend3::{Renderer, ShaderPreProcessor, graph};
+use rend3::{InstanceAdapterDevice, Renderer, ShaderPreProcessor, graph};
 use rend3_framework::{EventContext, Grabber, RedrawContext, SetupContext};
 use rend3_routine::base::{
     BaseRenderGraph, BaseRenderGraphInputs, BaseRenderGraphIntermediateState, BaseRenderGraphRoutines,
     BaseRenderGraphSettings, OutputRenderTarget,
 };
 use rend3_routine::common::CameraSpecifier;
+use rend3_routine::compute::ComputeRoutineArgs;
 use rend3_routine::forward::ForwardRoutineArgs;
 use rend3_routine::{clear, forward};
 use sargerust_files::m2::types::{M2TextureFlags, M2TextureType};
+use wgpu::util::{DeviceExt, TextureDataOrder};
+use wgpu::{BufferUsages, Features, TextureDescriptor};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
@@ -63,6 +74,7 @@ pub struct RenderingApplication {
 
     terrain_routine: Option<Mutex<TerrainRoutine>>,
     units_routine: Option<Mutex<UnitsRoutine>>,
+    ssao_routine: Option<Mutex<SSAORoutines>>,
     sample_count: SampleCount,
 }
 
@@ -83,6 +95,7 @@ impl RenderingApplication {
             fly_cam: false,
             terrain_routine: None,
             units_routine: None,
+            ssao_routine: None,
             sample_count,
         }
     }
@@ -630,7 +643,7 @@ impl rend3_framework::App for RenderingApplication {
 
     fn create_base_rendergraph(&mut self, renderer: &Arc<Renderer>, spp: &mut ShaderPreProcessor) -> BaseRenderGraph {
         let mut data_core = renderer.data_core.lock();
-        let render_graph = BaseRenderGraph::new(renderer, spp);
+        let render_graph = BaseRenderGraph::new(renderer, spp, 16);
         self.terrain_routine = Some(Mutex::new(TerrainRoutine::new(
             renderer,
             &mut data_core,
@@ -645,9 +658,25 @@ impl rend3_framework::App for RenderingApplication {
             &render_graph.interfaces,
         )));
 
+        self.ssao_routine = Some(Mutex::new(SSAORoutines::new(renderer)));
+
         drop(data_core);
 
         render_graph
+    }
+
+    fn create_iad<'a>(
+        &'a mut self,
+    ) -> Pin<Box<dyn Future<Output = Result<InstanceAdapterDevice, rend3::RendererInitializationError>> + 'a>> {
+        Box::pin(async move {
+            rend3::create_iad(
+                None,
+                None,
+                None,
+                Some(Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES),
+            )
+            .await
+        })
     }
 
     fn sample_count(&self) -> SampleCount {
@@ -910,6 +939,12 @@ impl rend3_framework::App for RenderingApplication {
             .expect("units routine to be setup")
             .lock()
             .expect("Units Routine Lock");
+        let ssao_routines = self
+            .ssao_routine
+            .as_ref()
+            .expect("units routine to be setup")
+            .lock()
+            .expect("Units Routine Lock");
 
         // Build a rendergraph
         let mut graph = rend3::graph::RenderGraph::new();
@@ -944,6 +979,7 @@ impl rend3_framework::App for RenderingApplication {
             },
             &terrain_routine,
             &units_routine,
+            &ssao_routines,
         );
 
         // Dispatch a render using the built up rendergraph!
@@ -961,6 +997,7 @@ fn base_rendergraph_add_to_graph<'node>(
     settings: BaseRenderGraphSettings,
     terrain_routine: &'node TerrainRoutine,
     units_routine: &'node UnitsRoutine,
+    ssao_routines: &'node SSAORoutines,
 ) {
     // Create the data and handles for the graph.
     let mut state = BaseRenderGraphIntermediateState::new(graph, inputs, settings);
@@ -975,8 +1012,201 @@ fn base_rendergraph_add_to_graph<'node>(
     // Perform compute based skinning.
     state.skinning(base_graph);
 
+    let normals_handle = state.graph.add_render_target(RenderTargetDescriptor {
+        label: Some("Normals Buffer".into()),
+        resolution: state.inputs.target.resolution,
+        depth: 1,
+        mip_levels: Some(1),
+        samples: state.inputs.target.samples,
+        format: wgpu::TextureFormat::Rgb10a2Unorm, // TODO: RG16F with reconstruction of z? Makes it harder to renderdoc
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+    });
+
+    let depth_renderpass = RenderPassTargets {
+        depth_stencil: state.primary_renderpass.depth_stencil.clone(),
+        targets: vec![RenderPassTarget {
+            color: normals_handle,
+            clear: Vec4::ZERO,
+            resolve: None,
+        }],
+    };
+
+    // Early-Z
+    let routines = [&units_routine.opaque_depth, &units_routine.cutout_depth];
+    for routine in routines {
+        routine.add_forward_to_graph(
+            ForwardRoutineArgs {
+                graph: state.graph,
+                label: "Units early-z",
+                camera: CameraSpecifier::Viewport,
+                binding_data: forward::ForwardRoutineBindingData {
+                    whole_frame_uniform_bg: state.shadow_uniform_bg,
+                    per_material_bgl: &units_routine.per_material,
+                    extra_bgs: None,
+                },
+                samples: state.inputs.target.samples,
+                renderpass: depth_renderpass.clone(),
+            },
+            |_| (),
+            |_, _, _| (),
+        );
+    }
+
+    terrain_routine.depth_routine.add_forward_to_graph(
+        ForwardRoutineArgs {
+            graph: state.graph,
+            label: "Terrain early-z",
+            camera: CameraSpecifier::Viewport,
+            binding_data: forward::ForwardRoutineBindingData {
+                whole_frame_uniform_bg: state.shadow_uniform_bg,
+                per_material_bgl: &terrain_routine.per_material,
+                extra_bgs: None,
+            },
+            samples: state.inputs.target.samples,
+            renderpass: depth_renderpass.clone(),
+        },
+        |_| (),
+        |_, _, _| (),
+    );
+
+    // SSAO Compute.
+    let main_element = state.graph.add_render_target(RenderTargetDescriptor {
+        label: Some("SSAO main buffer".into()),
+        resolution: state.inputs.target.resolution,
+        depth: 1,
+        mip_levels: Some(1),
+        samples: SampleCount::One,
+        format: wgpu::TextureFormat::R8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
+    });
+
+    ssao_routines.main.add_compute_to_graph(
+        ComputeRoutineArgs {
+            graph: state.graph,
+            label: "SSAO Main",
+        },
+        |builder| {
+            let depth_handle = builder.add_render_target(
+                depth_renderpass.depth_stencil.unwrap().target,
+                NodeResourceUsage::Input,
+            );
+            let normal_handle = builder.add_render_target(normals_handle, NodeResourceUsage::Input);
+            let output_handle = builder.add_render_target(main_element, NodeResourceUsage::Output);
+            let uniforms_handle = builder.add_data(state.forward_uniform_bg, NodeResourceUsage::Input);
+            (depth_handle, normal_handle, uniforms_handle, output_handle)
+        },
+        move |ctx, cpass, bgl, (depth_handle, normal_handle, uniforms_handle, output_handle)| {
+            let depth = ctx.graph_data.get_render_target(depth_handle);
+            let normals = ctx.graph_data.get_render_target(normal_handle);
+            let uniforms = ctx
+                .graph_data
+                .get_data(ctx.temps, uniforms_handle)
+                .expect("Whole Frame Uniforms to be present");
+            let output = ctx.graph_data.get_render_target(output_handle);
+
+            let samples_buffer = ctx.renderer.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("SSAO Samples Buffers"),
+                size: 16 * SAMPLE_SIZE as u64, // for some reason padded to 16 bytes instead of 12
+                usage: BufferUsages::UNIFORM,
+                mapped_at_creation: true,
+            });
+            let mut mapping = samples_buffer.slice(..).get_mapped_range_mut();
+            UniformBuffer::new(&mut *mapping)
+                .write(&ssao_routines.main.user_data.0)
+                .unwrap();
+            drop(mapping);
+            samples_buffer.unmap();
+
+            let mut noise_buffer = UniformBuffer::new(Vec::<u8>::new());
+            noise_buffer.write(&ssao_routines.main.user_data.1).unwrap();
+
+            let noise_texture = ctx.renderer.device.create_texture_with_data(
+                &ctx.renderer.queue,
+                &TextureDescriptor {
+                    label: Some("SSAO Noise Texture"),
+                    size: wgpu::Extent3d {
+                        width: 4,
+                        height: 4,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Rgba32Float,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                },
+                TextureDataOrder::LayerMajor,
+                &noise_buffer.into_inner(),
+            );
+
+            let noise_texture_view = noise_texture.create_view(&wgpu::TextureViewDescriptor {
+                label: Some("SSAO Noise Texture View"),
+                ..Default::default()
+            });
+
+            let bg = ctx.temps.add(
+                BindGroupBuilder::new() //
+                    .append_texture_view(depth)
+                    .append_texture_view(normals)
+                    .append_texture_view(output)
+                    .append_buffer(&samples_buffer)
+                    .append_texture_view(&noise_texture_view)
+                    .build(&ctx.renderer.device, Some("Compute BG"), &bgl[1]),
+            );
+
+            cpass.set_bind_group(0, &*uniforms, &[]);
+            cpass.set_bind_group(1, &*bg, &[]);
+            cpass.dispatch_workgroups(
+                div_round_up(state.inputs.target.resolution.x, 8),
+                div_round_up(state.inputs.target.resolution.y, 8),
+                1,
+            );
+        },
+    );
+
+    let blurred_element = state.graph.add_render_target(RenderTargetDescriptor {
+        label: Some("SSAO blur buffer".into()),
+        resolution: state.inputs.target.resolution,
+        depth: 1,
+        mip_levels: Some(1),
+        samples: SampleCount::One,
+        format: wgpu::TextureFormat::R16Float,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::STORAGE_BINDING,
+    });
+
+    ssao_routines.blur.add_compute_to_graph(
+        ComputeRoutineArgs {
+            graph: state.graph,
+            label: "SSAO Blur",
+        },
+        |builder| {
+            let main_handle = builder.add_render_target(main_element, NodeResourceUsage::Input);
+            let blurred_handle = builder.add_render_target(blurred_element, NodeResourceUsage::Output);
+            (main_handle, blurred_handle)
+        },
+        move |ctx, cpass, bgl, (main_handle, blurred_handle)| {
+            let tx_main = ctx.graph_data.get_render_target(main_handle);
+            let tx_blurred = ctx.graph_data.get_render_target(blurred_handle);
+
+            let bg = ctx.temps.add(
+                BindGroupBuilder::new() //
+                    .append_texture_view(tx_main)
+                    .append_texture_view(tx_blurred)
+                    .build(&ctx.renderer.device, Some("Blur BG"), &bgl[0]),
+            );
+
+            cpass.set_bind_group(0, &*bg, &[]);
+            cpass.dispatch_workgroups(
+                div_round_up(state.inputs.target.resolution.x, 8),
+                div_round_up(state.inputs.target.resolution.y, 8),
+                1,
+            );
+        },
+    );
+
     // Render all the shadows to the shadow map.
-    state.pbr_shadow_rendering();
+    // state.pbr_shadow_rendering();
 
     // Units Shadows
     for (shadow_index, desc) in state.inputs.eval_output.shadows.iter().enumerate() {
@@ -995,42 +1225,64 @@ fn base_rendergraph_add_to_graph<'node>(
 
         let routines = [&units_routine.opaque_depth, &units_routine.cutout_depth];
         for routine in routines {
-            routine.add_forward_to_graph(ForwardRoutineArgs {
-                graph: state.graph,
-                label: &format!("Units shadow renderering S{shadow_index}"),
-                camera: CameraSpecifier::Shadow(shadow_index as u32),
-                binding_data: forward::ForwardRoutineBindingData {
-                    whole_frame_uniform_bg: state.shadow_uniform_bg,
-                    per_material_bgl: &units_routine.per_material,
-                    extra_bgs: None,
+            routine.add_forward_to_graph(
+                ForwardRoutineArgs {
+                    graph: state.graph,
+                    label: &format!("Units shadow renderering S{shadow_index}"),
+                    camera: CameraSpecifier::Shadow(shadow_index as u32),
+                    binding_data: forward::ForwardRoutineBindingData {
+                        whole_frame_uniform_bg: state.shadow_uniform_bg,
+                        per_material_bgl: &units_routine.per_material,
+                        extra_bgs: None,
+                    },
+                    samples: SampleCount::One,
+                    renderpass: renderpass.clone(),
                 },
-                samples: SampleCount::One,
-                renderpass: renderpass.clone(),
-            });
+                |_| (),
+                |_, _, _| (),
+            );
         }
     }
     // TODO: Terrain Shadow Rendering?
 
     let routines = [&units_routine.opaque_routine, &units_routine.cutout_routine];
     for routine in routines {
-        routine.add_forward_to_graph(ForwardRoutineArgs {
-            graph: state.graph,
-            label: "Units Forward Pass",
-            camera: CameraSpecifier::Viewport,
-            binding_data: forward::ForwardRoutineBindingData {
-                whole_frame_uniform_bg: state.forward_uniform_bg,
-                per_material_bgl: &units_routine.per_material,
-                extra_bgs: None,
+        routine.add_forward_to_graph(
+            ForwardRoutineArgs {
+                graph: state.graph,
+                label: "Units Forward Pass",
+                camera: CameraSpecifier::Viewport,
+                binding_data: forward::ForwardRoutineBindingData {
+                    whole_frame_uniform_bg: state.forward_uniform_bg,
+                    per_material_bgl: &units_routine.per_material,
+                    extra_bgs: None,
+                },
+                samples: state.inputs.target.samples,
+                renderpass: state.primary_renderpass.clone(),
             },
-            samples: state.inputs.target.samples,
-            renderpass: state.primary_renderpass.clone(),
-        });
+            |builder| builder.add_render_target(blurred_element, NodeResourceUsage::Input),
+            |ctx, render_pass, (blur_target)| {
+                let tx_blurred = ctx.graph_data.get_render_target(blur_target);
+
+                let bg = ctx.temps.add(
+                    BindGroupBuilder::new() //
+                        .append_texture_view(tx_blurred)
+                        .build(
+                            &ctx.renderer.device,
+                            Some("BG SSAO Results"),
+                            &units_routine.ssao_bgl,
+                        ),
+                );
+
+                // Technically "extra_bg" starts at 3, but this is None here anyway (we can't build and pass the BG as args)
+                render_pass.set_bind_group(3, &*bg, &[]);
+            },
+        );
     }
 
     // Render after units, for less overdraw.
-    terrain_routine
-        .opaque_routine
-        .add_forward_to_graph(ForwardRoutineArgs {
+    terrain_routine.opaque_routine.add_forward_to_graph(
+        ForwardRoutineArgs {
             graph: state.graph,
             label: "Terrain Forward Pass",
             camera: CameraSpecifier::Viewport,
@@ -1041,10 +1293,28 @@ fn base_rendergraph_add_to_graph<'node>(
             },
             samples: state.inputs.target.samples,
             renderpass: state.primary_renderpass.clone(),
-        });
+        },
+        |builder| builder.add_render_target(blurred_element, NodeResourceUsage::Input),
+        |ctx, render_pass, (blur_target)| {
+            let tx_blurred = ctx.graph_data.get_render_target(blur_target);
+
+            let bg = ctx.temps.add(
+                BindGroupBuilder::new() //
+                    .append_texture_view(tx_blurred)
+                    .build(
+                        &ctx.renderer.device,
+                        Some("BG SSAO Results"),
+                        &units_routine.ssao_bgl,
+                    ),
+            );
+
+            // Technically "extra_bg" starts at 3, but this is None here anyway (we can't build and pass the BG as args)
+            render_pass.set_bind_group(3, &*bg, &[]);
+        },
+    );
 
     // Do the first pass, rendering the predicted triangles from last frame.
-    state.pbr_render();
+    // state.pbr_render();
 
     // Render the skybox.
     state.skybox();
@@ -1053,7 +1323,7 @@ fn base_rendergraph_add_to_graph<'node>(
     //
     // This _must_ happen after culling, as all transparent objects are
     // considered "residual".
-    state.pbr_forward_rendering_transparent();
+    // state.pbr_forward_rendering_transparent();
 
     // Tonemap the HDR inner buffer to the output buffer.
     state.tonemapping();

@@ -44,6 +44,7 @@ var textures: binding_array<texture_2d<f32>>;
     vertex_fetch
     object_buffer
     position
+    normal
     texture_coords_0
 }}
 
@@ -51,6 +52,7 @@ struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) @interpolate(flat) material: u32,
     @location(1) coords0: vec2<f32>,
+    @location(2) normal: vec3<f32>,
 }
 
 @vertex
@@ -59,7 +61,10 @@ fn vs_main(@builtin(instance_index) instance_index: u32, @builtin(vertex_index) 
     let data = object_buffer[indices.object];
     let vs_in = get_vertices(indices);
 
-    let model_view_proj = per_camera_uniform.view_proj * object_buffer[indices.object].transform;
+    let model = object_buffer[indices.object].transform;
+    let model_view_proj = per_camera_uniform.view_proj * model;
+    let m_mat3 = mat3x3<f32>(model[0].xyz, model[1].xyz, model[2].xyz);
+    let inv_scale_sq = mat3_inv_scale_squared(m_mat3);
 
     let position_vec4 = vec4<f32>(vs_in.position, 1.0);
 
@@ -67,11 +72,12 @@ fn vs_main(@builtin(instance_index) instance_index: u32, @builtin(vertex_index) 
     vs_out.coords0 = vs_in.texture_coords_0;
     vs_out.material = data.material_index;
     vs_out.position = model_view_proj * position_vec4;
+    vs_out.normal = m_mat3 * (inv_scale_sq * vs_in.normal);
     return vs_out;
 }
 
 @fragment
-fn fs_main(vs_out: VertexOutput) {
+fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
 {{#if discard}}
     var material = materials[vs_out.material]; // needs to be var, otherwise accessing additional_layers[i] won't work.
 
@@ -98,4 +104,6 @@ fn fs_main(vs_out: VertexOutput) {
         discard;
     }
     {{/if}}
+
+    return vec4(vs_out.normal, 0);
 }

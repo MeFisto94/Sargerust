@@ -46,10 +46,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
 dependencies = [
  "cfg-if",
- "getrandom",
+ "getrandom 0.2.11",
  "once_cell",
  "version_check",
- "zerocopy",
+ "zerocopy 0.7.32",
 ]
 
 [[package]]
@@ -1125,8 +1125,20 @@ dependencies = [
  "cfg-if",
  "js-sys",
  "libc",
- "wasi",
+ "wasi 0.11.0+wasi-snapshot-preview1",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "getrandom"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43a49c392881ce6d5c3b8cb70f98717b7c07aabbdff06687b9030dbfbe2725f8"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "wasi 0.13.3+wasi-0.2.2",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -1741,7 +1753,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
 dependencies = [
  "libc",
- "wasi",
+ "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.48.0",
 ]
 
@@ -1832,7 +1844,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a51313c5820b0b02bd422f4b44776fbf47961755c74ce64afc73bfad10226c3"
 dependencies = [
- "getrandom",
+ "getrandom 0.2.11",
 ]
 
 [[package]]
@@ -2642,8 +2654,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
 dependencies = [
  "libc",
- "rand_chacha",
- "rand_core",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
+]
+
+[[package]]
+name = "rand"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3779b94aeb87e8bd4e834cee3650289ee9e0d5677f976ecdb6d219e5f4f6cd94"
+dependencies = [
+ "rand_chacha 0.9.0",
+ "rand_core 0.9.2",
+ "zerocopy 0.8.20",
 ]
 
 [[package]]
@@ -2653,7 +2676,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
 dependencies = [
  "ppv-lite86",
- "rand_core",
+ "rand_core 0.6.4",
+]
+
+[[package]]
+name = "rand_chacha"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
+dependencies = [
+ "ppv-lite86",
+ "rand_core 0.9.2",
 ]
 
 [[package]]
@@ -2662,7 +2695,17 @@ version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
- "getrandom",
+ "getrandom 0.2.11",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a509b1a2ffbe92afab0e55c8fd99dea1c280e8171bd2d88682bb20bc41cbc2c"
+dependencies = [
+ "getrandom 0.3.1",
+ "zerocopy 0.8.20",
 ]
 
 [[package]]
@@ -2749,7 +2792,7 @@ version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a18479200779601e498ada4e8c1e1f50e3ee19deb0259c25825a98b5603b2cb4"
 dependencies = [
- "getrandom",
+ "getrandom 0.2.11",
  "libredox 0.0.1",
  "thiserror",
 ]
@@ -2835,7 +2878,7 @@ dependencies = [
 [[package]]
 name = "rend3"
 version = "0.23.1"
-source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#3db035a796821e3483edf5dc9502f136e09bef72"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork#33de907e619001b9f57e8189d131eef32e742f8a"
 dependencies = [
  "arrayvec",
  "bimap",
@@ -2855,7 +2898,7 @@ dependencies = [
  "parking_lot",
  "profiling",
  "range-alloc",
- "rend3-types 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3-types 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
  "rust-embed",
  "rustc-hash 1.1.0",
  "serde",
@@ -2898,7 +2941,7 @@ dependencies = [
 [[package]]
 name = "rend3-framework"
 version = "0.23.1"
-source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#3db035a796821e3483edf5dc9502f136e09bef72"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork#33de907e619001b9f57e8189d131eef32e742f8a"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -2914,8 +2957,8 @@ dependencies = [
  "parking_lot",
  "pollster",
  "profiling",
- "rend3 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
- "rend3-routine 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
+ "rend3-routine 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -2952,7 +2995,7 @@ dependencies = [
 [[package]]
 name = "rend3-routine"
 version = "0.23.1"
-source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#3db035a796821e3483edf5dc9502f136e09bef72"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork#33de907e619001b9f57e8189d131eef32e742f8a"
 dependencies = [
  "arrayvec",
  "bitflags 2.8.0",
@@ -2966,7 +3009,7 @@ dependencies = [
  "ordered-float",
  "parking_lot",
  "profiling",
- "rend3 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
  "rust-embed",
  "serde",
  "serde_json",
@@ -2992,7 +3035,7 @@ dependencies = [
 [[package]]
 name = "rend3-types"
 version = "0.23.1"
-source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials#3db035a796821e3483edf5dc9502f136e09bef72"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork#33de907e619001b9f57e8189d131eef32e742f8a"
 dependencies = [
  "bitflags 2.8.0",
  "bytemuck",
@@ -3150,10 +3193,11 @@ dependencies = [
  "pollster",
  "profiling",
  "quick_cache",
+ "rand 0.9.0",
  "rapier3d",
- "rend3 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
- "rend3-framework 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
- "rend3-routine 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Fcustom-materials)",
+ "rend3 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
+ "rend3-framework 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
+ "rend3-routine 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
  "rust-embed",
  "sargerust-files",
  "serde",
@@ -3878,6 +3922,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
+name = "wasi"
+version = "0.13.3+wasi-0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26816d2e1a4a36a2940b96c5296ce403917633dff8f3440e9b236ed6f6bacad2"
+dependencies = [
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "wasm-bindgen"
 version = "0.2.99"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4578,6 +4631,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "wit-bindgen-rt"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3268f3d866458b787f390cf61f4bbb563b922d091359f9608842999eaee3943c"
+dependencies = [
+ "bitflags 2.8.0",
+]
+
+[[package]]
 name = "wow_dbc"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4599,7 +4661,7 @@ checksum = "cc239609a34604bf1c3fc5c00ce4c9534acea0413f98af3a19d66184b0a3787d"
 dependencies = [
  "hmac",
  "num-bigint",
- "rand",
+ "rand 0.8.5",
  "sha-1",
 ]
 
@@ -4693,7 +4755,16 @@ version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74d4d3961e53fa4c9a25a8637fc2bfaf2595b3d3ae34875568a5cf64787716be"
 dependencies = [
- "zerocopy-derive",
+ "zerocopy-derive 0.7.32",
+]
+
+[[package]]
+name = "zerocopy"
+version = "0.8.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dde3bb8c68a8f3f1ed4ac9221aad6b10cece3e60a8e2ea54a6a2dec806d0084c"
+dependencies = [
+ "zerocopy-derive 0.8.20",
 ]
 
 [[package]]
@@ -4701,6 +4772,17 @@ name = "zerocopy-derive"
 version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ce1b18ccd8e73a9321186f97e46f9f04b778851177567b1975109d26a08d2a6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.94",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.8.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eea57037071898bf96a6da35fd626f4f27e9cee3ead2a6c703cf09d472b2e700"
 dependencies = [
  "proc-macro2",
  "quote",

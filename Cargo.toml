@@ -107,9 +107,9 @@ chrono = "0.4.39"
 # Linear algebra library
 glam = { version = "0.28.0", features = ["approx"] }
 # Renderer core
-rend3 = { git = "https://github.com/MeFisto94/rend3-hp/", branch = "feature/custom-materials" }
+rend3 = { git = "https://github.com/MeFisto94/rend3-hp/", branch = "feature/fork" }
 # Programmable render list that dictates how the scene renders
-rend3-routine = { git = "https://github.com/MeFisto94/rend3-hp/", branch = "feature/custom-materials" }
+rend3-routine = { git = "https://github.com/MeFisto94/rend3-hp/", branch = "feature/fork" }
 # For the custom materials
 encase = "0.9.0"
 encase_derive = "0.9.0"
@@ -119,7 +119,7 @@ wgpu = "23.0" # Needs to be in sync with rend3, used for custom materials.
 rust-embed = "8.1.0"
 
 # Framework that deals with the event loop, setting up the renderer, and platform differences.
-rend3-framework = { git = "https://github.com/MeFisto94/rend3-hp/", branch = "feature/custom-materials" }
+rend3-framework = { git = "https://github.com/MeFisto94/rend3-hp/", branch = "feature/fork" }
 # Provides `block_on` to wait for futures from sync code
 pollster = "0.3"
 
@@ -143,3 +143,5 @@ dashmap = "6.1.0"
 rapier3d = { version = "0.23.0", features = ["simd-nightly"] }
 # Caution: The convert-glam feature needs to match the glam version, otherwise it will cause duplicate dependencies in the tree
 nalgebra = { version = "0.33.2", features = ["convert-glam028"] } # Match version with rapier3d.
+
+rand = "0.9.0"
