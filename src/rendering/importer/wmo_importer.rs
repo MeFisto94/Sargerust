@@ -2,7 +2,7 @@ use std::sync::RwLock;
 
 use glam::{Vec2, Vec3, Vec4};
 use itertools::Itertools;
-use log::trace;
+use log::{debug, info, trace};
 
 use sargerust_files::wmo::reader::WMOReader;
 use sargerust_files::wmo::types::{WMOGroupAsset, WMORootAsset};
@@ -130,8 +130,11 @@ impl WMOGroupImporter {
                             mat.transparency = match _mat.blendMode {
                                 0 => TransparencyType::Opaque,
                                 1 => TransparencyType::Cutout { cutout: 0.5 },
-                                _ => TransparencyType::Opaque,
-                            }
+                                _ => {
+                                    debug!("Unknown blend mode: {}", _mat.blendMode);
+                                    TransparencyType::Opaque
+                                }
+                            };
                         }
 
                         mat

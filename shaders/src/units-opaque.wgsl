@@ -108,8 +108,13 @@ fn fs_main(vs_out: VertexOutput) -> @location(0) vec4<f32> {
             break;
         }
 
-        let albedo = textureSampleGrad(textures[tex_index - 1u], primary_sampler, coords, uvdx, uvdy);
-        albedo_sum = mix(albedo_sum, albedo, albedo.a);
+        var albedo = textureSampleGrad(textures[tex_index - 1u], primary_sampler, coords, uvdx, uvdy);
+        if (i == 0) {
+            // The base layer needs to be fully blend.
+            albedo_sum = albedo;
+        } else {
+            albedo_sum = mix(albedo_sum, albedo, albedo.a);
+        }
     }
 
     if (albedo_sum.a < material.alpha_cutout) {
