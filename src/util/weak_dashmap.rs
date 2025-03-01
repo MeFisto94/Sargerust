@@ -52,7 +52,7 @@ impl<K, V> WeakKeyDashMapPruneOnInsert<K, V> {
         F: FnOnce(&Weak<K>) -> V,
     {
         let ptr = key.as_ptr();
-        if !self.inner.contains_key(&ptr) {
+        if self.inner.contains_key(&ptr) {
             return;
         }
 

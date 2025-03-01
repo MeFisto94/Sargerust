@@ -50,7 +50,6 @@ Things that still need to be implemented (loosely sorted by priority):
     - Implement spline walking (NPCs have predefined splines)
     - Rendering thereof
 - Physics:
-    - Fix Doodad Collisions
     - Interpolation of Player Position (otherwise stuttery feel)
     - Verify that the colliders are scaled in the right coordinate system (e.g. scaling along z does the right, expected
       thing)
