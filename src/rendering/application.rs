@@ -1,5 +1,5 @@
 use arc_swap::ArcSwapOption;
-use encase::{ShaderSize, StorageBuffer, UniformBuffer};
+use encase::UniformBuffer;
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::future::Future;
@@ -393,10 +393,10 @@ impl RenderingApplication {
                 .write()
                 .expect("Object Handle Write Lock");
 
-            assert!(
-                !loaded_texture_layers.is_empty(),
-                "At least one texture layer has to be present"
-            );
+            if loaded_texture_layers.is_empty() {
+                // Some tiles have no layers at all, e.g. below stormwind. I think this is intentional/empty tiles.
+                continue;
+            }
 
             let base_texture = loaded_texture_layers[0].0.clone();
             let mut additional_layers = [const { None }; 6];
@@ -1295,7 +1295,7 @@ fn base_rendergraph_add_to_graph<'node>(
             renderpass: state.primary_renderpass.clone(),
         },
         |builder| builder.add_render_target(blurred_element, NodeResourceUsage::Input),
-        |ctx, render_pass, (blur_target)| {
+        |ctx, render_pass, blur_target| {
             let tx_blurred = ctx.graph_data.get_render_target(blur_target);
 
             let bg = ctx.temps.add(
