@@ -2,6 +2,7 @@
 #![feature(duration_millis_float)]
 
 use crate::game::application::GameApplication;
+use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::settings::{CliArgs, OperationMode};
 use clap::Parser;
@@ -79,8 +80,8 @@ fn main() {
 }
 
 #[allow(unused)]
-fn debug_dump_file(archive: &mut Archive, file: &str) {
-    let buf = io::mpq::loader::read_mpq_file_into_owned(archive, file).unwrap();
+fn debug_dump_file(loader: &MPQLoader, file: &str) {
+    let buf = loader.load_raw_owned(file).unwrap();
     std::fs::write(format!("./{}", file.replace('\\', "_")), buf).unwrap();
 }
 
