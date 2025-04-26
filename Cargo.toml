@@ -134,7 +134,7 @@ wow_login_messages = { git = "https://github.com/gtker/wow_messages", features =
 wow_world_messages = { git = "https://github.com/gtker/wow_messages", features = ["sync", "wrath", "print-testcase"], rev = "d30a0aea8213e963534c638c8166cae0d36e9f9f" }
 
 # async
-tokio = { version = "1.33.0", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 
 # replacing RwLock<HashMap<_>>, especially in the resolvers, that had held a global hashmap lock when inserting, massively impacting parallelity
 dashmap = "6.1.0"
