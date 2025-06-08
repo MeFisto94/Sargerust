@@ -20,6 +20,7 @@ members = [
     "sargerust-files/sargerust-files-derive-parseable",
     "mpq-rust",
     "framexml-parser",
+    "framexml"
 ]
 
 # Force release builds for rapier

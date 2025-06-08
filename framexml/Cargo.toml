@@ -1,0 +1,17 @@
+[package]
+name = "framexml"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+framexml-parser = { path = "../framexml-parser" }
+log = "0.4.27"
+# TODO: Should we have a "common" crate for both framexml and other game lua stuff? But then, even addons are framexml
+# lua52 for the bit operations module, but that excludes lua 5.4 (which is okay for the game), but at some point we want luajit/luaua anyway
+mlua = { version = "0.10.3", features = ["lua52", "macros", "vendored"] }
+stackmap = { version = "0.1.2" }
+glam = { version = "0.28.0", features = ["approx"] } # Keep in sync with the root Cargo.toml
+
+[dev-dependencies]
+sargerust = { path = "../" }
+test-log = "0.2.17"
