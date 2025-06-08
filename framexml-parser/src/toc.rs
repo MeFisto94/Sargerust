@@ -10,6 +10,7 @@ pub struct TocFile {
 
 impl TocFile {
     pub fn parse_file<R: std::io::BufRead>(reader: R) -> Result<Self, std::io::Error> {
+        // Technically, the original client is limited to 1024 characters per line.
         let mut directives = HashMap::new();
         let mut files = Vec::new();
         let mut comments = Vec::new();

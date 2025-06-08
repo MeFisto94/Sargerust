@@ -12,7 +12,9 @@ pub enum UiItem {
     // TODO: both Script and Include could carry a script as their $value?/content
     Script {
         #[serde(rename = "@file")]
-        file: String,
+        file: Option<String>,
+        #[serde(rename = "$value")]
+        content: Option<String>,
     },
     Button(FrameType),
     Include {
@@ -30,6 +32,7 @@ macro_rules! layout_frame_type {
     ($vis:vis struct $name:ident { $($fields:tt)* }) => {
     #[derive(Deserialize, Debug)]
     $vis struct $name {
+        // TODO: Technically we'd need this to be/have an enum, as things like the "Scripts" tag happens multiple times.
         // LayoutFrameType Start
         #[serde(rename = "@name")]
         pub name: Option<String>,
@@ -192,12 +195,13 @@ layout_frame_type!(
 layout_frame_type!(
     pub struct TextureType {
         #[serde(rename = "@file")]
-        pub file: String,
+        pub file: Option<String>, // Could be inherited from the parent
     }
 );
 
 #[derive(Deserialize, Debug)]
 pub enum LayerItems {
+    #[serde(alias = "Fontstring")]
     FontString(FontStringType),
     Texture(TextureType),
 }

@@ -1,6 +1,8 @@
 use crate::typedefs::FramePoint;
 use serde_derive::Deserialize;
 
+// TODO: setAllPoints -> TopLeft and BottomRight
+
 #[derive(Deserialize, Debug)]
 pub struct Anchor {
     #[serde(rename = "@point")]
@@ -9,10 +11,11 @@ pub struct Anchor {
     pub relative_to: Option<String>, // name of another frame
     #[serde(rename = "@relativePoint")]
     pub relative_point: Option<FramePoint>,
+    // TODO: Some blizz UI (e.g. FrameXML\PVPFrame.xml) has x="", so this'd fail, we may need to resort to string....
     #[serde(rename = "@x")]
-    pub x: Option<i32>,
+    pub x: Option<f32>,
     #[serde(rename = "@y")]
-    pub y: Option<i32>,
+    pub y: Option<f32>,
     #[serde(rename = "$value", default)]
     pub children: Vec<AnchorChild>,
 }
