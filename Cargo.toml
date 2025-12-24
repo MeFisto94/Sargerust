@@ -77,7 +77,7 @@ env_logger = { version = "0.11.3", default-features = false, features = ["auto-c
 log = "0.4.21"
 
 # Tracing / Profiling
-tracy-client = { version = "0.18.0", optional = true } # https://github.com/nagisa/rust_tracy_client/tree/main/tracy-client -> tracy client 0.11.1
+tracy-client = { version = "0.18.3", optional = true } # https://github.com/nagisa/rust_tracy_client/tree/main/tracy-client -> tracy client 0.11.1
 profiling = { version = "1.0.16", default-features = false }
 wgpu-profiler = { version = "0.19.0", features = ["tracy"] }
 
