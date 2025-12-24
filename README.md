@@ -35,7 +35,6 @@ Things that still need to be implemented (loosely sorted by priority):
 - Third Person Camera Controller (and sending `MOVE_FACING` packets / reworking the movement tracker)
 - Debug Shader Reloading. NOTE: This requires extensive rend3 changes because we need to reset the ShaderPreProcessor
   and rebuild the base_graph that is usually only built in async_start, once.
-- M2: Properly derive whether Alpha Key (Cutoff) shall be used or not, allowing for less texture fetches in shadows
 - M2: Cull Modes (Northshire cypress trees), there we'd need to disable culling / duplicate indices.
 - Configuration
 - CpuDriven support for shaders: That makes it work in non-bindless (binding) mode on old devices

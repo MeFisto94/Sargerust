@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
 use crate::rendering::common::types::Mesh;
-use crate::rendering::importer::m2_importer::{M2Importer, M2Material};
+use crate::rendering::importer::m2_importer::{M2Importer, ModelMaterial};
 use crate::rendering::rend3_backend::IRTextureReference;
 use itertools::Itertools;
 use sargerust_files::m2::reader::M2Reader;
@@ -12,7 +12,7 @@ use sargerust_files::m2::types::{M2Texture, M2TextureType};
 #[derive(Debug)]
 pub struct M2MeshAndMaterial {
     pub mesh: Mesh,
-    pub material: M2Material,
+    pub material: ModelMaterial,
     pub geoset_index: u16,
 }
 
@@ -59,7 +59,7 @@ impl M2Loader {
                         )
                     });
 
-                let mesh = M2Importer::create_mesh(&m2_asset, &skin, &sub_mesh);
+                let mesh = M2Importer::create_mesh(&m2_asset, &skin, sub_mesh);
                 let material = M2Importer::create_m2_material(&m2_asset, batch);
                 let geoset_index = sub_mesh.skinSectionId;
 

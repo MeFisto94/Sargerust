@@ -1,6 +1,6 @@
 use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::common::types::{Material, Mesh};
-use crate::rendering::importer::m2_importer::M2Material;
+use crate::rendering::importer::m2_importer::ModelMaterial;
 use crate::rendering::rend3_backend::{IRM2Material, IRMaterial, IRMesh, IRTextureReference};
 use arc_swap::ArcSwapOption;
 use glam::{Affine3A, Mat4, Vec3A};
@@ -203,8 +203,8 @@ impl From<String> for IRTextureReference {
     }
 }
 
-impl From<M2Material> for IRM2Material {
-    fn from(value: M2Material) -> Self {
+impl From<ModelMaterial> for IRM2Material {
+    fn from(value: ModelMaterial) -> Self {
         Self {
             data: value,
             handle: None,

@@ -7,8 +7,8 @@ use crate::ParserError;
 use crate::common::reader::Parseable;
 use crate::common::types::CAaBox;
 use crate::m2::types::{
-    FOURCC_M2HEADER, FOURCC_M2SKIN, M2Array, M2Asset, M2SkinProfile, M2Texture, M2TextureFlags, M2TextureInternal,
-    M2TextureType, M2Vertex, Version,
+    FOURCC_M2HEADER, FOURCC_M2SKIN, M2Array, M2Asset, M2Material, M2SkinProfile, M2Texture, M2TextureFlags,
+    M2TextureInternal, M2TextureType, M2Vertex, Version,
 };
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::ffi::CString;
@@ -114,6 +114,8 @@ impl M2Reader {
             })
             .collect();
 
+        let material_vec: Vec<M2Material> = M2Reader::resolve_array(rdr, &materials)?;
+
         Ok(M2Asset {
             magic,
             version,
@@ -122,6 +124,7 @@ impl M2Reader {
             #[cfg(feature = "wotlk")] // > TBC
             num_skin_profiles,
             textures,
+            materials: material_vec,
             textureCombos: M2Reader::resolve_array(rdr, &textureCombos)?,
             textureCoordCombos: M2Reader::resolve_array(rdr, &textureCoordCombos)?,
             textureWeightCombos: M2Reader::resolve_array(rdr, &textureWeightCombos)?,

@@ -65,6 +65,7 @@ pub struct M2Asset {
     #[cfg(feature = "wotlk")] // > TBC
     pub num_skin_profiles: u32,
     pub textures: Vec<M2Texture>,
+    pub materials: Vec<M2Material>,
     /// Aka texture_lookup_table: Is used to lookup from batch to texture index
     pub textureCombos: Vec<u16>,
     pub textureCoordCombos: Vec<u16>,
@@ -171,6 +172,94 @@ pub struct M2Texture {
     pub texture_type: M2TextureType,
     pub texture_flags: M2TextureFlags, // 0x1 wrap x, 0x2 wrap y, 0x3 = wrap x+y (bitflags)
     pub filename: String,              // maximum of 0x108 chars
+}
+
+bitflags! {
+    #[derive(Debug, Clone, Copy)]
+    pub struct M2MaterialFlag: u16 {
+        const UNLIT = 0x1;
+        const UNFOGGED = 0x2;
+        const TWO_SIDED = 0x4; // No backface culling
+        const DEPTH_TEST = 0x8;
+        const DEPTH_WRITE = 0x10;
+        /// seems to be WoD+?
+        const SHADOW_BATCH_RELATED_1 = 0x40;
+        /// seems to be WoD+?
+        const SHADOW_BATCH_RELATED_2 = 0x80;
+        /// (seen in 1 model in Wrath : HFjord_Fog_02.m2)
+        const UNK_1 = 0x100;
+        /// seems to be WoD+?
+        const SHADOW_BATCH_RELATED_3 = 0x200;
+        /// seems to be WoD+?
+        const UNK_2 = 0x400;
+        /// prevent alpha for custom elements. if set, use (fully) opaque or transparent. (litSphere, shadowMonk) (MoP+)
+        const PREVENT_ALPHA_CUSTOM_ELEMENT = 0x800;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum M2BlendingMode {
+    Opaque,
+    AlphaKey,
+    Alpha,
+    NoAlphaAdditive,
+    Additive,
+    Modulative,
+    Modulative2x,
+    BlendAdd,
+}
+
+impl TryFrom<u16> for M2BlendingMode {
+    type Error = ();
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(M2BlendingMode::Opaque),
+            1 => Ok(M2BlendingMode::AlphaKey),
+            2 => Ok(M2BlendingMode::Alpha),
+            3 => Ok(M2BlendingMode::NoAlphaAdditive),
+            4 => Ok(M2BlendingMode::Additive),
+            5 => Ok(M2BlendingMode::Modulative),
+            6 => Ok(M2BlendingMode::Modulative2x),
+            7 => Ok(M2BlendingMode::BlendAdd),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<M2BlendingMode> for u16 {
+    fn from(value: M2BlendingMode) -> Self {
+        match value {
+            M2BlendingMode::Opaque => 0,
+            M2BlendingMode::AlphaKey => 1,
+            M2BlendingMode::Alpha => 2,
+            M2BlendingMode::NoAlphaAdditive => 3,
+            M2BlendingMode::Additive => 4,
+            M2BlendingMode::Modulative => 5,
+            M2BlendingMode::Modulative2x => 6,
+            M2BlendingMode::BlendAdd => 7,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct M2Material {
+    pub flags: M2MaterialFlag,
+    pub blending_mode: M2BlendingMode,
+}
+
+impl Parseable<M2Material> for M2Material {
+    fn parse<R: Read>(rdr: &mut R) -> Result<M2Material, ParserError> {
+        Ok(M2Material {
+            flags: M2MaterialFlag::from_bits_retain(rdr.read_u16::<LittleEndian>()?),
+            blending_mode: rdr
+                .read_u16::<LittleEndian>()?
+                .try_into()
+                .map_err(|_| ParserError::FormatError {
+                    reason: "Unknown M2Material#blending_mode",
+                })?,
+        })
+    }
 }
 
 #[derive(Debug)]

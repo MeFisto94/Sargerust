@@ -2,13 +2,14 @@ use crate::rendering::common::coordinate_systems::adt_to_blender_unaligned;
 use crate::rendering::common::types::{Mesh, VertexBuffers};
 use glam::{Vec2, Vec3};
 use itertools::Itertools;
-use sargerust_files::m2::types::{M2Asset, M2Batch, M2SkinProfile, M2SkinSection, M2Texture};
+use sargerust_files::m2::types::{M2Asset, M2Batch, M2Material, M2SkinProfile, M2SkinSection, M2Texture};
 
 pub struct M2Importer {}
 
 #[derive(Debug)]
-pub struct M2Material {
+pub struct ModelMaterial {
     pub textures: Vec<M2Texture>,
+    pub material: M2Material,
 }
 
 impl M2Importer {
@@ -90,11 +91,15 @@ impl M2Importer {
             .collect_vec()
     }
 
-    pub fn create_m2_material(m2: &M2Asset, batch: &M2Batch) -> M2Material {
+    pub fn create_m2_material(m2: &M2Asset, batch: &M2Batch) -> ModelMaterial {
         let tex_ids = &m2.textureCombos
             [batch.textureComboIndex as usize..batch.textureComboIndex as usize + batch.textureCount as usize];
         let tex_uv_ids = &m2.textureCoordCombos[batch.textureCoordComboIndex as usize
             ..batch.textureCoordComboIndex as usize + batch.textureCount as usize];
+
+        // Apparently there is only one material for all textures, we wouldn't support anything else
+        // in the renderer anyway, but otherwise we'd get out of bounds here.
+        let material = m2.materials[batch.materialIndex as usize].to_owned();
 
         // TODO: to use this, we need M2Track, which is rather an animation topic. Also it did panic in the past.
         // let tex_weight_combos = &m2.textureWeightCombos[batch.textureWeightComboIndex as usize
@@ -106,6 +111,6 @@ impl M2Importer {
             textures.push(m2.textures[*id as usize].clone());
         }
 
-        M2Material { textures }
+        ModelMaterial { textures, material }
     }
 }

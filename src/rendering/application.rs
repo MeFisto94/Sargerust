@@ -48,7 +48,7 @@ use rend3_routine::common::CameraSpecifier;
 use rend3_routine::compute::ComputeRoutineArgs;
 use rend3_routine::forward::ForwardRoutineArgs;
 use rend3_routine::{clear, forward};
-use sargerust_files::m2::types::{M2TextureFlags, M2TextureType};
+use sargerust_files::m2::types::{M2BlendingMode, M2TextureFlags, M2TextureType};
 use wgpu::util::{DeviceExt, TextureDataOrder};
 use wgpu::{BufferUsages, Features, TextureDescriptor};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
@@ -574,7 +574,7 @@ impl RenderingApplication {
             Arc<RwLock<Option<IRTexture>>>,
         )],
     ) -> MaterialHandle {
-        let mut write = material.write().expect("Material read lock poisoned");
+        let mut write = material.write().expect("Material write lock poisoned");
         let textures = write
             .data
             .textures
@@ -608,9 +608,26 @@ impl RenderingApplication {
             warn!("UnitsMaterial is currently not supporting more than 3 textures");
         }
 
+        // TODO: flags for culling. It's not easily possible as it is not material but mesh related for us.
+        // TODO: element->alpha = batch->color.alpha * batch->textureWeight * m2->alpha;
+
+        // m2->alpha is overall model opacity, which can be manipulated by things like distance fading
+        // and similar effects; default: 1.0
+        let element_alpha = 1.0f32;
+
+        let alpha_cutout = if write.data.material.blending_mode == M2BlendingMode::AlphaKey {
+            // TODO: This is different starting with Cata.
+            Some((224.0f32 / 255.0f32) * element_alpha)
+        } else if write.data.material.blending_mode == M2BlendingMode::Opaque {
+            None // TODO: this is disregarding wiki information, but Opaque is Opaque...?
+        } else {
+            Some(1.0f32 / 255.0f32)
+        };
+
         let mut rend_material = UnitsMaterial {
             albedo: UnitsAlbedo::Textures([const { None }; 3]),
-            alpha_cutout: Some(0.5), // TODO: Derive from M2Material that we haven't even implemented.
+            // TODO: Revisit. Alpha Testing != Alpha Key / Cutout.
+            alpha_cutout, // "Alpha testing is enabled for most or all M2Elements being rendered."
         };
 
         for (idx, tex) in textures.into_iter().enumerate() {

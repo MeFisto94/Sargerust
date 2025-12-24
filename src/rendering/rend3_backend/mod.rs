@@ -1,7 +1,7 @@
 use crate::rendering::asset_graph::nodes::adt_node::{IRObject, IRObjectReference};
 use crate::rendering::common::types::TransparencyType::Cutout;
 use crate::rendering::common::types::{AlbedoType, Material, Mesh, MeshWithLod, VertexBuffers};
-use crate::rendering::importer::m2_importer::M2Material;
+use crate::rendering::importer::m2_importer::ModelMaterial;
 use crate::rendering::rend3_backend::material::units::units_material::{UnitsAlbedo, UnitsMaterial};
 use image_blp::convert::blp_to_image;
 use image_blp::{BlpDxtn, BlpImage, DxtnFormat};
@@ -14,7 +14,7 @@ pub mod gpu_loaders;
 pub mod material;
 
 pub type IRMaterial = IRObject<Material, MaterialHandle>;
-pub type IRM2Material = IRObject<M2Material, MaterialHandle>;
+pub type IRM2Material = IRObject<ModelMaterial, MaterialHandle>;
 pub type IRMesh = IRObject<Mesh, MeshHandle>;
 // TODO: Why are textures failable? Depending on the context that may not be a good idea. As is the file location for these.
 // Textures are failable
