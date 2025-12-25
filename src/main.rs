@@ -37,7 +37,7 @@ fn main() {
     let args = CliArgs::parse();
     log::trace!("Starting with args: {:?}", args);
 
-    let mpq_loader = MPQLoader::new(args.data_dir.as_ref());
+    let mpq_loader = MPQLoader::new(args.data_dir.as_ref(), &args.locale);
 
     let mut receiver = None;
     let app = Arc::new_cyclic(|weak| {

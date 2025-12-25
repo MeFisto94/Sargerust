@@ -31,7 +31,6 @@ a server and "remote", which is the classic mode that connects to an upstream re
 
 Things that still need to be implemented (loosely sorted by priority):
 
-- MPQ: Load order of interface MPQs
 - Third Person Camera Controller (and sending `MOVE_FACING` packets / reworking the movement tracker)
 - Debug Shader Reloading. NOTE: This requires extensive rend3 changes because we need to reset the ShaderPreProcessor
   and rebuild the base_graph that is usually only built in async_start, once.
