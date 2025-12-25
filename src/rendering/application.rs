@@ -65,8 +65,7 @@ pub struct RenderingApplication {
     grabber: Option<Grabber>,
     app: Weak<GameApplication>,
 
-    // mirroring the state of the MapManager.
-    current_map: Option<String>,
+    on_map_change: tokio::sync::watch::Receiver<Option<String>>,
     tile_graph: HashMap<(u8, u8), Arc<ADTNode>>,
     missing_texture_material: Option<MaterialHandle>,
     texture_still_loading_material: Option<MaterialHandle>,
@@ -80,6 +79,16 @@ pub struct RenderingApplication {
 
 impl RenderingApplication {
     pub fn new(app: Weak<GameApplication>, sample_count: SampleCount) -> Self {
+        let on_map_change = {
+            let app_strong = app.upgrade().expect("Weak Pointer expired");
+            let mm = app_strong
+                .game_state
+                .map_manager
+                .read()
+                .expect("Map Manager Read Lock");
+            mm.map_watcher.clone()
+        };
+
         Self {
             app,
             scancode_status: FastHashMap::default(),
@@ -88,7 +97,7 @@ impl RenderingApplication {
             camera_location: Vec3A::new(0.0, 0.0, 0.0),
             timestamp_last_frame: Instant::now(),
             grabber: None,
-            current_map: None,
+            on_map_change,
             tile_graph: HashMap::new(),
             missing_texture_material: None,
             texture_still_loading_material: None,
@@ -127,32 +136,36 @@ impl RenderingApplication {
             self.camera_location = coordinate_systems::adt_to_blender(player_loc);
         }
 
-        let mm_lock = app.game_state.clone().map_manager.clone();
+        let mm_lock = &app.game_state.map_manager;
+        if self
+            .on_map_change
+            .has_changed()
+            .expect("map change channel has been closed")
+        {
+            trace!("Map has changed, discarding everything");
+
+            // We don't even care for the actual map name as we rely on the map manager's tile graph
+            self.on_map_change.mark_unchanged();
+            self.tile_graph.clear();
+
+            // TODO: This needs to be more sophisticated, in general it sucks that we just can't call from the packet handler into RenderApplication
+            self.camera_location = coordinate_systems::adt_to_blender(
+                *app.game_state
+                    .player_location
+                    .read()
+                    .expect("Read Lock on Player Location"),
+            );
+
+            self.camera_yaw = PI
+                - *app
+                    .game_state
+                    .player_orientation
+                    .read()
+                    .expect("Read Lock on Player Orientation");
+        }
+
         {
             let mm = mm_lock.read().expect("Read Lock on Map Manager");
-            if mm.current_map.is_some() != self.current_map.is_some() /* initial load or unload */ ||
-                (mm.current_map.is_some() && &mm.current_map.as_ref().unwrap().0 != self.current_map.as_ref().unwrap())
-            {
-                trace!("Map has changed, discarding everything");
-                self.tile_graph.clear();
-                self.current_map = Some(mm.current_map.as_ref().unwrap().0.clone());
-
-                // TODO: This needs to be more sophisticated, in general it sucks that we just can't call from the packet handler into RenderApplication
-                self.camera_location = coordinate_systems::adt_to_blender(
-                    *app.game_state
-                        .player_location
-                        .read()
-                        .expect("Read Lock on Player Location"),
-                );
-
-                self.camera_yaw = PI
-                    - *app
-                        .game_state
-                        .player_orientation
-                        .read()
-                        .expect("Read Lock on Player Orientation");
-            }
-
             let added_tiles = mm
                 .tile_graph
                 .iter()
@@ -174,14 +187,13 @@ impl RenderingApplication {
                 self.add_tile_graph(renderer, *key, &val);
                 self.tile_graph.insert(*key, val);
             }
-
-            for (key, value) in &self.tile_graph {
-                // currently, we only update doodads
-                self.update_tile_graph(renderer, *key, value);
-            }
         }
 
-        // a) We need to drop mm first and b) this should happen after the camera_location has been initially set
+        for (key, value) in &self.tile_graph {
+            // currently, we only update doodads
+            self.update_tile_graph(renderer, *key, value);
+        }
+
         mm_lock
             .write()
             .expect("Write lock on map manager")

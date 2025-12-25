@@ -42,10 +42,15 @@ pub struct MapManager {
     //  now, it works that way.
     pub current_light_settings: Option<LightSettings>,
     pub sunlight: Sunlight,
+    /// A watcher to notify dependent systems of map changes.
+    /// Note: This shall replace the current polling of current_map
+    pub map_watcher: tokio::sync::watch::Receiver<Option<String>>,
+    map_event_sender: tokio::sync::watch::Sender<Option<String>>,
 }
 
 impl MapManager {
     pub fn new(mpq_loader: Arc<MPQLoader>) -> Self {
+        let (map_event_sender, map_watcher) = tokio::sync::watch::channel(None);
         Self {
             mpq_loader: mpq_loader.clone(),
             current_map: None,
@@ -61,6 +66,8 @@ impl MapManager {
             map_light_settings: vec![],
             current_light_settings: None,
             sunlight: Sunlight::new(3.0),
+            map_watcher,
+            map_event_sender,
         }
     }
 
@@ -120,7 +127,8 @@ impl MapManager {
             }
         }
 
-        self.current_map = Some((map, wdt));
+        self.current_map = Some((map.clone(), wdt));
+        self.map_event_sender.send_replace(Some(map));
         warn!("Loading took {}ms", now.elapsed().as_millis());
         // ADT file is map_x_y.adt. I think x are rows and ys are columns.
     }
