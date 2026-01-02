@@ -32,17 +32,19 @@ a server and "remote", which is the classic mode that connects to an upstream re
 Things that still need to be implemented (loosely sorted by priority):
 
 - Third Person Camera Controller (and sending `MOVE_FACING` packets / reworking the movement tracker)
-- Debug Shader Reloading. NOTE: This requires extensive rend3 changes because we need to reset the ShaderPreProcessor
-  and rebuild the base_graph that is usually only built in async_start, once.
 - M2: Cull Modes (Northshire cypress trees), there we'd need to disable culling / duplicate indices.
+- All the panics around closed channels and poisoned locks should be thiserror'ed so they are silently caught.
+  The information that a thread crashed because the application is shutting down is of now use.
 - Configuration
 - CpuDriven support for shaders: That makes it work in non-bindless (binding) mode on old devices
 - massive Map Manager rework
+- Properly Kill tracy
 - Instanced Rendering of M2s (UnitMaterial is currently created in-place, even if the same texture has already been
   used.) It remains to be seen if that is enough for rend3 to auto instance, though.
     - TODO: Does Rend3 even have instancing?
 - Portals, Water, and other less important render objects
-- Properly Kill tracy
+- Debug Shader Reloading. NOTE: This requires extensive rend3 changes because we need to reset the ShaderPreProcessor
+  and rebuild the base_graph that is usually only built in async_start, once.
 - hecs:
     - Add more components and unpack update messages further
     - Implement spline walking (NPCs have predefined splines)

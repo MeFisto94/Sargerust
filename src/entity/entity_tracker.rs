@@ -119,7 +119,7 @@ impl EntityTracker {
         let entity = write
             .query_mut::<(&Guid, &mut TmpLocation, &mut TmpOrientation)>()
             .into_iter()
-            .find(|(_, (&entity_guid, _, _))| entity_guid == *guid);
+            .find(|(_, (entity_guid, _, _))| **entity_guid == *guid);
 
         if entity.is_none() {
             warn!(
@@ -145,7 +145,7 @@ impl EntityTracker {
         let entity = write
             .query_mut::<(&Guid, &mut SplineWalker)>()
             .into_iter()
-            .find(|(_, (&entity_guid, _))| entity_guid == msg.guid);
+            .find(|(_, (entity_guid, _))| **entity_guid == msg.guid);
 
         if let Some((_, (_, spline_walker))) = entity {
             spline_walker.update_from(msg);
@@ -153,7 +153,7 @@ impl EntityTracker {
             let query_result = write
                 .query_mut::<&Guid>()
                 .into_iter()
-                .find(|(_, &guid)| guid == msg.guid);
+                .find(|(_, guid)| **guid == msg.guid);
 
             if let Some((entity, _)) = query_result {
                 write
@@ -196,7 +196,7 @@ impl EntityTracker {
         let entity = world
             .query_mut::<&Guid>()
             .into_iter()
-            .find(|(_, &entity_guid)| guid == entity_guid);
+            .find(|(_, entity_guid)| guid == **entity_guid);
         if let Some((id, _)) = entity {
             world
                 .despawn(id)
@@ -214,7 +214,7 @@ impl EntityTracker {
         let entities = world
             .query_mut::<&Guid>()
             .into_iter()
-            .filter(|(_, &entity_guid)| guids.contains(&entity_guid))
+            .filter(|(_, entity_guid)| guids.contains(&entity_guid))
             .map(|(id, _)| id)
             .collect_vec();
 
