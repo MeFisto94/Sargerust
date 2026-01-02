@@ -1,21 +1,42 @@
+use crate::rendering::common::coordinate_systems::{adt_tiles_to_world, adt_world_to_chunk, adt_world_to_tiles};
 use crate::rendering::common::special_types::TerrainTextureLayerRend3;
 use crate::rendering::common::types::{Material, Mesh};
 use crate::rendering::importer::m2_importer::ModelMaterial;
 use crate::rendering::rend3_backend::{IRM2Material, IRMaterial, IRMesh, IRTextureReference};
 use arc_swap::ArcSwapOption;
-use glam::{Affine3A, Mat4, Vec3A};
+use glam::{Affine3A, Mat4, Vec2, Vec3, Vec3A};
+use log::warn;
 use rend3::types::{MaterialHandle, MeshHandle, ObjectHandle};
 use sargerust_files::m2::types::M2Texture;
 use sargerust_files::wdt::types::SMMapObjDef;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
+use wow_dbc::wrath_tables::area_table::AreaTableKey;
 
 #[derive(Debug)]
 pub struct ADTNode {
     pub doodads: Vec<Arc<DoodadReference>>,
     pub terrain: Vec<TerrainTile>,
     pub wmos: Vec<Arc<WMOReference>>,
+    /// Up to 64x64 blocks that have 16x16 chunks (terrain tile), block is 533.33333 and chunk is 33.3333
+    pub chunk_coords: (u8, u8),
+}
+
+impl ADTNode {
+    pub fn calculate_terrain_tile_offset_for(&self, position: Vec3) -> Option<usize> {
+        // First, check if we are even on the right ADT.
+        let adt_tiles = adt_world_to_tiles(position);
+        if adt_tiles != self.chunk_coords {
+            warn!(
+                "Inconsistency in get_terrain_tile_offset: ADT is at {:?}, but position {:?} maps to ADT {:?}",
+                self.chunk_coords, position, adt_tiles
+            );
+            return None;
+        }
+
+        adt_world_to_chunk(&adt_tiles, position)
+    }
 }
 
 #[derive(Debug)]
@@ -24,6 +45,7 @@ pub struct TerrainTile {
     pub mesh: RwLock<IRMesh>,
     pub object_handle: RwLock<Option<ObjectHandle>>,
     pub texture_layers: Vec<TerrainTextureLayerRend3>,
+    pub area_id: AreaTableKey,
 }
 
 // TODO: commons.rs in nodes?

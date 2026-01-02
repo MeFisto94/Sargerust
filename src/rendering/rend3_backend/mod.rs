@@ -5,7 +5,6 @@ use crate::rendering::importer::m2_importer::ModelMaterial;
 use crate::rendering::rend3_backend::material::units::units_material::{UnitsAlbedo, UnitsMaterial};
 use image_blp::convert::blp_to_image;
 use image_blp::{BlpDxtn, BlpImage, DxtnFormat};
-use itertools::enumerate;
 use log::error;
 use rend3::types::{MaterialHandle, MeshHandle, Texture, Texture2DHandle};
 use std::num::NonZeroU32;

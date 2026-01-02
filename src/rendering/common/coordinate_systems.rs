@@ -71,9 +71,22 @@ pub fn light_dbc_to_vec(position: [f32; 3]) -> Vec3 {
         position[1] / 36.0,
     )
 }
+
 #[inline]
 pub fn light_dbc_falloff(falloff: f32) -> f32 {
     falloff / 36.0
+}
+
+#[inline]
+pub fn adt_world_to_chunk(adt_coords: &(u8, u8), position: Vec3) -> Option<usize> {
+    let adt_base: Vec3 = adt_tiles_to_world(adt_coords.0, adt_coords.1).into();
+    let relative_position = adt_base - position;
+    let chunk_x = (relative_position.x / CHUNK_SIZE).floor() as i32;
+    let chunk_y = (relative_position.y / CHUNK_SIZE).floor() as i32;
+    if chunk_x < 0 || chunk_x >= 16 || chunk_y < 0 || chunk_y >= 16 {
+        return None;
+    }
+    Some((chunk_y as usize) * 16 + (chunk_x as usize))
 }
 
 const CHUNK_SIZE: f32 = 100.0 / 3.0;

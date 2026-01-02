@@ -28,7 +28,7 @@ use crate::rendering::rend3_backend::{
 };
 use glam::{Mat4, UVec2, Vec3A, Vec4, Vec4Swizzles};
 use itertools::Itertools;
-use log::{trace, warn};
+use log::{debug, info, trace, warn};
 use rend3::graph::{
     NodeResourceUsage, RenderGraph, RenderPassTarget, RenderPassTargets, RenderTargetDescriptor, ViewportRect,
 };
@@ -53,6 +53,7 @@ use wgpu::util::{DeviceExt, TextureDataOrder};
 use wgpu::{BufferUsages, Features, TextureDescriptor};
 use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
+use wow_dbc::wrath_tables::map::MapRow;
 
 // #[derive(Debug)] // TODO: Ensure Grabber implements Display
 pub struct RenderingApplication {
@@ -65,7 +66,7 @@ pub struct RenderingApplication {
     grabber: Option<Grabber>,
     app: Weak<GameApplication>,
 
-    on_map_change: tokio::sync::watch::Receiver<Option<String>>,
+    on_map_change: tokio::sync::watch::Receiver<Option<MapRow>>,
     tile_graph: HashMap<(u8, u8), Arc<ADTNode>>,
     missing_texture_material: Option<MaterialHandle>,
     texture_still_loading_material: Option<MaterialHandle>,
@@ -136,6 +137,7 @@ impl RenderingApplication {
             self.camera_location = coordinate_systems::adt_to_blender(player_loc);
         }
 
+        let pre_mm = Instant::now();
         let mm_lock = &app.game_state.map_manager;
         if self
             .on_map_change
@@ -198,6 +200,10 @@ impl RenderingApplication {
             .write()
             .expect("Write lock on map manager")
             .update_camera(coordinate_systems::blender_to_adt(self.camera_location));
+        let duration_mm = (Instant::now() - pre_mm).as_millis();
+        if duration_mm > 6 {
+            debug!("Map Manager update took too long: {:?} ms", duration_mm);
+        }
     }
 
     fn init_missing_texture_material(&mut self, renderer: &Arc<Renderer>) {

@@ -112,11 +112,9 @@ impl GameState {
 
             mm.update_lights(lights);
 
-            mm.preload_map(
-                map_row.directory.clone(),
-                net_vector3d_to_glam(position),
-                orientation,
-            );
+            // TODO: The on_map_change event is emitted by the MapManager, but it may be better to emit it here,
+            //  in GameState instead of the MapManager (which loads maps/tiles instead).
+            mm.preload_map(map_row, net_vector3d_to_glam(position), orientation);
         }
     }
 }

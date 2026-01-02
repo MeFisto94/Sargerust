@@ -1,3 +1,4 @@
+use crate::audio::audio_playback_manager::AudioPlaybackManager;
 use crate::entity::entity_tracker::EntityTracker;
 use crate::entity::systems::systems::Systems;
 use crate::game::game_state::GameState;
@@ -12,7 +13,7 @@ use rend3::Renderer;
 use rend3::types::SampleCount;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Receiver;
-use std::sync::{Arc, OnceLock, Weak};
+use std::sync::{Arc, OnceLock, RwLock, Weak};
 use winit::dpi::LogicalSize;
 use wow_world_messages::wrath::opcodes::ServerOpcodeMessage;
 use wow_world_messages::{DateTime, Month, Weekday};
@@ -29,6 +30,7 @@ pub struct GameApplication {
     pub renderer: OnceLock<Arc<Renderer>>,
     pub network: Option<NetworkApplication>,
     pub entity_tracker: EntityTracker,
+    pub audio_playback_manager: RwLock<AudioPlaybackManager>,
     pub locale: String,
     systems: Systems,
     weak_self: Weak<GameApplication>,
@@ -53,8 +55,9 @@ impl GameApplication {
             renderer: OnceLock::new(),
             entity_tracker: EntityTracker::new(),
             network: None,
-            systems: Systems::new(weak_self.clone(), mpq_loader_arc.clone()),
+            systems: Systems::new(mpq_loader_arc.clone(), args),
             locale: args.locale.to_string(),
+            audio_playback_manager: RwLock::new(AudioPlaybackManager::new(args.audio_gain).unwrap()),
         }
     }
 

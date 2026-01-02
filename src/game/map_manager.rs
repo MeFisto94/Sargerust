@@ -3,12 +3,6 @@ use std::io::Cursor;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use glam::{Vec3, Vec3A};
-use itertools::Itertools;
-use log::{error, info, trace, warn};
-use tokio::runtime::{Builder, Handle, Runtime};
-use tokio::task::JoinSet;
-
 use crate::game::map_light_settings_provider::{LightSettings, MapLightSettingsProvider};
 use crate::io::common::loader::RawAssetLoader;
 use crate::io::mpq::loader::MPQLoader;
@@ -23,10 +17,17 @@ use crate::rendering::importer::adt_importer::ADTImporter;
 use crate::rendering::rend3_backend::{IRTexture, IRTextureReference};
 use crate::rendering::sky::sunlight::Sunlight;
 use crate::rendering::utils::{transform_for_doodad_ref, transform_for_wmo_ref};
+use glam::{Vec3, Vec3A};
+use itertools::Itertools;
+use log::{error, info, trace, warn};
 use sargerust_files::adt::reader::ADTReader;
 use sargerust_files::adt::types::ADTAsset;
 use sargerust_files::wdt::reader::WDTReader;
 use sargerust_files::wdt::types::{MPHDChunk, SMMapObjDef, WDTAsset};
+use tokio::runtime::{Builder, Handle, Runtime};
+use tokio::task::JoinSet;
+use wow_dbc::wrath_tables::area_table::AreaTableKey;
+use wow_dbc::wrath_tables::map::MapRow;
 
 pub struct MapManager {
     runtime: Runtime,
@@ -42,15 +43,20 @@ pub struct MapManager {
     //  now, it works that way.
     pub current_light_settings: Option<LightSettings>,
     pub sunlight: Sunlight,
+
+    // TODO: Those watchers could be their own component.
     /// A watcher to notify dependent systems of map changes.
     /// Note: This shall replace the current polling of current_map
-    pub map_watcher: tokio::sync::watch::Receiver<Option<String>>,
-    map_event_sender: tokio::sync::watch::Sender<Option<String>>,
+    pub map_watcher: tokio::sync::watch::Receiver<Option<MapRow>>,
+    map_event_sender: tokio::sync::watch::Sender<Option<MapRow>>,
+    pub tile_watcher: tokio::sync::watch::Receiver<Option<Arc<ADTNode>>>,
+    tile_event_sender: tokio::sync::watch::Sender<Option<Arc<ADTNode>>>,
 }
 
 impl MapManager {
     pub fn new(mpq_loader: Arc<MPQLoader>) -> Self {
         let (map_event_sender, map_watcher) = tokio::sync::watch::channel(None);
+        let (tile_event_sender, tile_watcher) = tokio::sync::watch::channel(None);
         Self {
             mpq_loader: mpq_loader.clone(),
             current_map: None,
@@ -68,6 +74,8 @@ impl MapManager {
             sunlight: Sunlight::new(3.0),
             map_watcher,
             map_event_sender,
+            tile_watcher,
+            tile_event_sender,
         }
     }
 
@@ -83,29 +91,44 @@ impl MapManager {
         }
 
         let coords = coordinate_systems::adt_world_to_tiles(position.into());
+        if let Some(tile) = self.tile_graph.get(&coords) {
+            self.tile_event_sender.send_if_modified(|last_known_opt| {
+                if last_known_opt
+                    .as_ref()
+                    .is_some_and(|last_known| Arc::ptr_eq(last_known, tile))
+                {
+                    return false;
+                }
+
+                *last_known_opt = Some(tile.to_owned());
+                true
+            });
+            return;
+        };
+
         if self.tile_graph.contains_key(&coords) {
             return;
         }
 
         // TODO: This could also update LightSettings, but doing it every tick may be uselessly aggressive.
-
-        // TODO: unloading and proper range based checks once the API around here stabilizesd
+        // TODO: unloading and proper range based checks once the API around here stabilized
+        // TODO: We could also do it in a reactive way, map change event -> tile/ADT event -> tile graph event.
         self.try_load_chunk(&coords);
     }
 
     // TODO: I am not sure if the whole preloading shouldn't be the responsibility of the render thread and if we as src\game should at best care about building the graph.
     pub fn preload_map(
         &mut self,
-        map: String,
+        map: &MapRow,
         position: Vec3,
         _orientation: f32, /* TODO: use for foveated preloading */
     ) {
         let now = Instant::now();
-        info!("Loading map {} @ {}", map, position);
-        let wdt_buf = self
-            .mpq_loader
-            .as_ref()
-            .load_raw_owned(&format!("world\\maps\\{}\\{}.wdt", map, map));
+        info!("Loading map {} @ {}", map.directory, position);
+        let wdt_buf = self.mpq_loader.as_ref().load_raw_owned(&format!(
+            "world\\maps\\{}\\{}.wdt",
+            map.directory, map.directory
+        ));
         let wdt =
             WDTReader::parse_asset(&mut Cursor::new(wdt_buf.expect("Cannot load map wdt"))).expect("Error parsing WDT");
 
@@ -120,15 +143,17 @@ impl MapManager {
                 );
 
                 if wdt.has_chunk(chunk_coords.1, chunk_coords.0) {
-                    self.load_chunk(&map, &chunk_coords, &wdt.mphd);
+                    self.load_chunk(&map.directory, &chunk_coords, &wdt.mphd);
                 } else {
                     error!("We load into the world on unmapped terrain?!");
                 }
             }
         }
 
-        self.current_map = Some((map.clone(), wdt));
-        self.map_event_sender.send_replace(Some(map));
+        self.current_map = Some((map.directory.clone(), wdt));
+        self.map_event_sender
+            .send(Some(map.to_owned()))
+            .expect("Channel closed");
         warn!("Loading took {}ms", now.elapsed().as_millis());
         // ADT file is map_x_y.adt. I think x are rows and ys are columns.
     }
@@ -152,11 +177,16 @@ impl MapManager {
         let adt =
             ADTReader::parse_asset(&mut Cursor::new(adt_buf.expect("Cannot load map adt"))).expect("Error parsing ADT");
         trace!("Loaded tile {}_{}_{}", map, chunk_coords.1, chunk_coords.0);
-        let graph = self.handle_adt_lazy(&adt, mphd).unwrap();
+        let graph = self.handle_adt_lazy(&adt, mphd, chunk_coords).unwrap();
         self.tile_graph.insert(*chunk_coords, Arc::new(graph));
     }
 
-    fn handle_adt_lazy(&self, adt: &ADTAsset, mphd: &MPHDChunk) -> Result<ADTNode, anyhow::Error> {
+    fn handle_adt_lazy(
+        &self,
+        adt: &ADTAsset,
+        mphd: &MPHDChunk,
+        chunk_coords: &(u8, u8),
+    ) -> Result<ADTNode, anyhow::Error> {
         let mut direct_doodad_refs = Vec::new();
         let mut wmos = Vec::new();
 
@@ -233,6 +263,8 @@ impl MapManager {
                 position: mesh.0.into(),
                 mesh: RwLock::new(mesh.1.into()),
                 object_handle: RwLock::new(None),
+                // TODO: "in alpha: both zone id and sub zone id, as uint16s." and outside?
+                area_id: AreaTableKey::new(mcnk.header.areaId as i32),
                 texture_layers,
             };
 
@@ -334,6 +366,7 @@ impl MapManager {
             terrain: terrain_chunk,
             doodads: direct_doodad_refs,
             wmos,
+            chunk_coords: *chunk_coords,
         })
     }
 

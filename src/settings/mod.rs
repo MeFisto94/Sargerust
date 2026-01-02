@@ -13,6 +13,16 @@ pub struct CliArgs {
     #[arg(long, default_value = "enUS", env = "SARGERUST_LOCALE")]
     pub locale: String,
 
+    #[arg(long, default_value = "1.0", help = "Main output volume gain")]
+    pub audio_gain: f32,
+
+    #[arg(
+        long,
+        default_value = "false",
+        help = "Continuously play zone music, without silence in between tracks"
+    )]
+    pub continuous_zone_music: bool,
+
     #[command(subcommand)]
     pub operation_mode: OperationMode,
 }

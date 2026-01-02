@@ -33,7 +33,13 @@ codegen-units = 1
 opt-level = 3
 codegen-units = 1
 
+# Force release builds for parry3d
 [profile.dev.package.parry3d]
+opt-level = 3
+codegen-units = 1
+
+# Force release builds for kira
+[profile.dev.package.kira]
 opt-level = 3
 codegen-units = 1
 
@@ -146,3 +152,4 @@ rapier3d = { version = "0.23.0", features = ["simd-nightly"] }
 nalgebra = { version = "0.33.2", features = ["convert-glam028"] } # Match version with rapier3d.
 
 rand = "0.9.0"
+kira = "0.11"
