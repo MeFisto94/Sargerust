@@ -361,9 +361,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
-version = "1.5.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2bd12c1caf447e69cd4528f47f94d203fd2582878ecb9e9465484c4148a8223"
+checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 
 [[package]]
 name = "bzip2-rs"
@@ -3108,6 +3108,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 [[package]]
 name = "rend3"
 version = "0.23.1"
+source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork#33de907e619001b9f57e8189d131eef32e742f8a"
 dependencies = [
  "arrayvec",
  "bimap",
@@ -3125,44 +3126,9 @@ dependencies = [
  "num-traits",
  "once_cell",
  "parking_lot",
- "pollster",
  "profiling",
  "range-alloc",
- "rend3-types 0.23.1",
- "rust-embed",
- "rustc-hash 1.1.0",
- "serde",
- "smallvec",
- "smartstring",
- "thiserror",
- "wgpu",
- "wgpu-profiler",
-]
-
-[[package]]
-name = "rend3"
-version = "0.23.1"
-source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork#33de907e619001b9f57e8189d131eef32e742f8a"
-dependencies = [
- "arrayvec",
- "bimap",
- "bitflags 2.8.0",
- "bumpalo",
- "bytemuck",
- "encase",
- "flume",
- "glam",
- "handlebars",
- "indexmap",
- "list-any",
- "log",
- "noop-waker",
- "num-traits",
- "once_cell",
- "parking_lot",
- "profiling",
- "range-alloc",
- "rend3-types 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
+ "rend3-types",
  "rust-embed",
  "rustc-hash 1.1.0",
  "serde",
@@ -3176,35 +3142,6 @@ dependencies = [
 [[package]]
 name = "rend3-framework"
 version = "0.23.1"
-dependencies = [
- "anyhow",
- "cfg-if",
- "console_error_panic_hook",
- "console_log",
- "env_logger",
- "glam",
- "gloo-net",
- "js-sys",
- "log",
- "ndk-glue",
- "once_cell",
- "parking_lot",
- "pollster",
- "profiling",
- "rend3 0.23.1",
- "rend3-routine 0.23.1",
- "thiserror",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "web-time",
- "wgpu",
- "winit",
-]
-
-[[package]]
-name = "rend3-framework"
-version = "0.23.1"
 source = "git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork#33de907e619001b9f57e8189d131eef32e742f8a"
 dependencies = [
  "anyhow",
@@ -3212,7 +3149,7 @@ dependencies = [
  "console_error_panic_hook",
  "console_log",
  "env_logger",
- "glam",
+ "glam 0.28.0",
  "gloo-net",
  "js-sys",
  "log",
@@ -3221,8 +3158,8 @@ dependencies = [
  "parking_lot",
  "pollster",
  "profiling",
- "rend3 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
- "rend3-routine 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
+ "rend3",
+ "rend3-routine",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -3230,31 +3167,6 @@ dependencies = [
  "web-time",
  "wgpu",
  "winit",
-]
-
-[[package]]
-name = "rend3-routine"
-version = "0.23.1"
-dependencies = [
- "arrayvec",
- "bitflags 2.8.0",
- "bytemuck",
- "codespan-reporting",
- "encase",
- "flume",
- "glam",
- "itertools 0.14.0",
- "log",
- "naga 22.1.0",
- "ordered-float",
- "parking_lot",
- "profiling",
- "rend3 0.23.1",
- "rust-embed",
- "serde",
- "serde_json",
- "wgpu",
- "wgpu-profiler",
 ]
 
 [[package]]
@@ -3268,33 +3180,18 @@ dependencies = [
  "codespan-reporting",
  "encase",
  "flume",
- "glam",
+ "glam 0.28.0",
  "log",
  "naga 22.1.0",
  "ordered-float",
  "parking_lot",
  "profiling",
- "rend3 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
+ "rend3",
  "rust-embed",
  "serde",
  "serde_json",
  "wgpu",
  "wgpu-profiler",
-]
-
-[[package]]
-name = "rend3-types"
-version = "0.23.1"
-dependencies = [
- "bitflags 2.8.0",
- "bytemuck",
- "cfg-if",
- "encase",
- "glam",
- "list-any",
- "once_cell",
- "thiserror",
- "wgpu-types",
 ]
 
 [[package]]
@@ -3306,7 +3203,7 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "encase",
- "glam",
+ "glam 0.28.0",
  "list-any",
  "once_cell",
  "thiserror",
@@ -3460,22 +3357,22 @@ dependencies = [
  "encase_derive",
  "encase_derive_impl",
  "env_logger",
- "glam",
+ "glam 0.28.0",
  "hecs",
  "image-blp",
  "itertools 0.14.0",
+ "kira",
  "log",
  "mpq",
  "nalgebra",
- "parry3d",
  "pollster",
  "profiling",
  "quick_cache",
  "rand 0.9.0",
  "rapier3d",
- "rend3 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
- "rend3-framework 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
- "rend3-routine 0.23.1 (git+https://github.com/MeFisto94/rend3-hp/?branch=feature%2Ffork)",
+ "rend3",
+ "rend3-framework",
+ "rend3-routine",
  "rust-embed",
  "sargerust-files",
  "serde",
